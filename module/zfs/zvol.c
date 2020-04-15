@@ -90,7 +90,7 @@ unsigned int zvol_inhibit_dev = 0;
 unsigned int zvol_volmode = ZFS_VOLMODE_GEOM;
 
 struct hlist_head *zvol_htable;
-static list_t zvol_state_list;
+list_t zvol_state_list;
 krwlock_t zvol_state_lock;
 
 typedef enum {
@@ -1700,6 +1700,7 @@ zvol_is_zvol(const char *name)
 {
 
 	return (zvol_os_is_zvol(name));
+
 }
 
 int

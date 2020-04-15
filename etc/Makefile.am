@@ -96,3 +96,9 @@ dist_modulesload_DATA = \
 	%D%/modules-load.d/zfs.conf
 endif
 endif
+
+if BUILD_MACOS
+include $(srcdir)/%D%/launchd/Makefile.am
+include $(srcdir)/%D%/paths.d/Makefile.am
+endif
+

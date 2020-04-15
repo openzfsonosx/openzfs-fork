@@ -58,6 +58,7 @@
 
 static ulong_t zfs_fsync_sync_cnt = 4;
 
+#ifndef __APPLE__
 int
 zfs_fsync(znode_t *zp, int syncflag, cred_t *cr)
 {
@@ -79,7 +80,7 @@ out:
 
 	return (error);
 }
-
+#endif
 
 #if defined(SEEK_HOLE) && defined(SEEK_DATA)
 /*

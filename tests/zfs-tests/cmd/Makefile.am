@@ -132,3 +132,7 @@ scripts_zfs_tests_bin_PROGRAMS += %D%/randfree_file
 scripts_zfs_tests_bin_PROGRAMS += %D%/file_fadvise
 %C%_file_fadvise_SOURCES  = %D%/file/file_fadvise.c
 endif
+
+if BUILD_MACOS
+include $(srcdir)/%D%/librt/Makefile.am
+endif

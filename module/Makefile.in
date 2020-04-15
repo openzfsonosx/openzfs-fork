@@ -16,7 +16,7 @@ check:
 	data_install data_install-Linux data_install-FreeBSD \
 	modules_uninstall modules_uninstall-Linux modules_uninstall-FreeBSD \
 	data_uninstall data_uninstall-Linux data_uninstall-FreeBSD \
-	cppcheck cppcheck-Linux cppcheck-FreeBSD
+	cppcheck cppcheck-Linux cppcheck-FreeBSD cppcheck-macOS
 
 # For FreeBSD, use debug options from ./configure if not overridden.
 export WITH_DEBUG ?= @WITH_DEBUG@
@@ -60,6 +60,9 @@ modules-Linux:
 modules-FreeBSD:
 	+$(FMAKE)
 
+modules-macOS:
+	@true
+
 modules-unknown:
 	@true
 
@@ -75,6 +78,9 @@ clean-Linux:
 
 clean-FreeBSD:
 	+$(FMAKE) clean
+
+clean-macOS:
+	@true
 
 clean: clean-@ac_system@
 
@@ -109,6 +115,9 @@ modules_install-Linux: modules_uninstall-Linux-legacy
 modules_install-FreeBSD:
 	@# Install the kernel modules
 	+$(FMAKE) install
+
+modules_install-macOS:
+	@true
 
 modules_install: modules_install-@ac_system@
 
@@ -156,6 +165,9 @@ cppcheck-Linux:
 		avl icp lua nvpair unicode zcommon zfs zstd os/linux
 
 cppcheck-FreeBSD:
+	@true
+
+cppcheck-macOS:
 	@true
 
 cppcheck: cppcheck-@ac_system@
