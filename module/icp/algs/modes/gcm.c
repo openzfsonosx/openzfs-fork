@@ -862,6 +862,12 @@ gcm_impl_init(void)
 	 * Set the fastest implementation given the assumption that the
 	 * hardware accelerated version is the fastest.
 	 */
+#if defined(__aarch64__) && defined(HAVE_ARMV8)
+	if (gcm_armv8_impl.is_supported()) {
+		memcpy(&gcm_fastest_impl, &gcm_armv8_impl,
+		    sizeof (gcm_fastest_impl));
+	} else
+#endif
 #if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
 	if (gcm_pclmulqdq_impl.is_supported()) {
 		memcpy(&gcm_fastest_impl, &gcm_pclmulqdq_impl,
@@ -985,8 +991,8 @@ gcm_impl_set(const char *val)
 	return (err);
 }
 
-#if defined(_KERNEL) && defined(__linux__)
-
+#if defined(_KERNEL)
+#if defined(__linux__) || defined(__APPLE__)
 static int
 icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
 {
@@ -1024,6 +1030,28 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
 
 	return (cnt);
 }
+#endif /* defined(Linux) || defined(APPLE) */
+
+#if defined(__APPLE__)
+/* get / set function */
+int
+param_icp_gcm_impl_set(ZFS_MODULE_PARAM_ARGS)
+{
+	char buf[1024]; /* Linux module string limit */
+	int rc = 0;
+
+	/* Always fill in value before calling sysctl_handle_*() */
+	if (req->newptr == (user_addr_t)NULL)
+		(void) icp_gcm_impl_get(buf, NULL);
+
+	rc = sysctl_handle_string(oidp, buf, sizeof (buf), req);
+	if (rc || req->newptr == (user_addr_t)NULL)
+		return (rc);
+
+	rc = gcm_impl_set(buf);
+	return (rc);
+}
+#endif /* defined(APPLE) */
 
 module_param_call(icp_gcm_impl, icp_gcm_impl_set, icp_gcm_impl_get,
     NULL, 0644);
@@ -1563,6 +1591,40 @@ icp_gcm_avx_set_chunk_size(const char *buf, zfs_kernel_param_t *kp)
 	error = param_set_uint(val_rounded, kp);
 	return (error);
 }
+
+#ifdef __APPLE__
+
+/* Lives in here to have access to GCM macros */
+int
+param_icp_gcm_avx_set_chunk_size(ZFS_MODULE_PARAM_ARGS)
+{
+	unsigned long val;
+	char buf[16];
+	int rc = 0;
+
+	/* Always fill in value before calling sysctl_handle_*() */
+	if (req->newptr == (user_addr_t)NULL)
+		snprintf(buf, sizeof (buf), "%u", gcm_avx_chunk_size);
+
+	rc = sysctl_handle_string(oidp, buf, sizeof (buf), req);
+	if (rc || req->newptr == (user_addr_t)NULL)
+		return (rc);
+
+	rc = kstrtoul(buf, 0, &val);
+	if (rc)
+		return (rc);
+
+	val = (val / GCM_AVX_MIN_DECRYPT_BYTES) * GCM_AVX_MIN_DECRYPT_BYTES;
+
+	if (val < GCM_AVX_MIN_ENCRYPT_BYTES || val > GCM_AVX_MAX_CHUNK_SIZE)
+		return (EINVAL);
+
+	gcm_avx_chunk_size = val;
+	return (rc);
+}
+
+#endif
+
 
 module_param_call(icp_gcm_avx_chunk_size, icp_gcm_avx_set_chunk_size,
     param_get_uint, &gcm_avx_chunk_size, 0644);
