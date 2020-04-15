@@ -24,6 +24,10 @@ zpool_SOURCES += \
 	%D%/os/linux/zpool_vdev_os.c
 endif
 
+if BUILD_MACOS
+zpool_SOURCES += os/macos/zpool_vdev_os.c
+endif
+
 zpool_LDADD = \
 	libzfs.la \
 	libzfs_core.la \

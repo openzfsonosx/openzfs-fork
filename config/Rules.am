@@ -12,6 +12,11 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/lib/libspl/include \
 	-I$(top_srcdir)/lib/libspl/include/os/@ac_system_l@
 
+if BUILD_MACOS
+DEFAULT_INCLUDES += \
+	-I$(top_srcdir)/lib/libspl/include/os/macos
+endif
+
 AM_LIBTOOLFLAGS = --silent
 
 AM_CFLAGS  = -std=gnu99 -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wwrite-strings -Wno-sign-compare -Wno-missing-field-initializers
@@ -71,7 +76,6 @@ AM_LDFLAGS += -fstack-protector-strong -shared
 AM_LDFLAGS += -Wl,-x -Wl,--fatal-warnings -Wl,--warn-shared-textrel
 AM_LDFLAGS += -lm
 endif
-
 
 # If a target includes kernel code, generate warnings for large stack frames
 KERNEL_CFLAGS       = $(FRAME_LARGER_THAN)

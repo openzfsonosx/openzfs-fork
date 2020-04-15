@@ -71,7 +71,9 @@ include $(srcdir)/%D%/libzutil/Makefile.am
 if BUILD_LINUX
 include $(srcdir)/%D%/libefi/Makefile.am
 endif
-
+if BUILD_MACOS
+include $(srcdir)/%D%/libefi/Makefile.am
+endif
 
 PHONY += lib
 lib: $(noinst_LTLIBRARIES) $(lib_LTLIBRARIES)

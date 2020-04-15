@@ -33,6 +33,13 @@ dist_libzfs_la_SOURCES += \
 	%D%/os/linux/libzfs_util_os.c
 endif
 
+if BUILD_MACOS
+dist_libzfs_la_SOURCES += \
+	%D%/os/macos/libzfs_mount_os.c \
+	%D%/os/macos/libzfs_pool_os.c \
+	%D%/os/macos/libzfs_util_os.c
+endif
+
 nodist_libzfs_la_SOURCES = \
 	module/icp/algs/sha2/sha2.c \
 	\
@@ -64,12 +71,18 @@ libzfs_la_LIBADD += -lm $(LIBCRYPTO_LIBS) $(ZLIB_LIBS) $(LIBFETCH_LIBS) $(LTLIBI
 
 libzfs_la_LDFLAGS = -pthread
 
+if !BUILD_MACOS
 if !ASAN_ENABLED
 libzfs_la_LDFLAGS += -Wl,-z,defs
+endif
 endif
 
 if BUILD_FREEBSD
 libzfs_la_LIBADD += -lutil -lgeom
+endif
+
+if BUILD_MACOS
+libzfs_la_LDFLAGS += -framework IOKit -lssl
 endif
 
 libzfs_la_LDFLAGS += -version-info 5:0:1

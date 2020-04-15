@@ -111,6 +111,11 @@ arc_summary: %D%/arc_summary
 	$(AM_V_at)cp $< $@
 endif
 
-
 PHONY += cmd
 cmd: $(bin_SCRIPTS) $(bin_PROGRAMS) $(sbin_SCRIPTS) $(sbin_PROGRAMS) $(dist_bin_SCRIPTS) $(zfsexec_PROGRAMS) $(mounthelper_PROGRAMS)
+
+# Eventually "os" will be "built" by all platforms?
+if BUILD_MACOS
+SUBDIRS += zed os
+endif
+

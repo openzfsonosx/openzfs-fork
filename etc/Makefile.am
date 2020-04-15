@@ -96,3 +96,7 @@ dist_modulesload_DATA = \
 	%D%/modules-load.d/zfs.conf
 endif
 endif
+
+if BUILD_MACOS
+SUBDIRS += launchd paths.d
+endif
