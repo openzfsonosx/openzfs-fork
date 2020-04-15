@@ -36,6 +36,13 @@ extern "C" {
 #include <sys/blake3.h>
 #include <sys/simd.h>
 
+#if defined(__APPLE__) && defined(__aarch64__)
+/* Sadly, toolchain sets this, but M1 can't compile it as-is */
+#undef __aarch64__
+#undef HAVE_SSE2
+#undef HAVE_SSE4_1
+#endif
+
 /*
  * Methods used to define BLAKE3 assembler implementations
  */

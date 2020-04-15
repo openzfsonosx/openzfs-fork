@@ -911,6 +911,12 @@ error:
 	return (NULL);
 }
 
+#ifdef __APPLE__
+
+/* We have our own zpool_read_label() / label_offset() */
+
+#else
+
 /*
  * Return the offset of the given label.
  */
@@ -922,6 +928,9 @@ label_offset(uint64_t size, int l)
 	    0 : size - VDEV_LABELS * sizeof (vdev_label_t)));
 }
 
+#ifdef __APPLE__
+/* We have our own */
+#else
 /*
  * The same description applies as to zpool_read_label below,
  * except here we do it without aio, presumably because an aio call
@@ -998,6 +1007,7 @@ zpool_read_label_slow(int fd, nvlist_t **config, int *num_labels)
 
 	return (0);
 }
+#endif /* APPLE */
 
 /*
  * Given a file descriptor, read the label information and return an nvlist
@@ -1134,6 +1144,7 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 	return (0);
 #endif
 }
+#endif /* APPLE */
 
 /*
  * Sorted by full path and then vdev guid to allow for multiple entries with
@@ -1239,6 +1250,12 @@ zpool_find_import_scan_add_slice(libpc_handle_t *hdl, pthread_mutex_t *lock,
 	slice->rn_lock = lock;
 	slice->rn_avl = cache;
 	slice->rn_hdl = hdl;
+#ifdef __APPLE__
+	/* Prefer diskX over rdiskX: involve os/ somehow? */
+	if (name[0] == 'r')
+		slice->rn_order = order + IMPORT_ORDER_DEFAULT;
+	else
+#endif
 	slice->rn_order = order + IMPORT_ORDER_SCAN_OFFSET;
 	slice->rn_labelpaths = B_FALSE;
 
