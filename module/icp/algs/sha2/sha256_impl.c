@@ -250,7 +250,7 @@ sha256_param_set(const char *val, zfs_kernel_param_t *unused)
 	return (generic_impl_setname(val));
 }
 
-#elif defined(__FreeBSD__)
+#elif defined(__FreeBSD__) || defined(__APPLE__)
 
 #include <sys/sbuf.h>
 
@@ -282,7 +282,12 @@ sha256_param(ZFS_MODULE_PARAM_ARGS)
 			(void) sbuf_printf(s, fmt, generic_supp_impls[i]->name);
 		}
 
+#ifdef __APPLE__
+		err = SYSCTL_OUT(req, s->s_buf, s->s_len);
+		sbuf_finish(s);
+#else
 		err = sbuf_finish(s);
+#endif
 		sbuf_delete(s);
 
 		return (err);

@@ -516,6 +516,7 @@ zfs_sha256_available(void)
 #define	kfpu_end()		do {} while (0)
 
 #define	HWCAP_FP		0x00000001
+#define	HWCAP_AES		0x00000008
 #define	HWCAP_SHA2		0x00000040
 #define	HWCAP_SHA512		0x00200000
 
@@ -547,6 +548,16 @@ zfs_sha512_available(void)
 {
 	unsigned long hwcap = getauxval(AT_HWCAP);
 	return (hwcap & HWCAP_SHA512);
+}
+
+/*
+ * Check if AESV8 is available
+ */
+static inline boolean_t
+zfs_aesv8_available(void)
+{
+	unsigned long hwcap = getauxval(AT_HWCAP);
+	return (hwcap & HWCAP_AES);
 }
 
 #elif defined(__powerpc__)
