@@ -310,7 +310,8 @@ zfs_mod_supported_feature(const char *name,
 	 * that all features are supported.
 	 */
 
-#if defined(_KERNEL) || defined(LIB_ZPOOL_BUILD) || defined(__FreeBSD__)
+#if defined(_KERNEL) || defined(LIB_ZPOOL_BUILD) || \
+	defined(__FreeBSD__) || defined(__APPLE__)
 	(void) name, (void) sfeatures;
 	return (B_TRUE);
 #else
