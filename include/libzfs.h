@@ -993,6 +993,12 @@ _LIBZFS_H int zfs_userns(zfs_handle_t *zhp, const char *nspath, int attach);
 
 #endif
 
+/*
+ * Manual mounting of snapshots.
+ */
+extern int zfs_snapshot_mount(zfs_handle_t *, const char *, int);
+extern int zfs_snapshot_unmount(zfs_handle_t *, int);
+
 #ifdef	__cplusplus
 }
 #endif
