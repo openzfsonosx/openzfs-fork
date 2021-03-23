@@ -32,16 +32,24 @@ if [ -f "@sysconfdir@/zfs/zsysctl.conf" ]; then
     @sbindir@/zsysctl -f @sysconfdir@/zfs/zsysctl.conf
 fi
 
+# check to see if we have been instructed not to try to import at all
+if [ -f /etc/zfs/noautoimport ];
+then
+    echo "/etc/zfs/noautoimport exits, exiting";
+    exit 0;
+fi
+
+date
+echo "-zpool-import-all.sh"
+
 sleep 10
-echo "Running zpool import -a"
+echo "Loading and starting org.openzfsonosx.zpool-import"
 date
 
 /bin/launchctl load /Library/LaunchDaemons/org.openzfsonosx.zpool-import.plist
 /bin/launchctl kickstart system/org.openzfsonosx.zpool-import
-ret=$?
 
-date
-echo "Launched zpool import -a : ${ret}"
+echo Status: $?
 
 echo "Touching the file ${ZPOOL_IMPORT_ALL_COOKIE}"
 touch "${ZPOOL_IMPORT_ALL_COOKIE}"
