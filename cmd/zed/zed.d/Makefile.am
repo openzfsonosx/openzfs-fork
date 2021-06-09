@@ -33,10 +33,14 @@ zedconfdefaults = \
 	resilver_finish-notify.sh \
 	resilver_finish-start-scrub.sh \
 	scrub_finish-notify.sh \
+	snapshot_mount.sh \
+	snapshot_unmount.sh \
 	statechange-led.sh \
 	statechange-notify.sh \
 	vdev_attach-led.sh \
-	vdev_clear-led.sh
+	vdev_clear-led.sh \
+	zvol.create.sh \
+        zvol.remove.sh
 
 dist_noinst_DATA += %D%/README
 

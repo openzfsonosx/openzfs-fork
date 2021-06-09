@@ -384,6 +384,7 @@ zfs_prop_init(void)
 	struct zfs_mod_supported_features *sfeatures =
 	    zfs_mod_list_supported(ZFS_SYSFS_DATASET_PROPERTIES);
 
+#ifdef __APPLE__
 	/* __APPLE__ */
 	static zprop_index_t devdisk_table[] = {
 		{ "poolonly",	ZFS_DEVDISK_POOLONLY },
@@ -399,6 +400,7 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 	/* ___APPLE___ */
+#endif
 
 	/* inherit index properties */
 	zprop_register_index(ZFS_PROP_REDUNDANT_METADATA, "redundant_metadata",

@@ -1700,6 +1700,7 @@ zvol_is_zvol(const char *name)
 {
 
 	return (zvol_os_is_zvol(name));
+
 }
 
 int
