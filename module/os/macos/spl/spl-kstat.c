@@ -717,7 +717,7 @@ kstat_handle_string SYSCTL_HANDLER_ARGS
 	}
 
 	if (!error && req->newptr) {
-		char *inbuf[256];
+		char *inbuf = IOMalloc(256);
 
 		error = SYSCTL_IN(req, inbuf, req->newlen);
 
@@ -735,6 +735,8 @@ kstat_handle_string SYSCTL_HANDLER_ARGS
 			if (ksp->ks_update)
 				error = ksp->ks_update(ksp, KSTAT_WRITE);
 		}
+
+		IOFree(inbuf, 256);
 
 	} else {
 
