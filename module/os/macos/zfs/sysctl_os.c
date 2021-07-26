@@ -833,6 +833,7 @@ extern int zfs_admin_snapshot;
 extern int zfs_auto_snapshot;
 
 extern unsigned int zfs_disable_spotlight;
+extern unsigned int zfs_disable_trashes;
 
 /* u64 just to sure it works */
 static uint64_t kstat_spa_version = SPA_VERSION;
@@ -865,3 +866,5 @@ ZFS_MODULE_IMPL( , zfs_auto_snapshot, zfs_auto_snapshot,
     UINT, ZMOD_RW, "Automatically mount snapshots on access");
 ZFS_MODULE_IMPL( , zfs_disable_spotlight, zfs_disable_spotlight,
     UINT, ZMOD_RW, "Forcefully stop spotlight");
+ZFS_MODULE_IMPL( , zfs_disable_trashes, zfs_disable_trashes,
+    UINT, ZMOD_RW, "Forcefully stop .Trashes");
