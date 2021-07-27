@@ -885,7 +885,7 @@ do_unmount_volume(const char *mntpt, int flags)
 }
 
 void
-zpool_disable_volume(const char *name)
+zpool_disable_volume_os(const char *name)
 {
 	CFMutableDictionaryRef matching = 0;
 	char *fullname = NULL;
@@ -975,7 +975,7 @@ zpool_disable_volumes(zfs_handle_t *nzhp, void *data)
 			 *      /var/run/zfs/zvol/dsk/$POOL/$volume
 			 */
 
-			zpool_disable_volume(zfs_get_name(nzhp));
+			zpool_disable_volume_os(zfs_get_name(nzhp));
 
 		}
 	}
