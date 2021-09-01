@@ -14,11 +14,15 @@ dist_zedexec_SCRIPTS = \
 	%D%/resilver_finish-notify.sh \
 	%D%/resilver_finish-start-scrub.sh \
 	%D%/scrub_finish-notify.sh \
+	%D%/snapshot_mount.sh \
+	%D%/snapshot_unmount.sh \
 	%D%/statechange-led.sh \
 	%D%/statechange-notify.sh \
 	%D%/trim_finish-notify.sh \
 	%D%/vdev_attach-led.sh \
-	%D%/vdev_clear-led.sh
+	%D%/vdev_clear-led.sh \
+	%D%/zvol_create.sh \
+	%D%/zvol_remove.sh
 
 nodist_zedexec_SCRIPTS = \
 	%D%/history_event-zfs-list-cacher.sh

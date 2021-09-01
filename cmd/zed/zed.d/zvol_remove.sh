@@ -4,8 +4,8 @@
 #
 
 # Given POOL and DATASET name for ZVOL
-# BSD_disk  for /dev/disk*
-# BSD_rdisk for /dev/rdisk*
+# DEVICE_NAME  for /dev/disk*
+# RAW_DEVICE_NAME for /dev/rdisk*
 # Create symlink in
 # /var/run/zfs/zvol/dsk/POOL/DATASET -> /dev/disk*
 # /var/run/zfs/zvol/rdsk/POOL/DATASET -> /dev/rdisk*
