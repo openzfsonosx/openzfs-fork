@@ -438,34 +438,22 @@ zfs_file_unlink(const char *path)
  * Get reference to file pointer
  *
  * fd - input file descriptor
- * fpp - pointer to file pointer
  *
- * Returns 0 on success EBADF on failure.
+ * Returns pointer to file struct or NULL
  */
-int file_flags(int, int *);
-int
-zfs_file_get(int fd, zfs_file_t **fpp)
+zfs_file_t *
+zfs_file_get(int fd)
 {
-	*fpp = getf(fd);
-	if (*fpp == NULL)
-		return (EBADF);
-
-	int flags = 0;
-	if (file_flags(fd, &flags) == 0) {
-		if (flags & O_APPEND) {
-			(*fpp)->f_ioflags = IO_APPEND;
-		}
-	}
-	return (0);
+	return (getf(fd));
 }
 
 /*
  * Drop reference to file pointer
  *
- * fd - input file descriptor
+ * fp - input file struct pointer
  */
 void
-zfs_file_put(int fd)
+zfs_file_put(zfs_file_t *fp)
 {
-	releasef(fd);
+	releasefp(fp);
 }

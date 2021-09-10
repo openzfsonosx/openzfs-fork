@@ -234,6 +234,21 @@ getf_vnode(void *fp)
 }
 
 void
+releasefp(struct spl_fileproc *fp)
+{
+	if (fp->f_vnode != NULL)
+		vnode_put(fp->f_vnode);
+
+	/* Remove node from the list */
+	mutex_enter(&spl_getf_lock);
+	list_remove(&spl_getf_list, fp);
+	mutex_exit(&spl_getf_lock);
+
+	/* Free the node */
+	kmem_free(fp, sizeof (*fp));
+}
+
+void
 releasef(int fd)
 {
 	struct spl_fileproc *fp = NULL;
@@ -249,16 +264,7 @@ releasef(int fd)
 	if (!fp)
 		return; // Not found
 
-	if (fp->f_vnode != NULL)
-		vnode_put(fp->f_vnode);
-
-	/* Remove node from the list */
-	mutex_enter(&spl_getf_lock);
-	list_remove(&spl_getf_list, fp);
-	mutex_exit(&spl_getf_lock);
-
-	/* Free the node */
-	kmem_free(fp, sizeof (*fp));
+	releasefp(fp);
 }
 
 /*

@@ -58,8 +58,10 @@ struct spl_fileproc {
 };
 /* Members with '*' are not used when 'fd' is not given */
 
+void releasefp(struct spl_fileproc *fp);
 void *getf(int fd);
 void releasef(int fd);
+
 struct vnode *getf_vnode(void *fp);
 
 #endif /* SPL_FILE_H */
