@@ -496,7 +496,6 @@
 #include <sys/debug.h>
 #include <sys/vmsystm.h>	/* For throttlefree */
 #include <sys/sysmacros.h>
-#include <sys/note.h>
 #include <sys/tsd.h>
 #ifdef __APPLE__
 #include <mach/thread_act.h>
@@ -752,7 +751,6 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
  */
 #define	TQ_DO_ENQUEUE(tq, tqe, func, arg, front) {			\
 	ASSERT(MUTEX_HELD(&tq->tq_lock));				\
-	_NOTE(CONSTCOND)						\
 	if (front) {							\
 		TQ_PREPEND(tq->tq_task, tqe);				\
 	} else {							\
