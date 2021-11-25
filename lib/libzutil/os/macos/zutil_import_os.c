@@ -613,3 +613,8 @@ update_vdev_config_dev_strs(nvlist_t *nv)
 		(void) nvlist_remove_all(nv, ZPOOL_CONFIG_VDEV_ENC_SYSFS_PATH);
 	}
 }
+
+void
+update_vdevs_config_dev_sysfs_path(nvlist_t *config)
+{
+}
