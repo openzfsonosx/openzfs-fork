@@ -1291,3 +1291,15 @@ spl_kstat_fini()
 	 */
 	sysctl_unregister_oid(&sysctl__kstat);
 }
+
+// piece of shit
+struct sysctl_oid_list *
+spl_kstat_find_oid(char *module, char *class)
+{
+	struct sysctl_oid_list *container;
+
+	container = get_kstat_parent(&sysctl__kstat_children,
+	    module,
+	    class);
+	return (container);
+}

@@ -58,7 +58,6 @@
 #include <sys/arc_impl.h>
 #include <sys/trace_zfs.h>
 #include <sys/aggsum.h>
-#include <sys/kstat_osx.h>
 
 extern arc_stats_t arc_stats;
 
