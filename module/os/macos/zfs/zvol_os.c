@@ -51,6 +51,9 @@ unsigned int zvol_threads = 8;
 
 taskq_t *zvol_taskq;
 
+/* Until we can find a solution that works for us too */
+extern list_t zvol_state_list;
+
 typedef struct zv_request {
 	zvol_state_t	*zv;
 
@@ -101,7 +104,8 @@ zvol_os_is_zvol(const char *device)
 
 /*
  * Make sure zv is still in the list (not freed) and if it is
- * grab the locks in the correct order.
+ * grab the locks in the correct order. We can not access "zv"
+ * until we know it exists in the list. (may be freed memory)
  * Can we rely on list_link_active() instead of looping list?
  * Return value:
  *        0           : not found. No locks.

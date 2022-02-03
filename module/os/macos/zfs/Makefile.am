@@ -82,7 +82,6 @@ zfs_ASM_SOURCES_AS = \
 	../../../icp/asm-x86_64/os/macos/modes/aesni-gcm-x86_64.S \
 	../../../icp/asm-x86_64/os/macos/modes/ghash-x86_64.S \
 	../../../icp/asm-x86_64/os/macos/modes/gcm_pclmulqdq.S \
-	../../../icp/asm-x86_64/os/macos/sha1/sha1-x86_64.S \
 	../../../icp/asm-x86_64/os/macos/sha2/sha256_impl.S \
 	../../../icp/asm-x86_64/os/macos/sha2/sha512_impl.S
 
@@ -142,6 +141,7 @@ zfs_SOURCES = \
 	ldi_vnode.c \
 	ldi_iokit.cpp \
 	../../../zfs/lz4.c \
+	../../../zfs/lz4_zfs.c \
 	../../../zfs/lzjb.c \
 	../../../zfs/metaslab.c \
 	../../../zfs/mmp.c \
@@ -273,12 +273,9 @@ zfs_SOURCES = \
 	../../../icp/core/kcf_prov_lib.c \
 	../../../icp/spi/kcf_spi.c \
 	../../../icp/io/aes.c \
-	../../../icp/io/edonr_mod.c \
 	../../../icp/io/sha2_mod.c \
-	../../../icp/io/sha1_mod.c \
 	../../../icp/io/skein_mod.c \
 	../../../icp/os/modhash.c \
-	../../../icp/os/modconf.c \
 	../../../icp/algs/edonr/edonr.c \
 	../../../icp/algs/modes/cbc.c \
 	../../../icp/algs/modes/ccm.c \

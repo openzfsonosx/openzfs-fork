@@ -38,7 +38,7 @@ typedef struct osx_kstat {
 	kstat_named_t darwin_force_formd_normalized;
 	kstat_named_t darwin_skip_unlinked_drain;
 	kstat_named_t darwin_use_system_sync;
-
+#if 0
 	kstat_named_t arc_zfs_arc_max;
 	kstat_named_t arc_zfs_arc_min;
 	kstat_named_t arc_zfs_arc_meta_limit;
@@ -207,6 +207,7 @@ typedef struct osx_kstat {
 	kstat_named_t vdev_file_physical_ashift;
 	kstat_named_t zvol_volmode;
 	kstat_named_t zfs_zevent_retain_max;
+#endif
 	kstat_named_t zfs_disable_spotlight;
 } osx_kstat_t;
 
@@ -334,7 +335,7 @@ extern int zfs_compressed_arc_enabled;
 extern int zfs_condense_indirect_commit_entry_delay_ms;
 extern unsigned long zfs_condense_min_mapping_bytes;
 extern unsigned long zfs_deadman_checktime_ms;
-extern char *zfs_deadman_failmode;
+extern const char *zfs_deadman_failmode;
 extern unsigned long zfs_deadman_synctime_ms;
 extern unsigned long zfs_deadman_ziotime_ms;
 extern int zfs_disable_ivset_guid_check;

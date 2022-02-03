@@ -74,6 +74,7 @@ osx_kstat_t osx_kstat = {
 	{ "skip_unlinked_drain",		KSTAT_DATA_UINT64 },
 	{ "use_system_sync",			KSTAT_DATA_UINT64 },
 
+#if 0
 	{ "zfs_arc_max",			KSTAT_DATA_UINT64 },
 	{ "zfs_arc_min",			KSTAT_DATA_UINT64 },
 	{ "zfs_arc_meta_limit",			KSTAT_DATA_UINT64 },
@@ -114,7 +115,7 @@ osx_kstat_t osx_kstat = {
 	{"zfs_delay_min_dirty_percent",		KSTAT_DATA_INT64  },
 	{"zfs_delay_scale",			KSTAT_DATA_INT64  },
 	{"spa_asize_inflation",			KSTAT_DATA_INT64  },
-	{"zfs_prefetch_disable",		KSTAT_DATA_INT64  },
+//	{"zfs_prefetch_disable",		KSTAT_DATA_INT64  },
 	{"zfetch_max_streams",			KSTAT_DATA_INT64  },
 	{"zfetch_min_sec_reap",			KSTAT_DATA_INT64  },
 	{"zfetch_array_rd_sz",			KSTAT_DATA_INT64  },
@@ -126,7 +127,7 @@ osx_kstat_t osx_kstat = {
 	{"zfs_flags",				KSTAT_DATA_INT64  },
 	{"zfs_txg_timeout",			KSTAT_DATA_INT64  },
 	{"zfs_vdev_cache_max",			KSTAT_DATA_INT64  },
-	{"zfs_vdev_cache_size",			KSTAT_DATA_INT64  },
+//	{"zfs_vdev_cache_size",			KSTAT_DATA_INT64  },
 	{"zfs_vdev_cache_bshift",		KSTAT_DATA_INT64  },
 	{"vdev_mirror_shift",			KSTAT_DATA_INT64  },
 	{"zfs_scrub_limit",			KSTAT_DATA_INT64  },
@@ -242,6 +243,7 @@ osx_kstat_t osx_kstat = {
 	{"vdev_file_physical_ashift",			KSTAT_DATA_UINT64  },
 	{"zvol_volmode",			KSTAT_DATA_UINT64  },
 	{"zfs_zevent_retain_max",			KSTAT_DATA_UINT64  },
+#endif
 	{"zfs_disable_spotlight",			KSTAT_DATA_UINT64  },
 
 };
@@ -280,6 +282,7 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		zfs_vfs_sync_paranoia =
 		    ks->darwin_use_system_sync.value.ui64;
 
+#if 0
 		/* ARC */
 		arc_kstat_update_osx(ksp, rw);
 
@@ -340,8 +343,8 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		    ks->zfs_delay_scale.value.i64;
 		spa_asize_inflation =
 		    ks->spa_asize_inflation.value.i64;
-		zfs_prefetch_disable =
-		    ks->zfs_prefetch_disable.value.i64;
+//		zfs_prefetch_disable =
+//		    ks->zfs_prefetch_disable.value.i64;
 		zfetch_max_streams =
 		    ks->zfetch_max_streams.value.i64;
 		zfetch_min_sec_reap =
@@ -364,8 +367,8 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		    ks->zfs_txg_timeout.value.i64;
 		zfs_vdev_cache_max =
 		    ks->zfs_vdev_cache_max.value.i64;
-		zfs_vdev_cache_size =
-		    ks->zfs_vdev_cache_size.value.i64;
+//		zfs_vdev_cache_size =
+//		    ks->zfs_vdev_cache_size.value.i64;
 		zfs_no_scrub_io =
 		    ks->zfs_no_scrub_io.value.i64;
 		zfs_no_scrub_prefetch =
@@ -580,6 +583,7 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		    ks->vdev_file_physical_ashift.value.ui64;
 		zvol_volmode = ks->zvol_volmode.value.ui64;
 		zfs_zevent_retain_max = ks->zfs_zevent_retain_max.value.ui64;
+#endif
 		zfs_disable_spotlight = ks->zfs_disable_spotlight.value.ui64;
 
 	} else {
@@ -602,7 +606,7 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		ks->darwin_skip_unlinked_drain.value.ui64 =
 		    zfs_vnop_skip_unlinked_drain;
 		ks->darwin_use_system_sync.value.ui64 = zfs_vfs_sync_paranoia;
-
+#if 0
 		/* ARC */
 		arc_kstat_update_osx(ksp, rw);
 
@@ -662,8 +666,8 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		    zfs_delay_scale;
 		ks->spa_asize_inflation.value.i64 =
 		    spa_asize_inflation;
-		ks->zfs_prefetch_disable.value.i64 =
-		    zfs_prefetch_disable;
+//		ks->zfs_prefetch_disable.value.i64 =
+//		    zfs_prefetch_disable;
 		ks->zfetch_max_streams.value.i64 =
 		    zfetch_max_streams;
 		ks->zfetch_min_sec_reap.value.i64 =
@@ -686,8 +690,8 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		    zfs_txg_timeout;
 		ks->zfs_vdev_cache_max.value.i64 =
 		    zfs_vdev_cache_max;
-		ks->zfs_vdev_cache_size.value.i64 =
-		    zfs_vdev_cache_size;
+//		ks->zfs_vdev_cache_size.value.i64 =
+//		    zfs_vdev_cache_size;
 		ks->zfs_no_scrub_io.value.i64 =
 		    zfs_no_scrub_io;
 		ks->zfs_no_scrub_prefetch.value.i64 =
@@ -869,6 +873,8 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 		    vdev_file_physical_ashift;
 		ks->zvol_volmode.value.ui64 = zvol_volmode;
 		ks->zfs_zevent_retain_max.value.ui64 = zfs_zevent_retain_max;
+#endif
+
 		ks->zfs_disable_spotlight.value.ui64 = zfs_disable_spotlight;
 
 	}
@@ -881,7 +887,7 @@ static int osx_kstat_update(kstat_t *ksp, int rw)
 int
 kstat_osx_init(void)
 {
-	osx_kstat_ksp = kstat_create("zfs", 0, "tunable", "darwin",
+	osx_kstat_ksp = kstat_create("zfs", 0, "tunableee", "darwin",
 	    KSTAT_TYPE_NAMED, sizeof (osx_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL|KSTAT_FLAG_WRITABLE);
 

@@ -135,6 +135,9 @@ typedef struct zfs_soft_state {
 #define	Z_ISDIR(type)	((type) == VDIR)
 
 #define	zn_has_cached_data(zp)	((zp)->z_is_mapped)
+#define	zn_flush_cached_data(zp, sync) \
+	(void) ubc_msync(ZTOV(zp), 0, \
+	ubc_getsize(ZTOV(zp)), NULL, UBC_PUSHALL | UBC_SYNC);
 #define	zn_rlimit_fsize(zp, uio)	(0)
 
 /* Called on entry to each ZFS inode and vfs operation. */
@@ -207,7 +210,7 @@ extern void	zfs_tstamp_update_setup(struct znode *,
 extern void zfs_znode_free(struct znode *);
 
 extern zil_get_data_t zfs_get_data;
-extern zil_replay_func_t *zfs_replay_vector[TX_MAX_TYPE];
+extern zil_replay_func_t *const zfs_replay_vector[TX_MAX_TYPE];
 extern int zfsfstype;
 
 extern int zfs_znode_parent_and_name(struct znode *zp, struct znode **dzpp,
