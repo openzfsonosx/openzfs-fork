@@ -23,6 +23,13 @@ nodist_libzfs_core_la_SOURCES = \
 	module/os/freebsd/zfs/zfs_ioctl_compat.c
 endif
 
+if BUILD_MACOS
+libzfs_core_la_CPPFLAGS += -I$(top_srcdir)/include/os/macos/zfs
+
+libzfs_core_la_SOURCES += \
+        %D%/os/macos/libzfs_core_ioctl.c
+endif
+
 libzfs_core_la_LIBADD = \
 	libnvpair.la \
 	libspl.la

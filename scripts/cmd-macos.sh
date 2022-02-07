@@ -8,6 +8,9 @@ fi
 cmd=$1
 shift
 
+# help find missing symbols
+export DYLD_BIND_AT_LAUNCH=1
+
 READLINK=$(which greadlink 2>/dev/null)
 if test "x$READLINK" = "x" ; then
 	READLINK=$(which readlink 2>/dev/null)
