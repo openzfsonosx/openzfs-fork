@@ -263,7 +263,7 @@ __attribute__((noinline)) int assfail(const char *str, const char *file,
 #endif /* MACOS_ASSERT_SHOULD_PANIC */
 #endif /* NDEBUG */
 
-#define	fallthrough		__attribute__((__fallthrough__))
+#define	zfs_fallthrough		__attribute__((__fallthrough__))
 
 #ifdef  __cplusplus
 }
