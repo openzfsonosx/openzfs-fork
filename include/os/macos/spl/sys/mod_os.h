@@ -87,8 +87,13 @@ extern "C" {
 #define	ZSYSCTL_STRING SYSCTL_STRING
 #define	ZSYSCTL_LONG(parent, nbr, name, access, ptr, val, descr) \
     SYSCTL_LONG(parent, nbr, name, access, ptr, descr)
+#if defined SYSCTL_ULONG
 #define	ZSYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr) \
     SYSCTL_ULONG(parent, nbr, name, access, ptr, descr)
+#else
+#define	ZSYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr) \
+    SYSCTL_LONG(parent, nbr, name, access, ptr, descr)
+#endif
 /*
  * Appears to be no default for 64bit values in Linux, if
  * ZOL adds it using STANDARD_PARAM_DEF let us guess

@@ -32,6 +32,8 @@
 extern "C" {
 #endif
 
+#include <kern/debug.h>
+
 #define	crgetzoneid(x)	(GLOBAL_ZONEID)
 
 typedef struct ksiddomain {
