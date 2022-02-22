@@ -26,6 +26,9 @@
 #include <fcntl.h>
 #include <sys/param.h>
 
+#include <TargetConditionals.h>
+#include <AvailabilityMacros.h>
+
 /* Handle Linux use of 64 names */
 
 #define	open64		open
@@ -75,5 +78,10 @@ pipe2(int fildes[2], int flags)
 	return (0);
 }
 
+#if !defined(MAC_OS_X_VERSION_10_12) || \
+  (MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12)
+#define	mkostemp(template, oflag) mkstemp((template))
+#define	mkostemps(template, slen, oflag) mkstemps((template), (slen))
+#endif
 
 #endif
