@@ -824,6 +824,7 @@ extern unsigned int zfs_vnop_ignore_positives;
 extern unsigned int zfs_vnop_create_negatives;
 extern unsigned int zfs_vnop_skip_unlinked_drain;
 extern uint64_t zfs_vfs_sync_paranoia;
+extern uint64_t zfs_iokit_sync_paranoia;
 extern uint64_t vnop_num_vnodes;
 extern uint64_t vnop_num_reclaims;
 extern int zfs_vnop_force_formd_normalized_output;
@@ -858,6 +859,8 @@ ZFS_MODULE_IMPL( , zfs_vnop_skip_unlinked_drain, skip_unlinked_drain,
     UINT, ZMOD_RW, "Do not call unlinked_drain on import");
 ZFS_MODULE_IMPL( , zfs_vfs_sync_paranoia, use_system_sync,
     ULLONG, ZMOD_RW, "Extra sync paranoia");
+ZFS_MODULE_IMPL( , zfs_iokit_sync_paranoia, do_iokit_sync,
+    ULLONG, ZMOD_RW, "IOKit should do more synchronizing");
 ZFS_MODULE_IMPL( , zfs_expire_snapshot, zfs_expire_snapshot,
     UINT, ZMOD_RW, "Seconds until auto snapshot unmount");
 ZFS_MODULE_IMPL( , zfs_admin_snapshot, zfs_admin_snapshot,

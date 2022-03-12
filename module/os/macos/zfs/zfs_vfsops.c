@@ -131,6 +131,13 @@ zfs_is_readonly(zfsvfs_t *zfsvfs)
  */
 uint64_t zfs_vfs_sync_paranoia = 0;
 
+/*
+ * IOKit wil use a barrier sync if this is zero, which may be a performance
+ * gain, at the risk of not doing sync correctly on devices which do not
+ * support barrier sync (see ioreg -l | grep Barrier).
+ */
+uint64_t zfs_iokit_sync_paranoia = 1;
+
 int
 zfs_vfs_sync(struct mount *vfsp, __unused int waitfor,
     __unused vfs_context_t context)
