@@ -79,7 +79,7 @@ pipe2(int fildes[2], int flags)
 }
 
 #if !defined(MAC_OS_X_VERSION_10_12) || \
-  (MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12)
+	(MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12)
 #define	mkostemp(template, oflag) mkstemp((template))
 #define	mkostemps(template, slen, oflag) mkstemps((template), (slen))
 #endif
