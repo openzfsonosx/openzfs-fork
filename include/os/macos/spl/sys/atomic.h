@@ -342,18 +342,22 @@ atomic_cas_ptr(volatile void *target, void *cmp,  void *newval);
 static inline uint64_t
 atomic_load_64(volatile uint64_t *target)
 {
-	return (__atomic_load_n(target, __ATOMIC_RELAXED));
+	return (__atomic_load_n(target, __ATOMIC_ACQUIRE));
 }
 
 static inline void
 atomic_store_64(volatile uint64_t *target, uint64_t bits)
 {
-	return (__atomic_store_n(target, bits, __ATOMIC_RELAXED));
+	return (__atomic_store_n(target, bits, __ATOMIC_RELEASE));
 }
 
 static inline __attribute__((always_inline)) void
 membar_producer(void)
 {
+	/*
+	 * On arm, Xcode 14 clang produces "dmb ish" here, which
+	 * matches the assembly in xnu's dtrace_membar_prodcer()
+	 */
 	__c11_atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 

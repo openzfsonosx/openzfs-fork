@@ -2676,7 +2676,7 @@ xnu_alloc_throttled_bail(uint64_t now_ticks, vmem_t *calling_vmp,
 			// if alloc_lock == f then alloc_lock = true and result
 			// is true otherwise result is false and f = true
 			if (!__c11_atomic_compare_exchange_strong(&alloc_lock,
-			    &f, true, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)) {
+			    &f, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 				/*
 				 * avoid (highly unlikely) data race on
 				 * alloc_lock. if alloc_lock has become true
@@ -2712,7 +2712,7 @@ xnu_alloc_throttled_bail(uint64_t now_ticks, vmem_t *calling_vmp,
 		} else if (zfs_lbolt() > timeout_time) {
 			bool f = false;
 			if (!__c11_atomic_compare_exchange_strong(&alloc_lock,
-			    &f, true, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)) {
+			    &f, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 				// avoid (highly unlikely) data race on
 				// alloc_lock as above
 				continue;
@@ -2961,7 +2961,7 @@ xnu_free_throttled(vmem_t *vmp, void *vaddr, size_t size)
 			// optimize it out)
 			bool f = false;
 			if (__c11_atomic_compare_exchange_weak(&is_freeing,
-			    &f, true, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+			    &f, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 				break;
 			}
 		}
