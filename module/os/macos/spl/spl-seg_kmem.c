@@ -140,9 +140,15 @@ vmem_t *abd_subpage_arena;
 #ifdef _KERNEL
 extern uint64_t total_memory;
 uint64_t stat_osif_malloc_success = 0;
+uint64_t stat_osif_malloc_fail = 0;
 uint64_t stat_osif_free = 0;
 uint64_t stat_osif_malloc_bytes = 0;
 uint64_t stat_osif_free_bytes = 0;
+uint64_t stat_osif_malloc_sub128k = 0;
+uint64_t stat_osif_malloc_sub64k = 0;
+uint64_t stat_osif_malloc_sub32k = 0;
+uint64_t stat_osif_malloc_page = 0;
+uint64_t stat_osif_malloc_subpage = 0;
 #endif
 
 void *
@@ -156,27 +162,26 @@ osif_malloc(uint64_t size)
 	// kern_return_t kr = kmem_alloc(kernel_map, &tr, size);
 	// tr = IOMalloc(size);
 
-	/*
-	 * align small allocations on PAGESIZE
-	 * and larger ones on the enclosing power of two
-	 * but drop to PAGESIZE for huge allocations
-	 */
-	uint64_t align = PAGESIZE;
-	if (size > PAGESIZE && !ISP2(size) && size < UINT32_MAX) {
-		uint64_t v = size;
-		v--;
-		v |= v >> 1;
-		v |= v >> 2;
-		v |= v >> 4;
-		v |= v >> 8;
-		v |= v >> 16;
-		v++;
-		align = v;
-	} else if (size > PAGESIZE && ISP2(size)) {
-		align = size;
-	}
+	if (size < PAGESIZE)
+		atomic_inc_64(&stat_osif_malloc_subpage);
+	else if (size == PAGESIZE)
+		atomic_inc_64(&stat_osif_malloc_page);
+	else if (size < 32768)
+		atomic_inc_64(&stat_osif_malloc_sub32k);
+	else if (size < 65536)
+		atomic_inc_64(&stat_osif_malloc_sub64k);
+	else if (size < 131072)
+		atomic_inc_64(&stat_osif_malloc_sub128k);
 
-	tr = IOMallocAligned(size, MAX(PAGESIZE, align));
+	/*
+	 * On Intel and ARM we can deal with eight-byte-aligned pointers from
+	 * IOMallocAligned().  Larger alignment may be faster, but may also
+	 * cause problems when we have a system with very large RAM that we
+	 * want to use for ARC and other zfs purposes.
+	 */
+	const uint64_t align = 8;
+
+	tr = IOMallocAligned(size, align);
 	if (tr != NULL)
 		kr = KERN_SUCCESS;
 
@@ -186,8 +191,19 @@ osif_malloc(uint64_t size)
 		atomic_add_64(&stat_osif_malloc_bytes, size);
 		return ((void *)tr);
 	} else {
-		// well, this can't really happen, kernel_memory_allocate
-		// would panic instead
+		/*
+		 * Apple documentation says IOMallocAligned()
+		 * may return NULL.  Make a note of these and
+		 * bubble the result upwards to deal with,
+		 * which may result in a kmem allocator returning
+		 * NULL, or potentially a panic if VM_PANIC is set.
+		 *
+		 * The only places VM_PANIC is set are in vmem_init() and if
+		 * in the call to vmem_populate is called because the
+		 * VMC_POPULATOR flag is given vmem_create(), so only very
+		 * early in vmem initialization.
+		 */
+		atomic_inc_64(&stat_osif_malloc_fail);
 		return (NULL);
 	}
 #else
@@ -215,7 +231,13 @@ osif_free(void *buf, uint64_t size)
 void
 kernelheap_init()
 {
-	heap_arena = vmem_init("heap", NULL, 0, PAGESIZE, segkmem_alloc,
+	heap_arena = vmem_init("heap", NULL, 0,
+#if defined(__arm64__)
+	    4096,
+#else
+	    PAGESIZE,
+#endif
+	    segkmem_alloc,
 	    segkmem_free);
 }
 

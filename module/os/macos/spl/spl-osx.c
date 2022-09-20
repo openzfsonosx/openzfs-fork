@@ -469,6 +469,41 @@ spl_start(kmod_info_t *ki, void *d)
 	total_memory = total_memory * 50ULL / 100ULL;
 	physmem = total_memory / PAGE_SIZE;
 
+#if defined(__arm64__)
+	/*
+	 * 128GiB Studio Ultras with 12.6.1 and earlier will panic, usually in
+	 * another kernel subsystem (hfs, hardware video encoding/decoding),
+	 * after we allocate more than around 30GiB of memory through
+	 * IOMallocAligned().
+	 *
+	 * So far this has not been observed on other hw platforms and has not
+	 * been tested in 13.x (Ventura) on these systems.  However, few other
+	 * macOS hw platforms have more than 64 GiB of RAM.  96 GiB of RAM is
+	 * likely to be the lower limit for running into this problem, since
+	 * smaller systems either [a] will not have total_memory >= 32 GiB,
+	 * [b] will have kernel pressure signals driven by memory use in
+	 * userland and the HFS/APFS buffer cache, or [c] both [a]and[b].
+	 *
+	 * For safety, on ARM we default to having a dynamic memory cap of 26
+	 * GiB any ARM with more than 64GiB of RAM.  This will prevent ARC
+	 * growth from climbing much above 20 GiB, consequently limiting the
+	 * various other ZFS caches and overheads. Total consumption will not
+	 * reach the panic-inviting levels around/above 32 GiB, since the ARC
+	 * will be shrunk when approaching the dynamic memory cap.
+	 *
+	 * This has proven safe enough, and can be overridden dynamically by a
+	 * sysctl or zsysctl.conf by setting
+	 * kstat.spl.misc.spl_misc.spl_osif_dynamic_memory_cap to some other
+	 * byte count, including 0 (which will allow growth until
+	 * IOMallocAligned() returns a NULL).
+	 */
+
+	extern _Atomic uint64_t spl_dynamic_memory_cap;
+
+	if (real_total_memory >= 64LL*1024LL*1024LL*1024LL)
+		spl_dynamic_memory_cap = 26LL*1024LL*1024LL*1024LL;
+#endif
+
 	len = sizeof (utsname_static.sysname);
 	sysctlbyname("kern.ostype", &utsname_static.sysname, &len, NULL, 0);
 

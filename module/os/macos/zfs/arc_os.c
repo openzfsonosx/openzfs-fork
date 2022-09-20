@@ -93,13 +93,30 @@ arc_default_max(uint64_t min, uint64_t allmem)
 static _Atomic boolean_t arc_reclaim_in_loop = B_FALSE;
 
 /*
- * Return maximum amount of memory that we could possibly use.  Reduced
- * to half of all memory in user space which is primarily used for testing.
+ * Return maximum amount of memory that ARC may use.
+ *
+ * kmem_size() returns half of the system memory.
+ * Keep 2^(-4) of that half away from ARC for various overheads,
+ * and other kmem cache users.
+ * On a 8 GiB Mac that means 256 MiB, arc_max max under 4 GiB
+ * On a 128 GiB Mac that means 4 GiB, arc_max max 60 GiB
+ *
+ * Greater memory typically implies more threads and more potential I/O
+ * throughput, so a large reduction is prudent on a large-memory machine.
+ *
+ * Since ARC is the primary driver of memory allocation activity, this reduces
+ * the chances of waiting in the lowest memory allocation layers.
+ *
  */
 uint64_t
 arc_all_memory(void)
 {
-	return (kmem_size());
+	const uint64_t ks = kmem_size();
+	const uint64_t overhead_safety_shift = 4;
+	const uint64_t leave_this_much_free = ks >> overhead_safety_shift;
+	const uint64_t ks_minus_overhead = ks - leave_this_much_free;
+
+	return (ks_minus_overhead);
 }
 
 /*
@@ -775,4 +792,12 @@ arc_register_hotplug(void)
 void
 arc_unregister_hotplug(void)
 {
+}
+
+void
+spl_set_arc_no_grow(int i)
+{
+	arc_no_grow = i;
+	if (i == B_TRUE)
+		membar_producer(); /* make it visible to other threads */
 }
