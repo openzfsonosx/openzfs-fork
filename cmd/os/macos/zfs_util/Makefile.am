@@ -1,34 +1,21 @@
-include $(top_srcdir)/config/Rules.am
-
-AUTOMAKE_OPTIONS = subdir-objects
-
-DEFAULT_INCLUDES += \
-	-I$(top_srcdir)/include \
-	-I$(top_srcdir)/lib/libspl/include
-
-sbin_PROGRAMS = zfs_util
+sbin_PROGRAMS   += zfs_util
+CPPCHECKTARGETS += zfs_util
 
 zfs_util_SOURCES = \
-	zfs_util.c
+	%D%/zfs_util.c
 
 zfs_util_LDADD = \
-        $(top_builddir)/lib/libzfs/libzfs.la
+        libzfs.la
 
 zfs_util_LDFLAGS = -static -framework IOKit
 
 # build the /Library/Filesystems/zfs.fs/ bundle
 
-FS_BUNDLEPREFIX = /Library/Filesystems
-FS_BUNDLEDIR = $(DESTDIR)$(FS_BUNDLEPREFIX)/zfs.fs
-PKGINFO = PkgInfo
-INFO_PLIST = Info.plist
-INFOPLIST_STRINGS = InfoPlist.strings
-
 zfs_fs_SOURCES =
 
-bin_PROGRAMS = zfs.fs
+bin_PROGRAMS += zfs.fs
 
-dist_noinst_DATA = $(INFO_PLIST) English.lproj/$(INFOPLIST_STRINGS) $(PKGINFO)
+dist_noinst_DATA += $(INFO_PLIST) English.lproj/$(INFOPLIST_STRINGS) $(PKGINFO)
 
 zfs.fs/Contents/$(PKGINFO):
 

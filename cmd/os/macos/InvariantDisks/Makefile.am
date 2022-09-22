@@ -1,1 +1,1 @@
-SUBDIRS  = InvariantDisks
+include $(srcdir)/%D%/InvariantDisks/Makefile.am

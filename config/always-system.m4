@@ -20,6 +20,7 @@ AC_DEFUN([ZFS_AC_CONFIG_ALWAYS_SYSTEM], [
 			AC_DEFINE([SYSTEM_MACOS], [1],
 				[True if ZFS is to be compiled for a macOS system])
 			ac_system="macOS"
+			ac_system_l="macos"
 			;;
 		*)
 			ac_system="unknown"

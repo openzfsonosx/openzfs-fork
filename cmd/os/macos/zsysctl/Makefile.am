@@ -1,6 +1,5 @@
-include $(top_srcdir)/config/Rules.am
-
-sbin_PROGRAMS = zsysctl
+sbin_PROGRAMS   += zsysctl
+CPPCHECKTARGETS += zsysctl
 
 zsysctl_SOURCES = \
 	zsysctl.c

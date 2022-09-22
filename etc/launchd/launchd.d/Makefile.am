@@ -1,12 +1,8 @@
-AUTOMAKE_OPTIONS = subdir-objects
 
-launchdscriptdir = ${libexecdir}/zfs/launchd.d
-launchdscript_SCRIPTS = \
-	zpool-import-all.sh
+CLEANFILES += $(launchdscript_SCRIPTS)
 
-CLEANFILES = $(launchdscript_SCRIPTS)
-
-EXTRA_DIST = \
+launch_ddir = $(sysconfdir)/etc/launchd/launchd.d
+dist_launch_d_DATA = \
 	$(top_srcdir)/etc/launchd/launchd.d/zpool-import-all.sh.in
 
 do_subst = -$(SED) -e 's,@bindir\@,$(bindir),g' \
@@ -19,5 +15,3 @@ zpool-import-all.sh: zpool-import-all.sh.in
 	$(do_subst) < $(top_srcdir)/etc/launchd/launchd.d/zpool-import-all.sh.in > zpool-import-all.sh
 	chmod +x zpool-import-all.sh
 
-clean-local::
-	-$(RM) $(launchdscript_SCRIPTS)

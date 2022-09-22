@@ -1,4 +1,2 @@
 
-if BUILD_MACOS
-SUBDIRS = macos
-endif
+include $(srcdir)/%D%/macos/Makefile.am

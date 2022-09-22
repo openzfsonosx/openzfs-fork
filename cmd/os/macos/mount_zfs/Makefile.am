@@ -1,9 +1,5 @@
-include $(top_srcdir)/config/Rules.am
-
-FS_BUNDLEPREFIX = /Library/Filesystems
-FS_BUNDLEDIR = $(DESTDIR)$(FS_BUNDLEPREFIX)/zfs.fs
-
-sbin_PROGRAMS = mount_zfs
+sbin_PROGRAMS   += mount_zfs
+CPPCHECKTARGETS += mount_zfs
 
 AM_CPPFLAGS += -I$(top_srcdir)/lib/libzfs
 
@@ -17,7 +13,6 @@ mount_zfs_LDADD = \
 
 mount_zfs_LDADD += $(LTLIBINTL)
 
-include $(top_srcdir)/config/CppCheck.am
-
-install-exec-hook:
+INSTALL_DATA_HOOKS += mount_zfs-install-exec-hook
+mount_zfs-install-exec-hook:
 	cp -f $(DESTDIR)/$(sbindir)/mount_zfs $(FS_BUNDLEDIR)/Contents/Resources/mount_zfs

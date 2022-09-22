@@ -1,9 +1,5 @@
-include $(top_srcdir)/config/Rules.am
 
-if BUILD_MACOS
-
-DEFAULT_INCLUDES += -I$(top_srcdir)/lib/libspl/include/os/macos
-lib_LTLIBRARIES = librt.la
+lib_LTLIBRARIES += librt.la
 
 nodist_librt_la_SOURCES = \
 	mach_gettime.c
@@ -14,5 +10,3 @@ librt_la_LDFLAGS=-module -avoid-version -shrext .so.1
 
 #install-exec-local: librt_la
 #	ln -s
-
-endif

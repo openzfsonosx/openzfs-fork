@@ -1,6 +1,5 @@
-AUTOMAKE_OPTIONS = subdir-objects
 
-launchddaemondir = /Library/LaunchDaemons
+CLEANFILES += $(launchddaemon_DATA)
 
 launchddaemon_DATA = \
 	$(top_srcdir)/etc/launchd/daemons/org.openzfsonosx.zconfigd.plist \
@@ -9,10 +8,7 @@ launchddaemon_DATA = \
 	$(top_srcdir)/etc/launchd/daemons/org.openzfsonosx.zpool-import-all.plist \
 	$(top_srcdir)/etc/launchd/daemons/org.openzfsonosx.InvariantDisks.plist
 
-DAEMON_DIR = $(top_srcdir)/etc/launchd/daemons
-launchdscriptdir=${libexecdir}/zfs/launchd.d
-
-EXTRA_DIST = \
+dist_launchddaemon_DATA = \
 	$(DAEMON_DIR)/org.openzfsonosx.zconfigd.plist.in \
 	$(DAEMON_DIR)/org.openzfsonosx.zed.plist.in \
 	$(DAEMON_DIR)/org.openzfsonosx.zpool-import.plist.in \
@@ -34,5 +30,4 @@ $(launchddaemon_DATA):
 		-e 's,@launchdscriptdir\@,$(launchdscriptdir),g' \
 		'$@.in' >'$@'
 
-clean-local::
-	-$(RM) $(launchddaemon_DATA)
+

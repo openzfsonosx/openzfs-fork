@@ -1,12 +1,7 @@
-include $(top_srcdir)/config/Rules.am
+sbin_PROGRAMS   += InvariantDisks
+CPPCHECKTARGETS += InvariantDisks
 
-AUTOMAKE_OPTIONS = subdir-objects
 AM_LIBTOOLFLAGS += --tag=CXX
-
-DEFAULT_INCLUDES += \
-	-I$(top_srcdir)/include
-
-sbin_PROGRAMS = InvariantDisks
 
 InvariantDisks_SOURCES = \
 	IDLogUtils.cpp \

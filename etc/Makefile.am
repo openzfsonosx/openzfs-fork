@@ -98,6 +98,7 @@ endif
 endif
 
 if BUILD_MACOS
-SUBDIRS += launchd paths.d
+include $(srcdir)/%D%/launchd/Makefile.am
+include $(srcdir)/%D%/paths.d/Makefile.am
 endif
 

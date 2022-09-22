@@ -1,8 +1,11 @@
 pathsddir = $(sysconfdir)/paths.d
 pathsd_DATA = zfs
 
-EXTRA_DIST = \
+paths_ddir = $(sysconfdir)/etc/paths.d/
+dist_paths_d_DATA = \
 	zfs
+
+CLEANFILES += $(pathsd_DATA)
 
 zfs: zfs.in
 
@@ -14,6 +17,3 @@ $(pathsd_DATA):
 		-e 's,@launchddaemondir\@,$(launchddaemondir),g' \
 		-e 's,@launchdscriptdir\@,$(launchdscriptdir),g' \
 		'$@.in' >'$@'
-
-distclean-local::
-	-$(RM) $(pathsd_DATA)

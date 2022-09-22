@@ -419,7 +419,7 @@ AC_DEFUN([ZFS_AC_KERNEL], [
 	*** Please make sure the kernel devel package for your distribution
 	*** is installed and then try again.  If that fails, you can specify the
 	*** location of the kernel source and build with the '--with-linux=PATH' and
-	*** '--with-linux-obj=PATH' options respectively.])
+	*** '--with-linux-obj=PATH' options respectively.
 	*** If you are configuring for macOS, use '--with-macos=PATH'.])
 	])
 
@@ -571,9 +571,9 @@ dnl # ZFS_LINUX_CONFTEST_H
 dnl #
 AC_DEFUN([ZFS_LINUX_CONFTEST_H], [
 test -d build/$2 || mkdir -p build/$2
-cat - <<_ACEOF >build/$2/$2.h
+cat - <<_ACEOF1 >build/$2/$2.h
 $1
-_ACEOF
+_ACEOF1
 ])
 
 dnl #
@@ -581,9 +581,9 @@ dnl # ZFS_LINUX_CONFTEST_C
 dnl #
 AC_DEFUN([ZFS_LINUX_CONFTEST_C], [
 test -d build/$2 || mkdir -p build/$2
-cat confdefs.h - <<_ACEOF >build/$2/$2.c
+cat confdefs.h - <<_ACEOF2 >build/$2/$2.c
 $1
-_ACEOF
+_ACEOF2
 ])
 
 dnl #
@@ -600,12 +600,12 @@ AC_DEFUN([ZFS_LINUX_CONFTEST_MAKEFILE], [
 	file=build/$1/Makefile
 
 	dnl # Example command line to manually build source.
-	cat - <<_ACEOF >$file
+	cat - <<_ACEOF3 >$file
 # Example command line to manually build source
 # make modules -C $LINUX_OBJ $ARCH_UM M=$PWD/build/$1
 
 ccflags-y := -Werror $FRAME_LARGER_THAN
-_ACEOF
+_ACEOF3
 
 	dnl # Additional custom CFLAGS as requested.
 	m4_ifval($3, [echo "ccflags-y += $3" >>$file], [])

@@ -134,6 +134,5 @@ scripts_zfs_tests_bin_PROGRAMS += %D%/file_fadvise
 endif
 
 if BUILD_MACOS
-SUBDIRS += \
-	librt
+include $(srcdir)/%D%/librt/Makefile.am
 endif

@@ -8,10 +8,10 @@ CPPCHECKTARGETS    += libefi.la
 if BUILD_MACOS
 libefi_la_SOURCES = \
 	%D%/rdwr_efi_macos.c
-libefi_la_LDFLAGS= -framework DiskArbitration -framework CoreServices
+libefi_la_LDFLAGS = -framework DiskArbitration -framework CoreServices
 else
-libefi_la_SOURCES = \
-	%D%/rdwr_efi.c
+#libefi_la_SOURCES = \
+#	%D%/rdwr_efi.c
 endif
 
 libefi_la_LIBADD = $(LIBUUID_LIBS) $(ZLIB_LIBS)
