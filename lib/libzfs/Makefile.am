@@ -35,6 +35,8 @@ endif
 
 if BUILD_MACOS
 dist_libzfs_la_SOURCES += \
+	%D%/os/macos/libzfs_dataset_os.c \
+	%D%/os/macos/libzfs_getmntany.c \
 	%D%/os/macos/libzfs_mount_os.c \
 	%D%/os/macos/libzfs_pool_os.c \
 	%D%/os/macos/libzfs_util_os.c
@@ -83,7 +85,7 @@ endif
 
 if BUILD_MACOS
 libzfs_la_LIBADD += \
-	$(abs_top_builddir)/lib/os/macos/libdiskmgt/libdiskmgt.la
+	libdiskmgt.la
 libzfs_la_LDFLAGS += -lobjc -framework IOKit -framework Foundation -lssl
 endif
 

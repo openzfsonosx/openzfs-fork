@@ -4,12 +4,12 @@ CPPCHECKTARGETS += mount_zfs
 AM_CPPFLAGS += -I$(top_srcdir)/lib/libzfs
 
 mount_zfs_SOURCES = \
-	mount_zfs.c
+	%D%/mount_zfs.c
 
 mount_zfs_LDADD = \
-	$(abs_top_builddir)/lib/libzfs/libzfs.la \
-	$(abs_top_builddir)/lib/libzfs_core/libzfs_core.la \
-	$(abs_top_builddir)/lib/libnvpair/libnvpair.la
+	libzfs.la \
+	libzfs_core.la \
+	libnvpair.la
 
 mount_zfs_LDADD += $(LTLIBINTL)
 

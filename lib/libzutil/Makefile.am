@@ -30,8 +30,7 @@ endif
 if BUILD_MACOS
 libzutil_la_SOURCES += \
 	%D%/os/macos/zutil_device_path_os.c \
-	%D%/os/macos/zutil_import_os.c \
-	%D%/os/macos/zutil_compat.c
+	%D%/os/macos/zutil_import_os.c
 endif
 
 libzutil_la_LIBADD = \

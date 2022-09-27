@@ -1,24 +1,24 @@
-include $(top_srcdir)/config/Rules.am
 
-DEFAULT_INCLUDES += \
-	-I$(top_srcdir)/include \
-	-I$(top_srcdir)/lib/libspl/include
+libdiskmgt_la_CFLAGS  = $(AM_CFLAGS) $(LIBRARY_CFLAGS)
+libdiskmgt_la_CFLAGS += -fvisibility=default
 
-lib_LTLIBRARIES = libdiskmgt.la
+libdiskmgt_la_CPPFLAGS  = $(AM_CPPFLAGS)
+libdiskmgt_la_CPPFLAGS += -I$(srcdir)/%D%
+
+noinst_LTLIBRARIES += libdiskmgt.la
+CPPCHECKTARGETS += libdiskmgt.la
 
 libdiskmgt_la_SOURCES = \
-	dm.c \
-	libdiskmgt.c \
-	diskutil.c \
-	entry.c \
-	inuse_corestorage.c \
-	inuse_fs.c \
-	inuse_macswap.c \
-	inuse_mnt.c \
-	inuse_partition.c \
-	inuse_zpool.c \
-	slice.c
+	%D%/dm.c \
+	%D%/libdiskmgt.c \
+	%D%/diskutil.c \
+	%D%/entry.c \
+	%D%/inuse_corestorage.c \
+	%D%/inuse_fs.c \
+	%D%/inuse_macswap.c \
+	%D%/inuse_mnt.c \
+	%D%/inuse_partition.c \
+	%D%/inuse_zpool.c \
+	%D%/slice.c
 
 libdiskmgt_la_LDFLAGS = -version-info 1:0:0 -framework DiskArbitration -framework CoreServices
-
-EXTRA_DIST = $(USER_C)

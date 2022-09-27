@@ -4,39 +4,39 @@ CPPCHECKTARGETS += InvariantDisks
 AM_LIBTOOLFLAGS += --tag=CXX
 
 InvariantDisks_SOURCES = \
-	IDLogUtils.cpp \
-	IDLogUtils.hpp \
-	IDBaseLinker.cpp \
-	IDBaseLinker.hpp \
-	IDCLI.cpp \
-	IDCLI.hpp \
-	IDDAHandlerIdle.cpp \
-	IDDAHandlerIdle.hpp \
-	IDDiskArbitrationDispatcher.cpp \
-	IDDiskArbitrationDispatcher.hpp \
-	IDDiskArbitrationHandler.hpp \
-	IDDiskArbitrationUtils.cpp \
-	IDDiskArbitrationUtils.hpp \
-	IDDiskInfoLogger.cpp \
-	IDDiskInfoLogger.hpp \
-	IDDispatchUtils.cpp \
-	IDDispatchUtils.hpp \
-	IDException.cpp \
-	IDException.hpp \
-	IDFileUtils.mm \
-	IDFileUtils.hpp \
-	IDImagePathLinker.cpp \
-	IDImagePathLinker.hpp \
-	IDMediaPathLinker.cpp \
-	IDMediaPathLinker.hpp \
-	IDSerialLinker.cpp \
-	IDSerialLinker.hpp \
-	IDSymlinkHandle.cpp \
-	IDSymlinkHandle.hpp \
-	IDUUIDLinker.cpp \
-	IDUUIDLinker.hpp \
-	git-version.h \
-	main.cpp
+	%D%/IDLogUtils.cpp \
+	%D%/IDLogUtils.hpp \
+	%D%/IDBaseLinker.cpp \
+	%D%/IDBaseLinker.hpp \
+	%D%/IDCLI.cpp \
+	%D%/IDCLI.hpp \
+	%D%/IDDAHandlerIdle.cpp \
+	%D%/IDDAHandlerIdle.hpp \
+	%D%/IDDiskArbitrationDispatcher.cpp \
+	%D%/IDDiskArbitrationDispatcher.hpp \
+	%D%/IDDiskArbitrationHandler.hpp \
+	%D%/IDDiskArbitrationUtils.cpp \
+	%D%/IDDiskArbitrationUtils.hpp \
+	%D%/IDDiskInfoLogger.cpp \
+	%D%/IDDiskInfoLogger.hpp \
+	%D%/IDDispatchUtils.cpp \
+	%D%/IDDispatchUtils.hpp \
+	%D%/IDException.cpp \
+	%D%/IDException.hpp \
+	%D%/IDFileUtils.mm \
+	%D%/IDFileUtils.hpp \
+	%D%/IDImagePathLinker.cpp \
+	%D%/IDImagePathLinker.hpp \
+	%D%/IDMediaPathLinker.cpp \
+	%D%/IDMediaPathLinker.hpp \
+	%D%/IDSerialLinker.cpp \
+	%D%/IDSerialLinker.hpp \
+	%D%/IDSymlinkHandle.cpp \
+	%D%/IDSymlinkHandle.hpp \
+	%D%/IDUUIDLinker.cpp \
+	%D%/IDUUIDLinker.hpp \
+	%D%/git-version.h \
+	%D%/main.cpp
 
 InvariantDisks_CXXFLAGS = -std=c++11 -stdlib=libc++
 InvariantDisks_OBJCXXFLAGS = -std=c++11 -stdlib=libc++

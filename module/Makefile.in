@@ -116,14 +116,14 @@ modules_install-Linux: modules_uninstall-Linux-legacy
 		depmod -ae -F $$sysmap @LINUX_VERSION@; \
 	fi
 
+modules_install-FreeBSD:
+	@# Install the kernel modules
+	+$(FMAKE) install
+
 modules_install-macOS:
 	flags="$$(echo $$MAKEFLAGS | tr ' ' '\n'|grep '^-j')"; \
 	env MAKEFLAGS="" SYSDIR=@LINUX@ \
 		make $${flags} -C os/macos/ install
-
-modules_install-FreeBSD:
-	@# Install the kernel modules
-	+$(FMAKE) install
 
 modules_install: modules_install-@ac_system@
 

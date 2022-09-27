@@ -1,13 +1,13 @@
 pathsddir = $(sysconfdir)/paths.d
-pathsd_DATA = zfs
+pathsd_DATA = zfs-path
 
 paths_ddir = $(sysconfdir)/etc/paths.d/
 dist_paths_d_DATA = \
-	zfs
+	zfs-path
 
 CLEANFILES += $(pathsd_DATA)
 
-zfs: zfs.in
+zfs-path: %D%/zfs-path.in
 
 $(pathsd_DATA):
 	-$(SED) -e 's,@bindir\@,$(bindir),g' \

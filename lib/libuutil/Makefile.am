@@ -26,11 +26,6 @@ libuutil_la_LDFLAGS += -Wl,-z,defs
 endif
 endif
 
-if BUILD_MACOS
-libuutil_la_LIBADD += \
-	$(abs_top_builddir)/lib/libefi/libefi.la
-endif
-
 libuutil_la_LDFLAGS += -version-info 3:0:0
 
 dist_noinst_DATA += %D%/libuutil.abi %D%/libuutil.suppr

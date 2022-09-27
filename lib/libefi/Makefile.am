@@ -5,13 +5,16 @@ libefi_la_CFLAGS += -fvisibility=hidden
 noinst_LTLIBRARIES += libefi.la
 CPPCHECKTARGETS    += libefi.la
 
-if BUILD_MACOS
+#if BUILD_MACOS
+
+# Why the hell does this fail if I use the "if"
 libefi_la_SOURCES = \
 	%D%/rdwr_efi_macos.c
 libefi_la_LDFLAGS = -framework DiskArbitration -framework CoreServices
-else
+
+#else
 #libefi_la_SOURCES = \
 #	%D%/rdwr_efi.c
-endif
+#endif
 
 libefi_la_LIBADD = $(LIBUUID_LIBS) $(ZLIB_LIBS)

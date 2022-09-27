@@ -158,7 +158,6 @@ zfs_SOURCES = \
 	../../../zfs/sha256.c \
 	../../../zfs/skein_zfs.c \
 	../../../zfs/spa.c \
-	../../../zfs/spa_boot.c \
 	../../../zfs/spa_checkpoint.c \
 	../../../zfs/spa_config.c \
 	../../../zfs/spa_errlog.c \
@@ -265,9 +264,7 @@ zfs_SOURCES = \
 	../../../zcommon/zpool_prop.c \
 	../../../zcommon/zprop_common.c \
 	../../../icp/api/kcf_cipher.c \
-	../../../icp/api/kcf_digest.c \
 	../../../icp/api/kcf_mac.c \
-	../../../icp/api/kcf_miscapi.c \
 	../../../icp/api/kcf_ctxops.c \
 	../../../icp/core/kcf_callprov.c \
 	../../../icp/core/kcf_prov_tabs.c \

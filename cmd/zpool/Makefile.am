@@ -25,7 +25,7 @@ zpool_SOURCES += \
 endif
 
 if BUILD_MACOS
-zpool_SOURCES += os/macos/zpool_vdev_os.c
+zpool_SOURCES += %D%/os/macos/zpool_vdev_os.c
 endif
 
 zpool_LDADD = \
@@ -40,6 +40,7 @@ zpool_LDADD += $(LTLIBINTL)
 if BUILD_FREEBSD
 zpool_LDADD += -lgeom
 endif
+
 zpool_LDADD += -lm $(LIBBLKID_LIBS) $(LIBUUID_LIBS)
 
 dist_noinst_DATA += %D%/zpool.d/README

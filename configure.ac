@@ -32,9 +32,6 @@
 
 AC_INIT(m4_esyscmd(awk '/^Name:/ {printf $2}' META),
 	m4_esyscmd(awk '/^Version:/ {printf $2}' META))
-
-AC_INIT(NAME, VERS)
-
 AC_LANG(C)
 ZFS_AC_META
 AC_CONFIG_AUX_DIR([config])
@@ -45,7 +42,8 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_INIT_AUTOMAKE([subdir-objects foreign])
 # Remove default macros from config.h:
 #   PACKAGE, PACKAGE_{BUGREPORT,NAME,STRING,TARNAME,VERSION}, STDC_HEADERS, VERSION
-	sed -nri~ -e '/^$/be' -e 'N;N;/#define (PACKAGE|VERSION|STDC_HEADERS)/d' -e ':e' -e 'p' zfs_config.h && rm zfs_config.h~ || exit])
+AC_CONFIG_HEADERS([zfs_config.h], [
+	$SED -nri~ -e '/^$/be' -e 'N;N;/#define (PACKAGE|VERSION|STDC_HEADERS)/d' -e ':e' -e 'p' zfs_config.h && rm zfs_config.h~ || exit])
 
 LT_INIT
 AC_PROG_INSTALL
@@ -56,8 +54,6 @@ AM_PROG_AS
 AM_PROG_CC_C_O
 AX_CODE_COVERAGE
 _AM_PROG_TAR(pax)
-
-dnl macOS additionals
 AC_PROG_CXX(clang++)
 AC_PROG_OBJC(clang)
 AC_PROG_OBJCXX(clang++)
@@ -71,7 +67,6 @@ ZFS_AC_DEBUG_KMEM
 ZFS_AC_DEBUG_KMEM_TRACKING
 ZFS_AC_DEBUG_INVARIANTS
 
-
 AC_CONFIG_FILES([
 	Makefile
 	include/Makefile
@@ -80,6 +75,7 @@ AC_CONFIG_FILES([
 	lib/libzfsbootenv/libzfsbootenv.pc
 	module/Kbuild
 	module/Makefile
+	module/os/macos/Makefile
 	rpm/generic/zfs-dkms.spec
 	rpm/generic/zfs-kmod.spec
 	rpm/generic/zfs.spec

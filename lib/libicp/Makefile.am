@@ -57,14 +57,18 @@ if TARGET_CPU_X86_64
 # Until we can work out how to share assembler files:
 if BUILD_MACOS
 nodist_libicp_la_SOURCES += \
-	module/icp/asm-x86_64/os/macos/aes/aeskey.c \
 	module/icp/asm-x86_64/os/macos/aes/aes_amd64.S \
 	module/icp/asm-x86_64/os/macos/aes/aes_aesni.S \
+	module/icp/asm-x86_64/os/macos/blake3/blake3_avx2.S \
+	module/icp/asm-x86_64/os/macos/blake3/blake3_avx512.S \
+	module/icp/asm-x86_64/os/macos/blake3/blake3_sse2.S \
+	module/icp/asm-x86_64/os/macos/blake3/blake3_sse41.S \
 	module/icp/asm-x86_64/os/macos/modes/gcm_pclmulqdq.S \
 	module/icp/asm-x86_64/os/macos/sha2/sha256_impl.S \
-	module/icp/asm-x86_64/os/macos/sha2/sha512_impl.S 
+	module/icp/asm-x86_64/os/macos/sha2/sha512_impl.S
 else
 nodist_libicp_la_SOURCES += \
+	module/icp/asm-x86_64/aes/anus.c \
 	module/icp/asm-x86_64/aes/aeskey.c \
 	module/icp/asm-x86_64/aes/aes_amd64.S \
 	module/icp/asm-x86_64/aes/aes_aesni.S \
@@ -79,4 +83,3 @@ nodist_libicp_la_SOURCES += \
 	module/icp/asm-x86_64/blake3/blake3_sse41.S
 endif
 endif
-
