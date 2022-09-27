@@ -144,7 +144,6 @@ zfs_ace_v0_set_who(void *acep, uint64_t who)
 	((zfs_oldace_t *)acep)->z_fuid = who;
 }
 
-/*ARGSUSED*/
 static size_t
 zfs_ace_v0_size(void *acep)
 {
@@ -163,7 +162,6 @@ zfs_ace_v0_mask_off(void)
 	return (offsetof(zfs_oldace_t, z_access_mask));
 }
 
-/*ARGSUSED*/
 static int
 zfs_ace_v0_data(void *acep, void **datap)
 {
@@ -629,7 +627,6 @@ zfs_acl_next_ace(zfs_acl_t *aclp, void *start, uint64_t *who,
 	return (NULL);
 }
 
-/*ARGSUSED*/
 static uint64_t
 zfs_ace_walk(void *datap, uint64_t cookie, int aclcnt,
     uint16_t *flags, uint16_t *type, uint32_t *mask)
@@ -691,7 +688,7 @@ zfs_copy_ace_2_fuid(zfsvfs_t *zfsvfs, vtype_t obj_type, zfs_acl_t *aclp,
 			    sizeof (aceobjp->a_obj_type));
 			memcpy(
 			    zobjacep->z_inherit_type,
-				aceobjp->a_inherit_obj_type,
+			    aceobjp->a_inherit_obj_type,
 			    sizeof (aceobjp->a_inherit_obj_type));
 			acep = (ace_t *)((caddr_t)acep + sizeof (ace_object_t));
 			break;
@@ -740,11 +737,11 @@ zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, cred_t *cr,
 			objacep = (ace_object_t *)acep;
 			memcpy(
 			    objacep->a_obj_type,
-				zobjacep->z_object_type,
+			    zobjacep->z_object_type,
 			    sizeof (zobjacep->z_object_type));
 			memcpy(
 			    objacep->a_inherit_obj_type,
-				zobjacep->z_inherit_type,
+			    zobjacep->z_inherit_type,
 			    sizeof (zobjacep->z_inherit_type));
 			ace_size = sizeof (ace_object_t);
 			break;
@@ -1129,7 +1126,6 @@ done:
 	return (error);
 }
 
-/*ARGSUSED*/
 void
 zfs_acl_data_locator(void **dataptr, uint32_t *length, uint32_t buflen,
     boolean_t start, void *userdata)

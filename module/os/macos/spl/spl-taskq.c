@@ -774,13 +774,11 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 /*
  * Do-nothing task which may be used to prepopulate thread caches.
  */
-/*ARGSUSED*/
 void
 nulltask(void *unused)
 {
 }
 
-/*ARGSUSED*/
 static int
 taskq_constructor(void *buf, void *cdrarg, int kmflags)
 {
@@ -801,7 +799,6 @@ taskq_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
 taskq_destructor(void *buf, void *cdrarg)
 {
@@ -820,7 +817,6 @@ taskq_destructor(void *buf, void *cdrarg)
 	cv_destroy(&tq->tq_maxalloc_cv);
 }
 
-/*ARGSUSED*/
 static int
 taskq_ent_constructor(void *buf, void *cdrarg, int kmflags)
 {
@@ -836,7 +832,6 @@ taskq_ent_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
 taskq_ent_destructor(void *buf, void *cdrarg)
 {
@@ -1151,7 +1146,6 @@ taskq_cpupct_remove(taskq_t *tq)
 	mutex_exit(&cpu_lock);
 }
 
-/*ARGSUSED*/
 static int
 taskq_cpu_setup(cpu_setup_t what, int id, void *arg)
 {

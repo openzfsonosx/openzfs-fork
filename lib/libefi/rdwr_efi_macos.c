@@ -1420,7 +1420,7 @@ efi_write(int fd, struct dk_gpt *vtoc)
 		}
 		memcpy(
 		    &efi_parts[i].efi_gpe_UniquePartitionGUID,
-			&vtoc->efi_parts[i].p_uguid,
+		    &vtoc->efi_parts[i].p_uguid,
 		    sizeof (uuid_t));
 	}
 	efi->efi_gpt_PartitionEntryArrayCRC32 =

@@ -133,7 +133,6 @@ zfs_rangelock_cb(zfs_locked_range_t *new, void *arg)
 	}
 }
 
-/*ARGSUSED*/
 #if 0 // unused function
 static void
 znode_evict_error(dmu_buf_t *dbuf, void *user_ptr)
@@ -156,7 +155,6 @@ extern struct vop_vector zfs_shareops;
  *      to pass vfsp here, which is not possible, because argument
  *      'cdrarg' is defined at kmem_cache_create() time.
  */
-/*ARGSUSED*/
 static int
 zfs_znode_cache_constructor(void *buf, void *arg, int kmflags)
 {
@@ -183,7 +181,6 @@ zfs_znode_cache_constructor(void *buf, void *arg, int kmflags)
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
 zfs_znode_cache_destructor(void *buf, void *arg)
 {
@@ -1568,7 +1565,6 @@ zfs_grow_blocksize(znode_t *zp, uint64_t size, dmu_tx_t *tx)
  * be calling back into the fs for a putpage().  E.g.: when truncating
  * a file, the pages being "thrown away* don't need to be written out.
  */
-/* ARGSUSED */
 static int
 zfs_no_putpage(struct vnode *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
     int flags, cred_t *cr)

@@ -130,7 +130,6 @@ vdev_disk_off_notify(ldi_handle_t lh, ldi_ev_cookie_t ecookie, void *arg,
 	return (LDI_EV_SUCCESS);
 }
 
-/* ARGSUSED */
 static void
 vdev_disk_off_finalize(ldi_handle_t lh, ldi_ev_cookie_t ecookie,
     int ldi_result, void *arg, void *ev_data)

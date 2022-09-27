@@ -333,9 +333,9 @@ static struct cdevsw zfs_cdevsw = {
 };
 
 #ifdef ZFS_DEBUG
-#define ZFS_DEBUG_STR   " (DEBUG mode)"
+#define	ZFS_DEBUG_STR   " (DEBUG mode)"
 #else
-#define ZFS_DEBUG_STR   ""
+#define	ZFS_DEBUG_STR   ""
 #endif
 
 static int
@@ -430,13 +430,13 @@ zfsdev_attach(void)
 
 	return (0);
 
-  openzfs_os_failed:
+openzfs_os_failed:
 	zstd_fini();
-  zstd_failed:
+zstd_failed:
 	icp_fini();
-  icp_failed:
+icp_failed:
 	zcommon_fini();
-  zcommon_failed:
+zcommon_failed:
 	return (err);
 }
 

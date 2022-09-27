@@ -7177,8 +7177,8 @@ share_mount(int op, int argc, char **argv)
 
 			} else {
 
-				ret = share_mount_one(zhp, op, flags, SA_NO_PROTOCOL,
-				    B_TRUE, options);
+				ret = share_mount_one(zhp, op, flags,
+				    SA_NO_PROTOCOL, B_TRUE, options);
 			}
 
 			zfs_close(zhp);
