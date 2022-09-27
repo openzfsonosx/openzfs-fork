@@ -7177,7 +7177,7 @@ share_mount(int op, int argc, char **argv)
 
 			} else {
 
-				ret = share_mount_one(zhp, op, flags, NULL,
+				ret = share_mount_one(zhp, op, flags, SA_NO_PROTOCOL,
 				    B_TRUE, options);
 			}
 

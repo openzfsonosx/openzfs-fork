@@ -998,10 +998,10 @@ _LIBZFS_H int zfs_snapshot_mount(zfs_handle_t *, const char *, int);
 _LIBZFS_H int zfs_snapshot_unmount(zfs_handle_t *, int);
 /* We moved these from libspl to libzfs to be able to do more */
 _LIBZFS_H int getmntent(FILE *, struct mnttab *);
-_LIBZFS_H char *hasmntopt(struct mnttab *, char *);
+_LIBZFS_H char *hasmntopt(struct mnttab *, const char *);
 _LIBZFS_H int getextmntent(const char *, struct extmnttab *,
     struct stat64 *);
-_LIBZFS_H int do_mount(zfs_handle_t *, const char *, char *, int);
+_LIBZFS_H int do_mount(zfs_handle_t *, const char *, const char *, int);
 #endif
 
 /*
