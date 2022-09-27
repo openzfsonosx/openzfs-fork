@@ -705,7 +705,7 @@ ZFSPool::doAsyncReadWrite(IOMemoryDescriptor *buffer,
 	/* Read vs. write */
 	if (buffer->getDirection() == kIODirectionIn) {
 		/* Zero the read buffer */
-		bzero(zero, ZFS_POOL_DEV_BSIZE);
+		memset(zero, 0, ZFS_POOL_DEV_BSIZE);
 		len = buffer->getLength();
 		while (len > 0) {
 			cur = (len > ZFS_POOL_DEV_BSIZE ?

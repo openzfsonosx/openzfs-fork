@@ -786,7 +786,7 @@ taskq_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	taskq_t *tq = buf;
 
-	bzero(tq, sizeof (taskq_t));
+	memset(tq, 0, sizeof (taskq_t));
 
 	mutex_init(&tq->tq_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&tq->tq_threadlock, NULL, RW_DEFAULT, NULL);
@@ -826,7 +826,7 @@ taskq_ent_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	taskq_ent_t *tqe = buf;
 
-	bzero(tqe, sizeof (taskq_ent_t));
+	memset(tqe, 0, sizeof (taskq_ent_t));
 	cv_init(&tqe->tqent_cv, NULL, CV_DEFAULT, NULL);
 #ifdef __APPLE__
 	/* Simulate TS_STOPPED */

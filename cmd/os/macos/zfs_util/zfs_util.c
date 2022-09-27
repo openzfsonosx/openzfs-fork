@@ -796,7 +796,7 @@ main(int argc, char **argv)
 	} while (0);
 
 
-	bzero(&probe_args, sizeof (probe_args_t));
+	memset(&probe_args, 0, sizeof (probe_args_t));
 	len = MAXNAMELEN;
 	pool_name = kmem_alloc(len, KM_SLEEP);
 	if (!pool_name) {
@@ -854,9 +854,9 @@ main(int argc, char **argv)
 
 		} else {  /* is_mounted == true */
 
-			bzero(&attr, sizeof (attr));
-			bzero(&nameBuf, sizeof (nameBuf));
-			bzero(&volname, sizeof (volname));
+			memset(&attr, 0, sizeof (attr));
+			memset(&nameBuf, 0, sizeof (nameBuf));
+			memset(&volname, 0, sizeof (volname));
 			attr.bitmapcount = 5;
 			attr.volattr = ATTR_VOL_INFO | ATTR_VOL_NAME;
 
@@ -904,7 +904,7 @@ main(int argc, char **argv)
 			if (!is_mounted) {
 				char uuid[40];
 
-				bzero(&probe_args, sizeof (probe_args_t));
+				memset(&probe_args, 0, sizeof (probe_args_t));
 
 				ret = zfs_probe(rawdevice, &probe_args);
 
@@ -948,8 +948,8 @@ main(int argc, char **argv)
 				/* Otherwise, ZFS filesystem pseudo device */
 
 				// struct attrlist attr;
-				bzero(&buf, sizeof (buf));
-				bzero(&attr, sizeof (attr));
+				memset(&buf, 0, sizeof (buf));
+				memset(&attr, 0, sizeof (attr));
 				attr.bitmapcount = 5;
 				attr.volattr = ATTR_VOL_INFO | ATTR_VOL_UUID;
 

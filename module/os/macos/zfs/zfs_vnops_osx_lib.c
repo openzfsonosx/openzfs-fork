@@ -1142,7 +1142,7 @@ void commonattrpack(attrinfo_t *aip, zfsvfs_t *zfsvfs, znode_t *zp,
 			finderinfo.fi_flags |=
 			    OSSwapHostToBigConstInt16(kIsInvisible);
 		}
-		bcopy(&finderinfo, attrbufptr, sizeof (finderinfo));
+		memcpy(attrbufptr, &finderinfo, sizeof (finderinfo));
 		attrbufptr = (char *)attrbufptr + 32;
 	}
 	if (ATTR_CMN_OWNERID & commonattr) {
@@ -1575,7 +1575,7 @@ out:
 	if (error == 0)
 		return;
 nodata:
-	bzero(fip, sizeof (finderinfo_t));
+	memset(fip, 0, sizeof (finderinfo_t));
 }
 
 #define	KAUTH_DIR_WRITE (KAUTH_VNODE_ACCESS | KAUTH_VNODE_ADD_FILE |	\
@@ -1695,7 +1695,7 @@ nfsacl_set_wellknown(int wkg, guid_t *guid)
 	/*
 	 * All WKGs begin with the same 12 bytes.
 	 */
-	bcopy(fingerprint, (void *)guid, 12);
+	memcpy((void *)guid, fingerprint, 12);
 	/*
 	 * The final 4 bytes are our code (in network byte order).
 	 */
@@ -1736,7 +1736,7 @@ aces_from_acl(ace_t *aces, int *nentries, struct kauth_acl *k_acl,
 
 	*nentries = k_acl->acl_entrycount;
 
-	// bzero(aces, sizeof (*aces) * *nentries);
+	// memset(aces, 0, sizeof (*aces) * *nentries);
 
 	// *nentries = aclp->acl_cnt;
 

@@ -536,12 +536,12 @@ zpl_xattr_set_sa(struct vnode *ip, const char *name, zfs_uio_t *uio,
 		/*
 		 * Allocate memory to copyin, which is a shame as nvlist
 		 * will also allocate memory to hold it. Could consider a
-		 * nvlist_add_byte_array_uio() so the bcopy() uses uiomove()
+		 * nvlist_add_byte_array_uio() so the memcpy(KM_SLEEP);
+			zfs_uiomove(buf, ) uses uiomove()
 		 * instead.
 		 */
 		if (zfs_uio_segflg(uio) != UIO_SYSSPACE) {
-			buf = kmem_alloc(len, KM_SLEEP);
-			zfs_uiomove(buf, len, UIO_WRITE, uio);
+			buf = kmem_alloc(len, len, UIO_WRITE, uio);
 		}
 
 		error = -nvlist_add_byte_array(nvl, name,

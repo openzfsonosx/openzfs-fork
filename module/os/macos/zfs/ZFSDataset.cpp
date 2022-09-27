@@ -374,7 +374,7 @@ ZFSDataset::setDatasetName(const char *name)
 #endif
 
 #if 0
-	bzero(newname, len);
+	memset(newname, 0, len);
 	snprintf(newname, len, "%s%s%s", kZFSIOMediaPrefix,
 	    name, kZFSIOMediaSuffix);
 
@@ -503,7 +503,7 @@ ZFSDataset::withDatasetNameAndSize(const char *name, uint64_t size)
 		/* Nothing allocated or retained yet */
 		return (NULL);
 	}
-	bzero(uuid_cstr, sizeof (uuid_cstr));
+	memset(uuid_cstr, 0, sizeof (uuid_cstr));
 
 #if 0
 	OSNumber *sizeNum = NULL;

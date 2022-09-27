@@ -115,7 +115,7 @@ rw_init(krwlock_t *rwlp, char *name, krw_type_t type, __unused void *arg)
 	    sizeof (struct leak),  M_TEMP, M_WAITOK);
 
 	if (leak) {
-		bzero(leak, sizeof (struct leak));
+		memset(leak, 0, sizeof (struct leak));
 		strlcpy(leak->location_file, file, SPL_DEBUG_RWLOCK_MAXCHAR);
 		strlcpy(leak->location_function, fn, SPL_DEBUG_RWLOCK_MAXCHAR);
 		leak->location_line = line;

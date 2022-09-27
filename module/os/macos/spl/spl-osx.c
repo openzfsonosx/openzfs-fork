@@ -390,7 +390,7 @@ ddi_copyin(const void *from, void *to, size_t len, int flags)
 
 	/* Fake ioctl() issued by kernel, 'from' is a kernel address */
 	if (flags & FKIOCTL)
-		bcopy(from, to, len);
+		memcpy(to, from, len);
 	else
 		ret = copyin((user_addr_t)from, (void *)to, len);
 
@@ -404,7 +404,7 @@ ddi_copyout(const void *from, void *to, size_t len, int flags)
 
 	/* Fake ioctl() issued by kernel, 'from' is a kernel address */
 	if (flags & FKIOCTL) {
-		bcopy(from, to, len);
+		memcpy(to, from, len);
 	} else {
 		ret = copyout(from, (user_addr_t)to, len);
 	}

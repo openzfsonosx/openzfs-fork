@@ -228,7 +228,7 @@ zfsctl_vnode_alloc(zfsvfs_t *zfsvfs, uint64_t id,
 
 	strlcpy(zp->z_name_cache, name, sizeof (zp->z_name_cache));
 
-	bzero(&vfsp, sizeof (vfsp));
+	memset(&vfsp, 0, sizeof (vfsp));
 	vfsp.vnfs_str = "zfs";
 	vfsp.vnfs_mp = zfsvfs->z_vfs;
 	vfsp.vnfs_vtype = IFTOVT((mode_t)zp->z_mode);
@@ -593,7 +593,7 @@ zfsctl_vnop_lookup(struct vnop_lookup_args *ap)
 	if (cnp->cn_nameptr[cnp->cn_namelen] != 0) {
 		filename_num_bytes = cnp->cn_namelen + 1;
 		filename = (char *)kmem_alloc(filename_num_bytes, KM_SLEEP);
-		bcopy(cnp->cn_nameptr, filename, cnp->cn_namelen);
+		memcpy(filename, cnp->cn_nameptr, cnp->cn_namelen);
 		filename[cnp->cn_namelen] = '\0';
 	}
 
@@ -655,7 +655,7 @@ static int zfsctl_dir_emit(const char *name, uint64_t id, enum vtype type,
 
 		eodp->d_ino = id;
 		eodp->d_type = type;
-		(void) bcopy(name, eodp->d_name, namelen + 1);
+		(void) memcpy(eodp->d_name, name, namelen + 1);
 		eodp->d_namlen = namelen;
 		eodp->d_reclen = reclen;
 
@@ -664,7 +664,7 @@ static int zfsctl_dir_emit(const char *name, uint64_t id, enum vtype type,
 
 		odp->d_ino = id;
 		odp->d_type = type;
-		(void) bcopy(name, odp->d_name, namelen + 1);
+		(void) memcpy(odp->d_name, name, namelen + 1);
 		odp->d_namlen = namelen;
 		odp->d_reclen = reclen;
 

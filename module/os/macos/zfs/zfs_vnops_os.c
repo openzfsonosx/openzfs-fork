@@ -1631,7 +1631,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 			    MAXPATHLEN-1, UTF_DECOMPOSED) != 0) {
 				/* ASCII or normalization failed, copy zap */
 				if ((namelen > 0))
-					(void) bcopy(zap.za_name, eodp->d_name,
+					(void) memcpy(eodp->d_name, zap.za_name,
 					    namelen + 1);
 			} else {
 				/* Normalization succeeded (in buffer) */
@@ -1661,7 +1661,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 			    MAXNAMLEN, UTF_DECOMPOSED) != 0) {
 				/* ASCII or normalization failed, copy zap */
 				if ((namelen > 0))
-					(void) bcopy(zap.za_name, odp->d_name,
+					(void) memcpy(odp->d_name, zap.za_name,
 					    namelen + 1);
 			} else {
 				/* Normalization succeeded (in buffer). */

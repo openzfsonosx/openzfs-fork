@@ -1311,7 +1311,7 @@ zfs_vfs_mount(struct mount *vfsp, vnode_t *mvp /* devvp */,
 	if (data) {
 
 		// Clear the struct, so that "flags" is null if only given path.
-		bzero(&mnt_args, sizeof (mnt_args));
+		memset(&mnt_args, 0, sizeof (mnt_args));
 
 		osname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 

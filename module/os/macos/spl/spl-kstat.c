@@ -173,7 +173,7 @@ sbuf_delete(struct sbuf *s)
 		SBFREE(s->s_buf);
 	}
 	isdyn = SBUF_ISDYNSTRUCT(s);
-	bzero(s, sizeof (*s));
+	memset(s, 0, sizeof (*s));
 	if (isdyn) {
 		SBFREE(s);
 	}
@@ -211,7 +211,7 @@ sbuf_extend(struct sbuf *s, int addlen)
 	if (newbuf == NULL) {
 		return (-1);
 	}
-	bcopy(s->s_buf, newbuf, s->s_size);
+	memcpy(newbuf, s->s_buf, s->s_size);
 	if (SBUF_ISDYNAMIC(s)) {
 		SBFREE(s->s_buf);
 	} else {
@@ -231,11 +231,11 @@ sbuf_new(struct sbuf *s, char *buf, int length, int flags)
 		if (s == NULL) {
 			return (NULL);
 		}
-		bzero(s, sizeof (*s));
+		memset(s, 0, sizeof (*s));
 		s->s_flags = flags;
 		SBUF_SETFLAG(s, SBUF_DYNSTRUCT);
 	} else {
-		bzero(s, sizeof (*s));
+		memset(s, 0, sizeof (*s));
 		s->s_flags = flags;
 	}
 	s->s_size = length;
@@ -300,7 +300,7 @@ sbuf_printf(struct sbuf *s, const char *fmt, ...)
 static void
 kstat_set_string(char *dst, const char *src)
 {
-	bzero(dst, KSTAT_STRLEN);
+	memset(dst, 0, KSTAT_STRLEN);
 	(void) strlcpy(dst, src, KSTAT_STRLEN);
 }
 
@@ -359,7 +359,7 @@ get_kstat_parent(struct sysctl_oid_list *root, char *module_name,
 
 	if (!the_module) {
 		new_node = IOMalloc(sizeof (sysctl_tree_node_t));
-		bzero(new_node, sizeof (sysctl_tree_node_t));
+		memset(new_node, 0, sizeof (sysctl_tree_node_t));
 		init_oid_tree_node(root, module_name, new_node);
 		the_module = &new_node->tn_oid;
 	}
@@ -372,7 +372,7 @@ get_kstat_parent(struct sysctl_oid_list *root, char *module_name,
 
 	if (!the_class) {
 		new_node = IOMalloc(sizeof (sysctl_tree_node_t));
-		bzero(new_node, sizeof (sysctl_tree_node_t));
+		memset(new_node, 0, sizeof (sysctl_tree_node_t));
 		init_oid_tree_node(container, class_name, new_node);
 		the_class = &new_node->tn_oid;
 	}
@@ -767,7 +767,7 @@ kstat_create(const char *ks_module, int ks_instance, const char *ks_name,
 	 */
 	size = sizeof (ekstat_t);
 	e = (ekstat_t *)IOMalloc(size);
-	bzero(e, size);
+	memset(e, 0, size);
 	if (e == NULL) {
 		cmn_err(CE_NOTE, "kstat_create('%s', %d, '%s'): "
 		    "insufficient kernel memory",
@@ -878,7 +878,7 @@ kstat_install(kstat_t *ksp)
 		// Create the leaf node OID objects
 		e->e_vals = (sysctl_leaf_t *)IOMalloc(ksp->ks_ndata *
 		    sizeof (sysctl_leaf_t));
-		bzero(e->e_vals, ksp->ks_ndata * sizeof (sysctl_leaf_t));
+		memset(e->e_vals, 0, ksp->ks_ndata * sizeof (sysctl_leaf_t));
 		e->e_num_vals = ksp->ks_ndata;
 
 		named_base = (kstat_named_t *)(ksp->ks_data);
@@ -1003,7 +1003,7 @@ kstat_install(kstat_t *ksp)
 
 		e->e_vals = (sysctl_leaf_t *)
 		    IOMalloc(sizeof (sysctl_leaf_t) * 2);
-		bzero(e->e_vals, sizeof (sysctl_leaf_t));
+		memset(e->e_vals, 0, sizeof (sysctl_leaf_t));
 		e->e_num_vals = 2;
 		sysctl_leaf_t *val = e->e_vals;
 
@@ -1064,7 +1064,7 @@ kstat_install(kstat_t *ksp)
 	} else if (ksp->ks_type == KSTAT_TYPE_IO) {
 
 		e->e_vals = (sysctl_leaf_t *)IOMalloc(sizeof (sysctl_leaf_t));
-		bzero(e->e_vals, sizeof (sysctl_leaf_t));
+		memset(e->e_vals, 0, sizeof (sysctl_leaf_t));
 		e->e_num_vals = 1;
 		sysctl_leaf_t *val = e->e_vals;
 

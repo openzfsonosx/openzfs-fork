@@ -239,7 +239,7 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 		struct componentname cn;
 		char *tmpname = ".fseventsd";
 
-		bzero(&cn, sizeof (cn));
+		memset(&cn, 0, sizeof (cn));
 		cn.cn_nameiop = LOOKUP;
 		cn.cn_flags = ISLASTCN;
 		// cn.cn_context = kernelctx;
@@ -1023,7 +1023,7 @@ transfer_out:
 				vfsstatfs = vfs_statfs(zfsvfs->z_vfs);
 				vcbFndrInfo[6] = vfsstatfs->f_fsid.val[0];
 				vcbFndrInfo[7] = vfsstatfs->f_fsid.val[1];
-				bcopy(vcbFndrInfo, ap->a_data,
+				memcpy(ap->a_data, vcbFndrInfo,
 				    sizeof (vcbFndrInfo));
 			}
 			break;
@@ -1296,7 +1296,7 @@ zfs_vnop_lookup(struct vnop_lookup_args *ap)
 	// filename = (char *)kmem_alloc(filename_num_bytes, KM_SLEEP);
 	filename_num_bytes = MAXPATHLEN;
 	filename = kmem_cache_alloc(vnop_lookup_cache, KM_SLEEP);
-	bcopy(cnp->cn_nameptr, filename, cnp->cn_namelen);
+	memcpy(filename, cnp->cn_nameptr, cnp->cn_namelen);
 	filename[cnp->cn_namelen] = '\0';
 
 #if 1
@@ -2642,7 +2642,7 @@ top:
 		 * Zero out the remainder of the PAGE that didn't fit within
 		 * the file size.
 		 */
-		// bzero(va, PAGESIZE-sz);
+		// memset(va, 0, PAGESIZE-sz);
 		// dprintf("zero last 0x%lx bytes.\n", PAGESIZE-sz);
 
 	}
@@ -3338,7 +3338,7 @@ zfs_vnop_mknod(struct vnop_mknod_args *ap)
 
 	dprintf("%s\n", __func__);
 
-	bzero(&create_ap, sizeof (struct vnop_create_args));
+	memset(&create_ap, 0, sizeof (struct vnop_create_args));
 
 	create_ap.a_dvp = ap->a_dvp;
 	create_ap.a_vpp = ap->a_vpp;
@@ -3558,7 +3558,7 @@ zfs_vnop_getxattr(struct vnop_getxattr_args *ap)
 	 * ie, not the a_uio == NULL case to read the size required.
 	 */
 	if (resid &&
-		bcmp(ap->a_name, XATTR_FINDERINFO_NAME,
+		memcmp(XATTR_FINDERINFO_NAME, ap->a_name,
 			sizeof (XATTR_FINDERINFO_NAME)) == 0) {
 
 		/* Must be 32 bytes */
@@ -3591,7 +3591,7 @@ zfs_vnop_getxattr(struct vnop_getxattr_args *ap)
 		finderinfo_update((uint8_t *)local_finderinfo, zp);
 
 		/* If FinderInfo is empty > it doesn't exist */
-		if (bcmp(local_finderinfo, emptyfinfo,
+		if (memcmp(emptyfinfo, local_finderinfo,
 		    sizeof (emptyfinfo)) == 0) {
 			error = ENOATTR;
 		} else {
@@ -3647,7 +3647,7 @@ zfs_vnop_setxattr(struct vnop_setxattr_args *ap)
 	 * We need to do special work on the finderinfo when writing, so
 	 * copyin to local buffer, and modify before passing to lower
 	 */
-	if (bcmp(ap->a_name, XATTR_FINDERINFO_NAME,
+	if (memcmp(XATTR_FINDERINFO_NAME, ap->a_name,
 			sizeof (XATTR_FINDERINFO_NAME)) == 0) {
 
 		/* Must be 32 bytes */
@@ -3663,7 +3663,7 @@ zfs_vnop_setxattr(struct vnop_setxattr_args *ap)
 		finderinfo_update((uint8_t *)local_finderinfo, zp);
 
 		/* If FinderInfo is empty > it doesn't exist - don't write */
-		if (bcmp(local_finderinfo, emptyfinfo,
+		if (memcmp(emptyfinfo, local_finderinfo,
 		    sizeof (emptyfinfo)) == 0) {
 
 			/* But if there was one, delete it */
@@ -3806,7 +3806,7 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 	/*
 	 * Mac OS X only supports the "com.apple.ResourceFork" stream.
 	 */
-	if (bcmp(ap->a_name, XATTR_RESOURCEFORK_NAME,
+	if (memcmp(XATTR_RESOURCEFORK_NAME, ap->a_name,
 	    sizeof (XATTR_RESOURCEFORK_NAME)) != 0)
 		goto out;
 
@@ -3897,7 +3897,7 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 	/*
 	 * Mac OS X only supports the "com.apple.ResourceFork" stream.
 	 */
-	if (bcmp(ap->a_name, XATTR_RESOURCEFORK_NAME,
+	if (memcmp(XATTR_RESOURCEFORK_NAME, ap->a_name,
 	    sizeof (XATTR_RESOURCEFORK_NAME)) != 0) {
 		error = ENOATTR;
 		goto out;
@@ -3907,7 +3907,7 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 	if ((error = zfs_get_xattrdir(zp, &xdzp, cr, CREATE_XATTR_DIR)))
 		goto out;
 
-	bzero(&cn, sizeof (cn));
+	memset(&cn, 0, sizeof (cn));
 	cn.cn_nameiop = CREATE;
 	cn.cn_flags = ISLASTCN;
 	cn.cn_nameptr = (char *)ap->a_name;
@@ -3954,7 +3954,7 @@ zfs_vnop_removenamedstream(struct vnop_removenamedstream_args *ap)
 	/*
 	 * Mac OS X only supports the "com.apple.ResourceFork" stream.
 	 */
-	if (bcmp(ap->a_name, XATTR_RESOURCEFORK_NAME,
+	if (memcmp(XATTR_RESOURCEFORK_NAME, ap->a_name,
 	    sizeof (XATTR_RESOURCEFORK_NAME)) != 0) {
 		error = ENOATTR;
 		goto out;
@@ -4751,7 +4751,7 @@ zfs_znode_getvnode(znode_t *zp, zfsvfs_t *zfsvfs)
 	if (zp->z_vnode)
 		panic("zp %p vnode already set\n", zp->z_vnode);
 
-	bzero(&vfsp, sizeof (vfsp));
+	memset(&vfsp, 0, sizeof (vfsp));
 	vfsp.vnfs_str = "zfs";
 	vfsp.vnfs_mp = zfsvfs->z_vfs;
 	vfsp.vnfs_vtype = IFTOVT((mode_t)zp->z_mode);

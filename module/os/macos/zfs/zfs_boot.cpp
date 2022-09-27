@@ -340,7 +340,7 @@ zfs_boot_add_config(pool_list_t *pl, const char *path,
 		    sizeof (name_entry_t), KM_SLEEP)) == NULL) {
 			return (-1);
 		}
-		bzero(ne, sizeof (name_entry_t));
+		memset(ne, 0, sizeof (name_entry_t));
 
 		if ((ne->ne_name = spa_strdup(path)) == NULL) {
 			kmem_free(ne, sizeof (name_entry_t));
@@ -389,7 +389,7 @@ zfs_boot_add_config(pool_list_t *pl, const char *path,
 			nvlist_free(config);
 			return (-1);
 		}
-		bzero(pe, sizeof (pool_entry_t));
+		memset(pe, 0, sizeof (pool_entry_t));
 		pe->pe_guid = pool_guid;
 		pe->pe_next = pl->pools;
 		pl->pools = pe;
@@ -410,7 +410,7 @@ zfs_boot_add_config(pool_list_t *pl, const char *path,
 			nvlist_free(config);
 			return (-1);
 		}
-		bzero(ve, sizeof (vdev_entry_t));
+		memset(ve, 0, sizeof (vdev_entry_t));
 		ve->ve_guid = top_guid;
 		ve->ve_next = pe->pe_vdevs;
 		pe->pe_vdevs = ve;
@@ -432,7 +432,7 @@ zfs_boot_add_config(pool_list_t *pl, const char *path,
 			nvlist_free(config);
 			return (-1);
 		}
-		bzero(ce, sizeof (config_entry_t));
+		memset(ce, 0, sizeof (config_entry_t));
 		ce->ce_txg = txg;
 		ce->ce_config = config;
 		ce->ce_next = ve->ve_configs;
@@ -451,7 +451,7 @@ zfs_boot_add_config(pool_list_t *pl, const char *path,
 	    sizeof (name_entry_t), KM_SLEEP)) == NULL) {
 		return (-1);
 	}
-	bzero(ne, sizeof (name_entry_t));
+	memset(ne, 0, sizeof (name_entry_t));
 
 	if ((ne->ne_name = spa_strdup(path)) == NULL) {
 		kmem_free(ne, sizeof (name_entry_t));
@@ -1013,7 +1013,7 @@ zfs_boot_read_label(IOService *zfs_hl, IOMedia *media,
 		uint64_t state, guid, txg;
 
 		/* Zero the label buffer */
-		bzero(label, labelsize);
+		memset(label, 0, labelsize);
 
 		/* Prepare the buffer for IO */
 		buffer->prepare(kIODirectionIn);
@@ -1554,8 +1554,8 @@ zfs_boot_publish_bootfs(IOService *zfs_hl, pool_list_t *pools)
 		char uuid_cstr[UUID_PRINTABLE_STRING_LENGTH];
 		uuid_t uuid;
 
-		bzero(uuid, sizeof (uuid_t));
-		bzero(uuid_cstr, UUID_PRINTABLE_STRING_LENGTH);
+		memset(uuid, 0, sizeof (uuid_t));
+		memset(uuid_cstr, 0, UUID_PRINTABLE_STRING_LENGTH);
 
 		zfs_vfs_uuid_gen(zfs_bootfs, uuid);
 		zfs_vfs_uuid_unparse(uuid, uuid_cstr);
@@ -2106,7 +2106,7 @@ zfs_boot_init(IOService *zfs_hl)
 	if (!pools) {
 		goto error;
 	}
-	bzero(pools, sizeof (pool_list_t));
+	memset(pools, 0, sizeof (pool_list_t));
 
 	if ((pools->disks = OSSet::withCapacity(
 	    ZFS_BOOT_PREALLOC_SET)) == NULL) {
@@ -2245,7 +2245,7 @@ zfs_boot_update_bootinfo_vdev_leaf(OSArray *array, vdev_t *vd)
 		dprintf("%s info alloc failed\n", __func__);
 		return (ENOMEM);
 	}
-	bzero(info, sizeof (struct io_bootinfo));
+	memset(info, 0, sizeof (struct io_bootinfo));
 
 	/* Ask the vdev handle to fill in the info */
 	error = ldi_ioctl(dvd->vd_lh, DKIOCGETBOOTINFO,
@@ -2729,7 +2729,7 @@ ZFSBootDevice::doAsyncReadWrite(IOMemoryDescriptor *buffer,
 	/* Read vs. write */
 	if (buffer->getDirection() == kIODirectionIn) {
 		/* Zero the read buffer */
-		bzero(zero, ZFS_BOOT_DEV_BSIZE);
+		memset(zero, 0, ZFS_BOOT_DEV_BSIZE);
 		len = buffer->getLength();
 		while (len > 0) {
 			cur = (len > ZFS_BOOT_DEV_BSIZE ?

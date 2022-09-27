@@ -68,7 +68,7 @@ static inline int
 	z_stream zs;
 	int err;
 
-	bzero(&zs, sizeof (zs));
+	memset(&zs, 0, sizeof (zs));
 	zs.next_in = (uchar_t *)src;
 	zs.avail_in = srclen;
 	zs.next_out = dst;
@@ -91,7 +91,7 @@ z_compress_level(void *dst, size_t *dstlen, const void *src, size_t srclen,
 {
 	z_stream zs;
 	int err;
-	bzero(&zs, sizeof (zs));
+	memset(&zs, 0, sizeof (zs));
 	zs.next_in = (uchar_t *)src;
 	zs.avail_in = srclen;
 	zs.next_out = dst;

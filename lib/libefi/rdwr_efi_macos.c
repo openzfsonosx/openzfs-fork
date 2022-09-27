@@ -967,17 +967,17 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 	dk_ioc.dki_data = (efi_gpt_t *)buf;
 	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc) == -1) {
 		(void) memcpy(&mb, buf, sizeof (mb));
-		bzero(&mb, sizeof (mb));
+		memset(&mb, 0, sizeof (mb));
 		mb.signature = LE_16(MBB_MAGIC);
 	} else {
 		(void) memcpy(&mb, buf, sizeof (mb));
 		if (mb.signature != LE_16(MBB_MAGIC)) {
-			bzero(&mb, sizeof (mb));
+			memset(&mb, 0, sizeof (mb));
 			mb.signature = LE_16(MBB_MAGIC);
 		}
 	}
 
-	bzero(&mb.parts, sizeof (mb.parts));
+	memset(&mb.parts, 0, sizeof (mb.parts));
 	cp = (uchar_t *)&mb.parts[0];
 	/* bootable or not */
 	*cp++ = 0;
@@ -1418,8 +1418,9 @@ efi_write(int fd, struct dk_gpt *vtoc)
 			(void) uuid_generate((uchar_t *)
 			    &vtoc->efi_parts[i].p_uguid);
 		}
-		bcopy(&vtoc->efi_parts[i].p_uguid,
+		memcpy(
 		    &efi_parts[i].efi_gpe_UniquePartitionGUID,
+			&vtoc->efi_parts[i].p_uguid,
 		    sizeof (uuid_t));
 	}
 	efi->efi_gpt_PartitionEntryArrayCRC32 =

@@ -909,7 +909,7 @@ handle_alloc_common(uint_t type, dev_t device, int fmode)
 	}
 #ifdef LDI_ZERO
 	/* Clear the struct for safety */
-	bzero(new_lh, len);
+	memset(new_lh, 0, len);
 #endif
 
 	/* Create handle lock */
@@ -2303,7 +2303,7 @@ ldi_bioinit(ldi_buf_t *lbp)
 {
 #ifdef LDI_ZERO
 	/* Zero the new buffer struct */
-	bzero(lbp, sizeof (ldi_buf_t));
+	memset(lbp, 0, sizeof (ldi_buf_t));
 #endif
 
 	/* Initialize defaults */
