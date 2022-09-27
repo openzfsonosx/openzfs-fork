@@ -182,16 +182,26 @@ find_shares_object(differ_info_t *di)
  * Fill given version buffer with zfs kernel version read from ZFS_SYSFS_DIR
  * Returns 0 on success, and -1 on error (with errno set)
  */
-int
-zfs_version_kernel(char *version, int len)
+char *
+zfs_version_kernel(void)
 {
-	size_t rlen = len;
+	size_t rlen = 0;
 
 	if (sysctlbyname("zfs.kext_version",
-	    version, &rlen, NULL, 0) == -1)
-		return (-1);
+	    NULL, &rlen, NULL, 0) == -1)
+		return (NULL);
 
-	return (0);
+	char *version = malloc(rlen + 1);
+	if (version == NULL)
+		return (NULL);
+
+	if (sysctlbyname("zfs.kext_version",
+	    version, &rlen, NULL, 0) == -1) {
+		free(version);
+		return (NULL);
+	}
+
+	return (version);
 }
 
 static int
@@ -716,10 +726,4 @@ libzfs_macos_pipefd(int *read_fd, int *write_fd)
 void
 libzfs_macos_wrapclose(void)
 {
-}
-
-void
-libzfs_set_pipe_max(int infd)
-{
-	/* macOS automatically resizes */
 }

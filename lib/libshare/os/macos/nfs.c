@@ -49,8 +49,6 @@
 #define	ZFS_EXPORTS_FILE	"/etc/exports"
 #define	ZFS_EXPORTS_LOCK	ZFS_EXPORTS_FILE".lock"
 
-static sa_fstype_t *nfs_fstype;
-
 static int nfs_lock_fd = -1;
 
 /*
@@ -286,7 +284,7 @@ nfs_enable_share(sa_share_impl_t impl_share)
 		nfs_exports_unlock();
 		return (SA_SYSTEM_ERR);
 	}
-	char *shareopts = FSINFO(impl_share, nfs_fstype)->shareopts;
+	char *shareopts = impl_share->sa_shareopts;
 	if (strcmp(shareopts, "on") == 0)
 		shareopts = "";
 
@@ -386,19 +384,6 @@ nfs_validate_shareopts(const char *shareopts)
 	return (SA_OK);
 }
 
-static int
-nfs_update_shareopts(sa_share_impl_t impl_share, const char *shareopts)
-{
-	FSINFO(impl_share, nfs_fstype)->shareopts = (char *)shareopts;
-	return (SA_OK);
-}
-
-static void
-nfs_clear_shareopts(sa_share_impl_t impl_share)
-{
-	FSINFO(impl_share, nfs_fstype)->shareopts = NULL;
-}
-
 /*
  * Commit the shares by restarting mountd.
  */
@@ -408,22 +393,11 @@ nfs_commit_shares(void)
 	return (SA_OK);
 }
 
-static const sa_share_ops_t nfs_shareops = {
+const sa_fstype_t libshare_nfs_type = {
 	.enable_share = nfs_enable_share,
 	.disable_share = nfs_disable_share,
 	.is_shared = nfs_is_shared,
 
 	.validate_shareopts = nfs_validate_shareopts,
-	.update_shareopts = nfs_update_shareopts,
-	.clear_shareopts = nfs_clear_shareopts,
 	.commit_shares = nfs_commit_shares,
 };
-
-/*
- * Initializes the NFS functionality of libshare.
- */
-void
-libshare_nfs_init(void)
-{
-	nfs_fstype = register_fstype("nfs", &nfs_shareops);
-}

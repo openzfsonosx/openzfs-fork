@@ -14,6 +14,7 @@
 
 extern int
 clock_gettime(clock_id_t clock_id, struct timespec *tp);
+extern void gettime_dummy(void);
 
 void
 gettime_dummy(void)

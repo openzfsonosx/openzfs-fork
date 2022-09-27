@@ -46,7 +46,6 @@ inuse_macswap(const char *dev_name)
 {
 	size_t oldlen = 0;
 	char *tmp;
-	char *tmp2;
 	char *swap_filename;
 	char real_swap_path[MAXPATHLEN];
 	char real_dev_path[MAXPATHLEN];

@@ -314,7 +314,7 @@ out:
  * otherwise they are considered fatal are copied in to badopt.
  */
 int
-zfs_parse_mount_options(char *mntopts, unsigned long *mntflags,
+zfs_parse_mount_options(const char *mntopts, unsigned long *mntflags,
     unsigned long *zfsflags, int sloppy, char *badopt, char *mtabopt)
 {
 	int error = 0, quote = 0, flag = 0, count = 0;
@@ -403,7 +403,7 @@ zfs_adjust_mount_options(zfs_handle_t *zhp, const char *mntpoint,
  * MNTTYPE_ZFS, NULL, 0, mntopts, sizeof (mntopts)) != 0) {
  */
 int
-do_mount(zfs_handle_t *zhp, const char *dir, char *optptr, int mflag)
+do_mount(zfs_handle_t *zhp, const char *dir, const char *optptr, int mflag)
 {
 	int rv;
 	const char *spec = zfs_get_name(zhp);
@@ -461,11 +461,10 @@ do_mount(zfs_handle_t *zhp, const char *dir, char *optptr, int mflag)
 			args = fnvlist_alloc();
 			fnvlist_add_string(args, ZPOOL_CONFIG_POOL_NAME,
 			    zhp->zfs_name);
-			rv = zcmd_write_src_nvlist(zhp->zfs_hdl, &zc, args);
+			zcmd_write_src_nvlist(zhp->zfs_hdl, &zc, args);
 
-			if (rv == 0)
-				rv = zfs_ioctl(zhp->zfs_hdl,
-				    ZFS_IOC_PROXY_DATASET, &zc);
+			rv = zfs_ioctl(zhp->zfs_hdl,
+			    ZFS_IOC_PROXY_DATASET, &zc);
 
 			/* Free innvl */
 			nvlist_free(args);
@@ -617,10 +616,9 @@ do_unmount(zfs_handle_t *zhp, const char *mntpt, int flags)
 		args = fnvlist_alloc();
 		fnvlist_add_string(args, ZPOOL_CONFIG_POOL_NAME,
 		    zhp->zfs_name);
-		rv = zcmd_write_src_nvlist(zhp->zfs_hdl, &zc, args);
+		zcmd_write_src_nvlist(zhp->zfs_hdl, &zc, args);
 
-		if (rv == 0)
-			rv = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_PROXY_REMOVE, &zc);
+		rv = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_PROXY_REMOVE, &zc);
 
 		/* Free innvl */
 		nvlist_free(args);

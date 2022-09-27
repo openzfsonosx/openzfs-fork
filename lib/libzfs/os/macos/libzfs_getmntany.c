@@ -156,7 +156,7 @@ mntopt(char **p)
 }
 
 char *
-hasmntopt(struct mnttab *mnt, char *opt)
+hasmntopt(struct mnttab *mnt, const char *opt)
 {
 	char tmpopts[256];
 	char *f, *opts = tmpopts;

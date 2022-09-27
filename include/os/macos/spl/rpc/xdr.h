@@ -51,7 +51,7 @@ enum xdr_op {
 struct xdr_ops;
 
 typedef struct {
-	struct xdr_ops *x_ops;	/* Also used to let caller know if */
+	const struct xdr_ops *x_ops;	/* Also used to let caller know if */
 				/* xdrmem_create() succeeds (sigh..) */
 	caddr_t		x_addr;	/* Current buffer addr */
 	caddr_t		x_addr_end; /* End of the buffer */

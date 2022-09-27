@@ -1150,6 +1150,7 @@ show_var(int *oid, int nlen, int show_masked)
 				goto RETURN;
 			}
 			/* FALL THROUGH */
+			zfs_fallthrough;
 		default:
 			if (!Aflag) {
 				retval = 1;

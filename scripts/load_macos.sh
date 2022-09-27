@@ -7,11 +7,10 @@
 # for load.
 #
 
-rsync -ar module/os/macos/zfs/zfs.kext/ /tmp/zfs.kext/
+rsync -ar module/os/macos/zfs.kext/ /tmp/zfs.kext/
 
 chown -R root:wheel /tmp/zfs.kext
 
 kextload -v /tmp/zfs.kext || kextutil /tmp/zfs.kext
 
 # log stream --source --predicate 'sender == "zfs"' --style compact
-

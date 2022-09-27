@@ -41,7 +41,6 @@
 #include <sys/stat.h>
 #include <sys/efi_partition.h>
 #include <sys/systeminfo.h>
-#include <sys/vtoc.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/vdev_disk.h>
 #include <dlfcn.h>
@@ -80,7 +79,6 @@ zpool_relabel_disk(libzfs_handle_t *hdl, const char *path, const char *msg)
 
 	/* Flush the buffers to disk and invalidate the page cache. */
 	(void) fsync(fd);
-//	(void) ioctl(fd, BLKFLSBUF);
 
 	(void) close(fd);
 	if (error && error != VT_ENOSPC) {

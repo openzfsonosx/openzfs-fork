@@ -332,6 +332,25 @@ static struct cdevsw zfs_cdevsw = {
 	.d_type		= D_DISK
 };
 
+#ifdef ZFS_DEBUG
+#define ZFS_DEBUG_STR   " (DEBUG mode)"
+#else
+#define ZFS_DEBUG_STR   ""
+#endif
+
+static int
+openzfs_init_os(void)
+{
+	return (0);
+}
+
+static void
+openzfs_fini_os(void)
+{
+}
+
+
+
 /*
  * This is an identical copy of zfsdev_minor_alloc() except we check if
  * 'last_minor + 0' is available instead of 'last_minor + 1'. The latter
@@ -395,19 +414,30 @@ zfsdev_attach(void)
 		return (-1);
 	}
 
-	wrap_avl_init();
-	wrap_unicode_init();
-	wrap_nvpair_init();
-	wrap_zcommon_init();
-	wrap_icp_init();
-	wrap_lua_init();
-	wrap_zstd_init();
+	int err = 0;
+	if ((err = zcommon_init()) != 0)
+		goto zcommon_failed;
+	if ((err = icp_init()) != 0)
+		goto icp_failed;
+	if ((err = zstd_init()) != 0)
+		goto zstd_failed;
+	if ((err = openzfs_init_os()) != 0)
+		goto openzfs_os_failed;
 
 	tsd_create(&zfsdev_private_tsd, NULL);
 
 	sysctl_os_init();
 
 	return (0);
+
+  openzfs_os_failed:
+	zstd_fini();
+  zstd_failed:
+	icp_fini();
+  icp_failed:
+	zcommon_fini();
+  zcommon_failed:
+	return (err);
 }
 
 void
@@ -417,13 +447,10 @@ zfsdev_detach(void)
 
 	tsd_destroy(&zfsdev_private_tsd);
 
-	wrap_zstd_fini();
-	wrap_lua_fini();
-	wrap_icp_fini();
-	wrap_zcommon_fini();
-	wrap_nvpair_fini();
-	wrap_unicode_fini();
-	wrap_avl_fini();
+	openzfs_fini_os();
+	zstd_fini();
+	icp_fini();
+	zcommon_fini();
 
 	if (zfs_devnode) {
 		devfs_remove(zfs_devnode);

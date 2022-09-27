@@ -54,9 +54,8 @@ spa_history_zone(void)
 }
 
 void
-spa_create_os(void *arg)
+spa_import_os(spa_t *spa)
 {
-	spa_t *spa = (spa_t *)arg;
 	int haslock = 0;
 	int error;
 
@@ -92,16 +91,14 @@ spa_create_os(void *arg)
 }
 
 void
-spa_export_os(void *arg)
+spa_export_os(spa_t *spa)
 {
-	spa_t *spa = (spa_t *)arg;
-
 	/* Remove IOKit pool proxy */
 	spa_iokit_pool_proxy_destroy(spa);
 }
 
 void
-spa_activate_os(void *arg)
+spa_activate_os(spa_t *spa)
 {
 	/* spa_t *spa = (spa_t *)arg; */
 	/* Lock kext in kernel while mounted */
@@ -109,7 +106,7 @@ spa_activate_os(void *arg)
 }
 
 void
-spa_deactivate_os(void *arg)
+spa_deactivate_os(spa_t *spa)
 {
 	/* spa_t *spa = (spa_t *)arg; */
 	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());

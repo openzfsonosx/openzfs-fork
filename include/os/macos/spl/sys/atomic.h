@@ -354,6 +354,12 @@ membar_producer(void)
 	__c11_atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
+static inline __attribute__((always_inline)) void
+membar_consumer(void)
+{
+	__c11_atomic_thread_fence(__ATOMIC_ACQ_REL);
+}
+
 #ifdef	__cplusplus
 }
 #endif

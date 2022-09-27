@@ -30,7 +30,6 @@
 
 extern "C" {
 #include <sys/spa_impl.h>
-#include <sys/spa_boot.h>
 #include <sys/spa.h>
 } /* extern "C" */
 

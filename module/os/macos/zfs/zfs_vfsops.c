@@ -839,8 +839,6 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	if (error)
 		return (error);
 
-	zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
-
 	/*
 	 * If we are not mounting (ie: online recv), then we don't
 	 * have to worry about replaying the log as we blocked all
@@ -850,6 +848,10 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 
 		ASSERT3P(zfsvfs->z_kstat.dk_kstats, ==, NULL);
 		dataset_kstats_create(&zfsvfs->z_kstat, zfsvfs->z_os);
+		if (error)
+			return (error);
+		zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data,
+		    &zfsvfs->z_kstat.dk_zil_sums);
 
 		/*
 		 * During replay we remove the read only flag to
@@ -916,6 +918,10 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		/* restore readonly bit */
 		if (readonly != 0)
 			readonly_changed_cb(zfsvfs, B_TRUE);
+	} else {
+		ASSERT3P(zfsvfs->z_kstat.dk_kstats, !=, NULL);
+		zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data,
+		    &zfsvfs->z_kstat.dk_zil_sums);
 	}
 
 	/*

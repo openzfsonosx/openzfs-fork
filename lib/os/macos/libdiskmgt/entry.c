@@ -142,6 +142,7 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 			    strcmp(by,  DM_USE_OS_PARTITION) == 0)
 				break;
 			/* FALLTHROUGH */
+			zfs_fallthrough;
 		case DM_WHO_ZPOOL:
 			if (build_usage_string(dev_name,
 			    by, data, msg, &found, errp) != 0) {

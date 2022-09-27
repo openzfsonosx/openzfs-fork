@@ -18,23 +18,28 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
- *	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
- *	  All Rights Reserved
- *
- * Portions of this source code were derived from Berkeley 4.3 BSD
- * under license from the Regents of the University of California.
  */
 
-#ifndef LIBSPL_MACOS_RPC_XDR_H
-#define	LIBSPL_MACOS_RPC_XDR_H
+#ifndef _SPL_SYS_STRING_H
+#define	_SPL_SYS_STRING_H
 
-#include <rpc/types.h>
-#include_next <rpc/xdr.h>
+#include <string.h>
+#include <stddef.h>
+#include <libkern/libkern.h>
 
-// -Wincompatible-pointer-types
+static inline int
+kstrtoul(const char *cp, unsigned int base, unsigned long *res)
+{
+	char *end;
 
-#endif /* LIBSPL_MACOS_RPC_XDR_H */
+	*res = strtoul(cp, &end, base);
+
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
+	if (*cp == 0 || *end != 0)
+		return (-EINVAL);
+	return (0);
+}
+
+#endif

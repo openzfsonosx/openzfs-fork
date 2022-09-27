@@ -120,7 +120,7 @@ __bswap32_var(__uint32_t _x)
 #define	__ntohs(x)	__bswap16(x)
 
 #include <sys/isa_defs.h>
-#include <sys/int_types.h>
+#include <stdint.h>
 
 #if defined(__GNUC__) && defined(_ASM_INLINES) && \
 	(defined(__i386) || defined(__amd64))

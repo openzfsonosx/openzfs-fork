@@ -71,7 +71,7 @@ extern int openat64(int, const char *, int, ...);
 
 extern int getmntany(FILE *fd, struct mnttab *mgetp, struct mnttab *mrefp);
 extern int getmntent(FILE *fp, struct mnttab *mp);
-extern char *hasmntopt(struct mnttab *mnt, char *opt);
+extern char *hasmntopt(struct mnttab *mnt, const char *opt);
 extern int getextmntent(const char *path, struct extmnttab *entry,
 	struct stat64 *statbuf);
 

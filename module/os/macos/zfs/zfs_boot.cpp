@@ -97,7 +97,6 @@ extern "C" {
 #include <sys/vdev_disk.h>
 #include <sys/vdev_disk_os.h>
 #include <sys/spa_impl.h>
-#include <sys/spa_boot.h>
 #include <sys/spa.h>
 
 #include <sys/zfs_context.h>

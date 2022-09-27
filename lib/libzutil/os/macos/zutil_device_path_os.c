@@ -35,7 +35,7 @@
  * Note: The caller must free the returned string.
  */
 char *
-zfs_strip_partition(char *dev)
+zfs_strip_partition(const char *dev)
 {
 	unsigned int disk, slice;
 	char *partless;
@@ -113,8 +113,8 @@ zfs_append_partition(char *path, size_t max_len)
  * On FreeBSD we only want to remove "/dev/" from the beginning of
  * paths if present.
  */
-char *
-zfs_strip_path(char *path)
+const char *
+zfs_strip_path(const char *path)
 {
 	char *r;
 	r = strrchr(path, '/');

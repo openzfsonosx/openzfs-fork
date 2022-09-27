@@ -25,7 +25,6 @@
  */
 
 #include <fcntl.h>
-#include <libdevinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

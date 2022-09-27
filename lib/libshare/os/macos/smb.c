@@ -44,8 +44,6 @@
 
 static boolean_t smb_available(void);
 
-static sa_fstype_t *smb_fstype;
-
 #define	SMB_NAME_MAX 255
 #define	SHARING_CMD_PATH "/usr/sbin/sharing"
 
@@ -302,7 +300,7 @@ smb_enable_share(sa_share_impl_t impl_share)
 	if (smb_is_share_active(impl_share))
 		smb_disable_share(impl_share);
 
-	shareopts = FSINFO(impl_share, smb_fstype)->shareopts;
+	shareopts = impl_share->sa_shareopts;
 	if (shareopts == NULL) /* on/off */
 		return (SA_SYSTEM_ERR);
 
@@ -404,48 +402,22 @@ smb_is_share_active(sa_share_impl_t impl_share)
 	return (B_FALSE);
 }
 
-/*
- * Called to update a share's options. A share's options might be out of
- * date if the share was loaded from disk and the "sharesmb" dataset
- * property has changed in the meantime. This function also takes care
- * of re-enabling the share if necessary.
- */
-static int
-smb_update_shareopts(sa_share_impl_t impl_share, const char *shareopts)
-{
-	if (!impl_share)
-		return (SA_SYSTEM_ERR);
-
-	FSINFO(impl_share, smb_fstype)->shareopts = (char *)shareopts;
-	return (SA_OK);
-}
-
 static int
 smb_update_shares(void)
 {
 	/* Not implemented */
 	return (0);
 }
-/*
- * Clears a share's SMB options. Used by libshare to
- * clean up shares that are about to be free()'d.
- */
-static void
-smb_clear_shareopts(sa_share_impl_t impl_share)
-{
-	FSINFO(impl_share, smb_fstype)->shareopts = NULL;
-}
 
-static const sa_share_ops_t smb_shareops = {
+const sa_fstype_t libshare_smb_type = {
 	.enable_share = smb_enable_share,
 	.disable_share = smb_disable_share,
 	.is_shared = smb_is_share_active,
 
 	.validate_shareopts = smb_validate_shareopts,
-	.update_shareopts = smb_update_shareopts,
-	.clear_shareopts = smb_clear_shareopts,
 	.commit_shares = smb_update_shares,
 };
+
 
 /*
  * Provides a convenient wrapper for determining SMB availability
@@ -458,13 +430,4 @@ smb_available(void)
 		return (B_FALSE);
 
 	return (B_TRUE);
-}
-
-/*
- * Initializes the SMB functionality of libshare.
- */
-void
-libshare_smb_init(void)
-{
-	smb_fstype = register_fstype("smb", &smb_shareops);
 }

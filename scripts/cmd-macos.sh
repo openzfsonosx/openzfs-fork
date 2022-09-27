@@ -53,7 +53,8 @@ topdir=$topdir/../
 
 # lib/
 for lib in nvpair uutil zpool zfs zfs_core; do
-	export DYLD_LIBRARY_PATH=$topdir/lib/lib${lib}/.libs:$DYLD_LIBRARY_PATH
+#	export DYLD_LIBRARY_PATH=$topdir/lib/lib${lib}/.libs:$DYLD_LIBRARY_PATH
+	export DYLD_LIBRARY_PATH=$topdir/.libs:$DYLD_LIBRARY_PATH
 done
 
 # lib/os/macos/
@@ -63,11 +64,12 @@ for lib in diskmgt; do
 done
 
 for c in zdb zfs zpool ztest; do
-	export PATH=${topdir}/cmd/${c}/.libs:$PATH
+#	export PATH=${topdir}/cmd/${c}/.libs:$PATH
+	export PATH=${topdir}/.libs:$PATH
 done
 
 # Check if it is cmd/ or cmd/os/macos/
-realcmd="${topdir}/cmd/$cmd/.libs/$cmd"
+realcmd="${topdir}/.libs/$cmd"
 if [ -f "${topdir}/cmd/os/macos/$cmd/.libs/$cmd" ]; then
     realcmd="${topdir}/cmd/os/macos/$cmd/.libs/$cmd"
 fi

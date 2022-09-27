@@ -557,8 +557,15 @@ zpl_xattr_set_sa(struct vnode *ip, const char *name, zfs_uio_t *uio,
 	 * error drop the inconsistent cached version of the nvlist, it
 	 * will be reconstructed from the ARC when next accessed.
 	 */
-	if (error == 0)
-		error = -zfs_sa_set_xattr(zp);
+	if (error == 0) {
+		void *buf = NULL;
+		int len = 0;
+		if (uio != NULL) {
+			buf = zfs_uio_iovbase(uio, 0);
+			len = zfs_uio_iovlen(uio, 0);
+		}
+		error = zfs_sa_set_xattr(zp, name, buf, len);
+	}
 
 	if (error) {
 		nvlist_free(nvl);

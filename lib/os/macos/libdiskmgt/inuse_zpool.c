@@ -37,7 +37,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <thread.h>
 #include <synch.h>
 #include <dlfcn.h>
 #include <ctype.h>

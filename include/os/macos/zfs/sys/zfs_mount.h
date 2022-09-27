@@ -27,7 +27,7 @@
 struct zfs_mount_args {
 	const char	*fspec;
 	int			mflag;
-	char		*optptr;
+	const char		*optptr;
 	int			optlen;
 	int			struct_size;
 };
