@@ -305,7 +305,7 @@ blake3_param_set(const char *val, zfs_kernel_param_t *unused)
 	return (blake3_impl_setname(val));
 }
 
-#elif defined(__FreeBSD__)
+#elif defined(__FreeBSD__) || defined(__APPLE__)
 
 #include <sys/sbuf.h>
 
@@ -336,7 +336,12 @@ blake3_param(ZFS_MODULE_PARAM_ARGS)
 			(void) sbuf_printf(s, fmt, blake3_supp_impls[i]->name);
 		}
 
+#ifdef __APPLE__
+		err = SYSCTL_OUT(req, s->s_buf, s->s_len);
+		sbuf_finish(s);
+#else
 		err = sbuf_finish(s);
+#endif
 		sbuf_delete(s);
 
 		return (err);

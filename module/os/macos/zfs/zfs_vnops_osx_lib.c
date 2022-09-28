@@ -173,8 +173,8 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 
 	// printf("getattr_osx\n");
 
-	ZFS_ENTER(zfsvfs);
-	ZFS_VERIFY_ZP(zp);
+	if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
+		return (error);
 
 	// If wanted, return NULL guids
 	if (VATTR_IS_ACTIVE(vap, va_uuuid))
@@ -229,7 +229,7 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 		dprintf("ZFS: Warning: getattr failed sa_bulk_lookup: %d, "
 		    "parent %llu, flags %llu\n", error, parent, zp->z_pflags);
 		mutex_exit(&zp->z_lock);
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		return (0);
 	}
 
@@ -558,7 +558,7 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 
 	mutex_exit(&zp->z_lock);
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	return (error);
 }
 
@@ -757,8 +757,9 @@ zpl_obtain_xattr(znode_t *dzp, const char *name, mode_t mode, cred_t *cr,
 
 	/* zfs_dirent_lock() expects a component name */
 
-	ZFS_ENTER(zfsvfs);
-	ZFS_VERIFY_ZP(dzp);
+	if ((error = zfs_enter_verify_zp(zfsvfs, dzp, FTAG)) != 0)
+		return (error);
+
 	zilog = zfsvfs->z_log;
 
 	VATTR_INIT(&vattr);
@@ -767,7 +768,7 @@ zpl_obtain_xattr(znode_t *dzp, const char *name, mode_t mode, cred_t *cr,
 
 	if ((error = zfs_acl_ids_create(dzp, 0,
 	    &vattr, cr, NULL, &acl_ids)) != 0) {
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		return (error);
 	}
 
@@ -836,7 +837,7 @@ out:
 	if (xzp)
 		*vpp = ZTOV(xzp);
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	return (error);
 }
 

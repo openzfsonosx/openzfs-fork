@@ -415,7 +415,6 @@ KERNEL_MODDIR=  $(DESTDIR)@KERNEL_MODPREFIX@/zfs.kext
 dist_noinst_DATA += $(PLIST_STRING) $(KEXTINFO_PLIST)
 
 zfs.kext$(EXEEXT): macos_zfs $(PLIST_STRING) $(KEXTINFO_PLIST)
-	echo "running the thing"
 	@echo ""
 	@mkdir -p %D%/zfs.kext/Contents/Resources/English.lproj %D%/zfs.kext/Contents/MacOS
 	@cp -f $(KEXTINFO_PLIST) %D%/zfs.kext/Contents/

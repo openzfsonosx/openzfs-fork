@@ -75,7 +75,7 @@ static kcondvar_t		arc_reclaim_waiters_cv;
  * This must be less than arc_shrink_shift, so that when we shrink the ARC,
  * we will still not allow it to grow.
  */
-extern int	arc_no_grow_shift;
+extern uint_t	arc_no_grow_shift;
 
 
 /*
@@ -714,7 +714,7 @@ arc_prune_task(void *ptr)
  * for releasing it once the registered arc_prune_func_t has completed.
  */
 void
-arc_prune_async(int64_t adjust)
+arc_prune_async(uint64_t adjust)
 {
 	arc_prune_t *ap;
 

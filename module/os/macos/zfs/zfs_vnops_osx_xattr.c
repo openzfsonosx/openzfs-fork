@@ -225,8 +225,8 @@ zpl_xattr_list(struct vnode *dvp, zfs_uio_t *uio, cred_t *cr)
 	zfsvfs_t *zfsvfs = ZTOZSB(zp);
 	int error = 0;
 
-	ZPL_ENTER(zfsvfs);
-	ZPL_VERIFY_ZP(zp);
+	if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
+		return (error);
 	rw_enter(&zp->z_xattr_lock, RW_READER);
 
 	if (zfsvfs->z_use_sa && zp->z_is_sa) {
@@ -243,7 +243,7 @@ zpl_xattr_list(struct vnode *dvp, zfs_uio_t *uio, cred_t *cr)
 out:
 
 	rw_exit(&zp->z_xattr_lock);
-	ZPL_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 
 	return (error);
 }
@@ -398,12 +398,12 @@ zpl_xattr_get(struct vnode *ip, const char *name, zfs_uio_t *uio, cred_t *cr)
 	zfsvfs_t *zfsvfs = ZTOZSB(zp);
 	int error;
 
-	ZPL_ENTER(zfsvfs);
-	ZPL_VERIFY_ZP(zp);
+	if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
+		return (error);
 	rw_enter(&zp->z_xattr_lock, RW_READER);
 	error = __zpl_xattr_get(ip, name, uio, cr);
 	rw_exit(&zp->z_xattr_lock);
-	ZPL_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 
 	return (error);
 }
@@ -587,8 +587,8 @@ zpl_xattr_set(struct vnode *ip, const char *name, zfs_uio_t *uio, int flags,
 	int where;
 	int error;
 
-	ZPL_ENTER(zfsvfs);
-	ZPL_VERIFY_ZP(zp);
+	if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
+		return (error);
 	rw_enter(&zp->z_xattr_lock, RW_WRITER);
 
 	/*
@@ -642,7 +642,7 @@ zpl_xattr_set(struct vnode *ip, const char *name, zfs_uio_t *uio, int flags,
 		zpl_xattr_set_sa(ip, name, NULL, 0, cr);
 out:
 	rw_exit(&zp->z_xattr_lock);
-	ZPL_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 
 	ASSERT3S(error, <=, 0);
 

@@ -204,6 +204,9 @@ extern "C" {
 #define	fletcher_4_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, fletcher_4_param, "A"
 
+#define	blake3_param_set_args(var) \
+    CTLTYPE_STRING, NULL, 0, blake3_param, "A"
+
 #define	module_param_call(a, b, c, d, e)
 #define	module_param_named(a, b, c, d)
 #define	module_init_early(fn)	\

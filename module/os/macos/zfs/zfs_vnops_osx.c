@@ -204,7 +204,8 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 
 
 	/* Guard against unmount */
-	ZFS_ENTER_ERROR(zfsvfs, VFS_RETURNED);
+	if (zfs_enter(zfsvfs, FTAG) != 0)
+		return (VFS_RETURNED);
 
 	/* Check if space usage has changed enough to bother updating */
 	uint64_t refdbytes, availbytes, usedobjs, availobjs;
@@ -272,7 +273,7 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	} // VFS_ROOT
 
 out:
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 
 	return (VFS_RETURNED);
 }
@@ -475,14 +476,16 @@ zfs_vnop_ioctl(struct vnop_ioctl_args *ap)
 	dprintf("vnop_ioctl %08lx: VTYPE %d\n", ap->a_command,
 			vnode_vtype(ZTOV(zp)));
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
+
 	if (IFTOVT((mode_t)zp->z_mode) == VFIFO) {
 		dprintf("ZFS: FIFO ioctl  %02lx ('%lu' + %lu)\n",
 			ap->a_command, (ap->a_command&0xff00)>>8,
 		    ap->a_command&0xff);
 		error = fifo_ioctl(ap);
 		error = 0;
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		goto out;
 	}
 
@@ -492,10 +495,10 @@ zfs_vnop_ioctl(struct vnop_ioctl_args *ap)
 		    ap->a_command, (ap->a_command&0xff00)>>8,
 		    ap->a_command&0xff);
 		error = spec_ioctl(ap);
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		goto out;
 	}
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 
 	switch (ap->a_command) {
 
@@ -1937,12 +1940,13 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 		mask |= ATTR_MODE;
 
 		dprintf("fetching MODE for FLAGS or ACL\n");
-		ZFS_ENTER(zp->z_zfsvfs);
-		ZFS_VERIFY_ZP(zp);
+
+		if ((error = zfs_enter_verify_zp(zp->z_zfsvfs, zp, FTAG)) != 0)
+			return (error);
 		(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_MODE(zp->z_zfsvfs), &mode,
 		    sizeof (mode));
 		vap->va_mode = mode;
-		ZFS_EXIT(zp->z_zfsvfs);
+		zfs_exit(zp->z_zfsvfs, FTAG);
 	}
 	if (VATTR_IS_ACTIVE(vap, va_flags)) {
 
@@ -2381,7 +2385,8 @@ zfs_vnop_pagein(struct vnop_pagein_args *ap)
 		return (EINVAL);
 	}
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
 
 	file_sz = zp->z_size;
 
@@ -2390,7 +2395,7 @@ zfs_vnop_pagein(struct vnop_pagein_args *ap)
 	if ((off < 0) || (off >= file_sz) ||
 		(len & PAGE_MASK) || (upl_offset & PAGE_MASK)) {
 		dprintf("passed EOF or size error\n");
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		if (!(flags & UPL_NOCOMMIT))
 			ubc_upl_abort_range(upl, upl_offset, len,
 			    (UPL_ABORT_ERROR | UPL_ABORT_FREE_ON_EMPTY));
@@ -2414,7 +2419,7 @@ zfs_vnop_pagein(struct vnop_pagein_args *ap)
 			(void) ubc_upl_abort(upl, 0);
 		if (need_unlock)
 			rw_exit(&zp->z_map_lock);
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		return (ENOMEM);
 	}
 
@@ -2475,7 +2480,7 @@ zfs_vnop_pagein(struct vnop_pagein_args *ap)
 	if (need_unlock)
 		rw_exit(&zp->z_map_lock);
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	if (error) dprintf("%s error %d\n", __func__, error);
 	return (error);
 }
@@ -2502,16 +2507,13 @@ zfs_pageout(zfsvfs_t *zfsvfs, znode_t *zp, upl_t upl, vm_offset_t upl_offset,
 		dprintf("ZFS: vnop_pageout: failed on NULL upl\n");
 		return (EINVAL);
 	}
-	/*
-	 * We can't leave this function without either calling upl_commit or
-	 * upl_abort. So use the non-error version.
-	 */
-	ZFS_ENTER_IFERROR(zfsvfs) {
+
+	if ((err = zfs_enter(zfsvfs, FTAG)) != 0) {
 		if (!(flags & UPL_NOCOMMIT))
 			(void) ubc_upl_abort(upl,
 			    UPL_ABORT_DUMP_PAGES|UPL_ABORT_FREE_ON_EMPTY);
 		dprintf("ZFS: vnop_pageout: abort on z_unmounted\n");
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		return (EIO);
 	}
 
@@ -2682,7 +2684,7 @@ out:
 			    UPL_COMMIT_FREE_ON_EMPTY));
 	}
 exit:
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	if (err) dprintf("%s err %d\n", __func__, err);
 	return (err);
 }
@@ -2909,8 +2911,9 @@ zfs_vnop_pageoutv2(struct vnop_pageout_args *ap)
 	 * We can't leave this function without either calling upl_commit or
 	 * upl_abort. So use the non-error version.
 	 */
-	ZFS_ENTER_IFERROR(zfsvfs) {
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0) {
 		dprintf("ZFS: vnop_pageoutv2: abort on z_unmounted\n");
+		zfsvfs = NULL;
 		error = EIO;
 		goto exit_abort;
 	}
@@ -3121,7 +3124,7 @@ out:
 
 	vnode_put(ZTOV(zp));
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	if (error)
 		dprintf("ZFS: pageoutv2 failed %d\n", error);
 	return (error);
@@ -3137,7 +3140,7 @@ exit_abort:
 	vnode_put(ZTOV(zp));
 
 	if (zfsvfs)
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 	return (error);
 }
 
@@ -3160,6 +3163,7 @@ zfs_vnop_mmap(struct vnop_mmap_args *ap)
 	struct vnode *vp = ap->a_vp;
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs;
+	int error = 0;
 
 	if (!zp)
 		return (ENODEV);
@@ -3168,19 +3172,22 @@ zfs_vnop_mmap(struct vnop_mmap_args *ap)
 
 	dprintf("+vnop_mmap: %p\n", ap->a_vp);
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		goto out;
 
 	if (!vnode_isreg(vp)) {
-		ZFS_EXIT(zfsvfs);
-		return (ENODEV);
+		error = ENODEV;
+		goto out;
 	}
+
 	mutex_enter(&zp->z_lock);
 	zp->z_is_mapped = 1;
 	mutex_exit(&zp->z_lock);
 
-	ZFS_EXIT(zfsvfs);
+out:
+	zfs_exit(zfsvfs, FTAG);
 	dprintf("-vnop_mmap\n");
-	return (0);
+	return (error);
 }
 
 int
@@ -3197,14 +3204,16 @@ zfs_vnop_mnomap(struct vnop_mnomap_args *ap)
 	struct vnode *vp = ap->a_vp;
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	int error = 0;
 
 	dprintf("+vnop_mnomap: %p\n", ap->a_vp);
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		goto out;
 
 	if (!vnode_isreg(vp)) {
-		ZFS_EXIT(zfsvfs);
-		return (ENODEV);
+		error = ENODEV;
+		goto out;
 	}
 	mutex_enter(&zp->z_lock);
 	/*
@@ -3216,13 +3225,11 @@ zfs_vnop_mnomap(struct vnop_mnomap_args *ap)
 	/* zp->z_is_mapped = 0; */
 	mutex_exit(&zp->z_lock);
 
-	ZFS_EXIT(zfsvfs);
+out:
+	zfs_exit(zfsvfs, FTAG);
 	dprintf("-vnop_mnomap\n");
-	return (0);
+	return (error);
 }
-
-
-
 
 int
 zfs_vnop_inactive(struct vnop_inactive_args *ap)
@@ -3368,7 +3375,7 @@ zfs_vnop_allocate(struct vnop_allocate_args *ap)
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs;
 	uint64_t wantedsize = 0, filesize = 0;
-	int err = 0;
+	int error = 0;
 
 	dprintf("%s %llu %d %llu %llu: '%s'\n", __func__, ap->a_length,
 	    ap->a_flags, (ap->a_bytesallocated ? *ap->a_bytesallocated : 0),
@@ -3384,10 +3391,14 @@ zfs_vnop_allocate(struct vnop_allocate_args *ap)
 	if (!zp || !zp->z_sa_hdl)
 		return (ENODEV);
 
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
+
+
 //	*ap->a_bytesallocated = 0;
 
 	if (!vnode_isreg(vp)) {
-		ZFS_EXIT(zfsvfs);
+		zfs_exit(zfsvfs, FTAG);
 		return (ENODEV);
 	}
 
@@ -3406,7 +3417,7 @@ zfs_vnop_allocate(struct vnop_allocate_args *ap)
 	// If we are extending
 	if (wantedsize > filesize) {
 
-		err = zfs_freesp(zp, wantedsize, 0, FWRITE, B_TRUE);
+		error = zfs_freesp(zp, wantedsize, 0, FWRITE, B_TRUE);
 
 		// If we are truncating, Apple claims this code is never called.
 	} else if (wantedsize < filesize) {
@@ -3415,13 +3426,13 @@ zfs_vnop_allocate(struct vnop_allocate_args *ap)
 
 	}
 
-	if (!err) {
+	if (!error) {
 		*(ap->a_bytesallocated) = wantedsize - filesize;
 	}
 
-	ZFS_EXIT(zfsvfs);
-	dprintf("-%s: %d\n", __func__, err);
-	return (err);
+	zfs_exit(zfsvfs, FTAG);
+	dprintf("-%s: %d\n", __func__, error);
+	return (error);
 }
 
 int
@@ -3792,7 +3803,7 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 	znode_t  *zp = VTOZ(vp);
 	zfsvfs_t  *zfsvfs = zp->z_zfsvfs;
 	struct componentname cn = { 0 };
-	int  error = ENOATTR;
+	int  error = 0;
 	znode_t *xdzp = NULL;
 	znode_t *xzp = NULL;
 
@@ -3801,22 +3812,26 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 
 	*svpp = NULLVP;
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
 
 	/*
 	 * Mac OS X only supports the "com.apple.ResourceFork" stream.
 	 */
 	if (memcmp(XATTR_RESOURCEFORK_NAME, ap->a_name,
-	    sizeof (XATTR_RESOURCEFORK_NAME)) != 0)
+	    sizeof (XATTR_RESOURCEFORK_NAME)) != 0) {
+		error = ENOATTR;
 		goto out;
+	}
 
 	/* Only regular files */
 	if (!vnode_isreg(vp)) {
-		return (EPERM);
+		error = EPERM;
+		goto out;
 	}
 
 	/* Grab the hidden attribute directory vnode. */
-	if (zfs_get_xattrdir(zp, &xdzp, cr, 0) != 0)
+	if ((error = zfs_get_xattrdir(zp, &xdzp, cr, 0)) != 0)
 		goto out;
 
 	cn.cn_namelen = strlen(ap->a_name) + 1;
@@ -3857,7 +3872,7 @@ out:
 	}
 #endif
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	if (error) dprintf("%s vp %p: error %d\n", __func__, ap->a_vp, error);
 	return (error);
 }
@@ -3886,7 +3901,8 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 
 	*ap->a_svpp = NULLVP;
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
 
 	/* Only regular files can have a resource fork stream. */
 	if (!vnode_isreg(vp)) {
@@ -3927,7 +3943,7 @@ out:
 	if (xdzp)
 		zrele(xdzp);
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	if (error) dprintf("%s vp %p: error %d\n", __func__, ap->a_vp, error);
 	return (error);
 }
@@ -3949,7 +3965,9 @@ zfs_vnop_removenamedstream(struct vnop_removenamedstream_args *ap)
 
 	dprintf("zfs_vnop_removenamedstream: %p '%s'\n",
 		svp, ap->a_name);
-	ZFS_ENTER(zfsvfs);
+
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
 
 	/*
 	 * Mac OS X only supports the "com.apple.ResourceFork" stream.
@@ -3969,8 +3987,8 @@ zfs_vnop_removenamedstream(struct vnop_removenamedstream_args *ap)
 	dprintf("zfs_vnop_removenamedstream\n");
 	error = EPERM;
 out:
-	ZFS_EXIT(zfsvfs);
-	return (ENOTSUP);
+	zfs_exit(zfsvfs, FTAG);
+	return (error);
 }
 #endif /* HAVE_NAMED_STREAMS */
 
@@ -4002,6 +4020,7 @@ zfs_vnop_exchange(struct vnop_exchange_args *ap)
 	vnode_t *tvp = ap->a_tvp;
 	znode_t  *fzp;
 	zfsvfs_t  *zfsvfs;
+	int error = 0;
 
 	/* The files must be on the same volume. */
 	if (vnode_mount(fvp) != vnode_mount(tvp)) {
@@ -4025,11 +4044,12 @@ zfs_vnop_exchange(struct vnop_exchange_args *ap)
 	fzp = VTOZ(fvp);
 	zfsvfs = fzp->z_zfsvfs;
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
 
 	/* ADD MISSING CODE HERE */
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	printf("vnop_exchange: ENOTSUP\n");
 	return (ENOTSUP);
 }
@@ -4259,7 +4279,8 @@ zfs_vnop_readdirattr(struct vnop_readdirattr_args *ap)
 	attrinfo.ai_varbufend = (char *)attrbufptr + maxsize;
 	attrinfo.ai_context = ap->a_context;
 
-	ZFS_ENTER(zfsvfs);
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (error);
 
 	/*
 	 * Initialize the zap iterator cursor.
@@ -4425,7 +4446,7 @@ update:
 	*ap->a_newstate = zp->z_atime[0] + zp->z_atime[1];
 	uio_setoffset(uio, offset);
 
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	dprintf("-readdirattr: error %d\n", error);
 	return (error);
 }
@@ -4879,6 +4900,7 @@ int
 zfs_znode_asyncwait(zfsvfs_t *zfsvfs, znode_t *zp)
 {
 	int ret = -1;
+	int error = 0;
 
 	if (zp == NULL)
 		return (ret);
@@ -4886,8 +4908,8 @@ zfs_znode_asyncwait(zfsvfs_t *zfsvfs, znode_t *zp)
 	if (zfsvfs == NULL)
 		return (ret);
 
-	ZFS_ENTER_IFERROR(zfsvfs)
-		goto out;
+	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
+		return (ret);
 
 	if (zfsvfs->z_os == NULL)
 		goto out;
@@ -4905,7 +4927,7 @@ zfs_znode_asyncwait(zfsvfs_t *zfsvfs, znode_t *zp)
 	mutex_exit(&zp->z_attach_lock);
 
 out:
-	ZFS_EXIT(zfsvfs);
+	zfs_exit(zfsvfs, FTAG);
 	return (ret);
 }
 
