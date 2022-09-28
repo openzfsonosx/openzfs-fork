@@ -17,6 +17,12 @@ if BUILD_LINUX
 include $(srcdir)/%D%/rpm/Makefile.am
 endif
 
+if BUILD_MACOS
+bin_PROGRAMS=
+noinst_PROGRAMS=
+include $(srcdir)/%D%/module/os/macos/Makefile.am
+endif
+
 if CONFIG_USER
 include $(srcdir)/%D%/cmd/Makefile.am
 include $(srcdir)/%D%/contrib/Makefile.am
@@ -31,7 +37,7 @@ endif
 endif
 CPPCHECKDIRS += module
 if CONFIG_KERNEL
-SUBDIRS += module module/os/macos
+SUBDIRS += module
 
 extradir = $(prefix)/src/zfs-$(VERSION)
 extra_HEADERS = zfs.release.in zfs_config.h.in

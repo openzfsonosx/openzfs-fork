@@ -32,10 +32,10 @@ spl_SRCS = 	\
 # libspl_la_LIBS = -lnone
 
 
-INFO_PLIST = zfs/Info.plist
-PLIST_STRING = zfs/InfoPlist.strings
+KEXTINFO_PLIST = %D%/zfs/Info.plist
+PLIST_STRING = %D%/zfs/InfoPlist.strings
 
-ZFS_META_VERSION = @ZFS_META_VERSION@
+# ZFS_META_VERSION = @ZFS_META_VERSION@
 ZFS_DEBUG_STR = @ZFS_DEBUG_STR@
 
 macos_zfs_CPPFLAGS = \
@@ -89,12 +89,13 @@ endif
 macos_zfs_LIBS =
 
 # If we don't set this to nothing, it adds "-lz -liconv"
-LIBS =
+# LIBS =
 
-bin_PROGRAMS = zfs.kext
-noinst_PROGRAMS = macos_zfs
+bin_PROGRAMS += zfs.kext
+noinst_PROGRAMS += macos_zfs
 
 zfs_kext_SOURCES =
+
 
 if TARGET_CPU_X86_64
 zfs_ASM_SOURCES_C = \
@@ -411,21 +412,23 @@ macos_zfs_SOURCES = \
 
 KERNEL_MODDIR=  $(DESTDIR)@KERNEL_MODPREFIX@/zfs.kext
 
-dist_noinst_DATA = $(PLIST_STRING) $(INFO_PLIST)
+dist_noinst_DATA += $(PLIST_STRING) $(KEXTINFO_PLIST)
 
-zfs.kext$(EXEEXT): macos_zfs $(PLIST_STRING) $(INFO_PLIST)
+zfs.kext$(EXEEXT): macos_zfs $(PLIST_STRING) $(KEXTINFO_PLIST)
+	echo "running the thing"
 	@echo ""
-	@mkdir -p zfs.kext/Contents/Resources/English.lproj zfs.kext/Contents/MacOS
-	@cp -f $(INFO_PLIST) zfs.kext/Contents/
-	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(ZFS_META_VERSION)" zfs.kext/Contents/Info.plist
-	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(ZFS_META_VERSION)" zfs.kext/Contents/Info.plist
-	@cp -f $(PLIST_STRING) zfs.kext/Contents/Resources/English.lproj/
-	@cp -f macos_zfs zfs.kext/Contents/MacOS/zfs
-	@cp -f $(top_srcdir)/contrib/macOS/VolumeIcon.icns zfs.kext/Contents/Resources/VolumeIcon.icns
-/usr/libexec/PlistBuddy -c "Add :OSBundleRequired string Root" zfs.kext/Contents/Info.plist
-	@kextlibs -unsupported -undef-symbols -xml zfs.kext/ || echo "Ignoring errors..(Most of these are expected)"
+	@mkdir -p %D%/zfs.kext/Contents/Resources/English.lproj %D%/zfs.kext/Contents/MacOS
+	@cp -f $(KEXTINFO_PLIST) %D%/zfs.kext/Contents/
+	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(ZFS_META_VERSION)" %D%/zfs.kext/Contents/Info.plist
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(ZFS_META_VERSION)" %D%/zfs.kext/Contents/Info.plist
+	@cp -f $(PLIST_STRING) %D%/zfs.kext/Contents/Resources/English.lproj/
+	@cp -f macos_zfs %D%/zfs.kext/Contents/MacOS/zfs
+	@cp -f $(top_srcdir)/contrib/macOS/VolumeIcon.icns %D%/zfs.kext/Contents/Resources/VolumeIcon.icns
+/usr/libexec/PlistBuddy -c "Add :OSBundleRequired string Root" %D%/zfs.kext/Contents/Info.plist
+	@kextlibs -unsupported -undef-symbols -xml %D%/zfs.kext/ || echo "Ignoring errors..(Most of these are expected)"
 
-install-exec-local: zfs.kext
+INSTALL_DATA_HOOKS += kext-install-exec-local
+kext-install-exec-local: zfs.kext
 	rm -rf $(KERNEL_MODDIR)
 	mkdir -p $(KERNEL_MODDIR)
 	rsync -r zfs.kext/ $(KERNEL_MODDIR)
@@ -438,6 +441,7 @@ install-exec-local: zfs.kext
 uninstall-am:
 	rm -rf $(KERNEL_MODDIR)
 
-clean:
+CLEAN_LOCAL += kext-clean
+kext-clean:
 	rm -rf zfs.kext/
 	rm -f *.o *.lo macos_zfs $(zfs_OBJECTS)
