@@ -68,7 +68,6 @@ nodist_libicp_la_SOURCES += \
 	module/icp/asm-x86_64/os/macos/sha2/sha512_impl.S
 else
 nodist_libicp_la_SOURCES += \
-	module/icp/asm-x86_64/aes/anus.c \
 	module/icp/asm-x86_64/aes/aeskey.c \
 	module/icp/asm-x86_64/aes/aes_amd64.S \
 	module/icp/asm-x86_64/aes/aes_aesni.S \
