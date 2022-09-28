@@ -67,21 +67,19 @@ include $(srcdir)/%D%/zpool_influxdb/Makefile.am
 include $(srcdir)/%D%/zstream/Makefile.am
 
 
-# Linux steps on our toes a bit here, until we can
-# get permission to move it into cmd/os/linux/mount_zfs
 if BUILD_LINUX
-#mounthelper_PROGRAMS += mount.zfs
-#CPPCHECKTARGETS      += mount.zfs
-#
-#mount_zfs_SOURCES = \
-#	%D%/mount_zfs.c
-#
-#mount_zfs_LDADD = \
-#	libzfs.la \
-#	libzfs_core.la \
-#	libnvpair.la
-#
-#mount_zfs_LDADD += $(LTLIBINTL)
+mounthelper_PROGRAMS += mount.zfs
+CPPCHECKTARGETS      += mount.zfs
+
+mount_zfs_SOURCES = \
+	%D%/mount_zfs.c
+
+mount_zfs_LDADD = \
+	libzfs.la \
+	libzfs_core.la \
+	libnvpair.la
+
+mount_zfs_LDADD += $(LTLIBINTL)
 
 CPPCHECKTARGETS += raidz_test
 
@@ -100,7 +98,6 @@ SHELLCHECKSCRIPTS += %D%/zvol_wait
 include $(srcdir)/%D%/zed/Makefile.am
 endif
 
-# Eventually "os" will be "built" by all platforms?
 if BUILD_MACOS
 include $(srcdir)/%D%/zed/Makefile.am
 include $(srcdir)/%D%/os/Makefile.am

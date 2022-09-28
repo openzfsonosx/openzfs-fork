@@ -56,12 +56,6 @@ lib_LTLIBRARIES =
 pkgconfig_DATA =
 
 if BUILD_MACOS
-if BUILD_LINUX
-$(error "both linux and macos are defined")
-endif
-endif
-
-if BUILD_MACOS
 include $(srcdir)/%D%/os/macos/libdiskmgt/Makefile.am
 include $(srcdir)/%D%/libefi/Makefile.am
 endif

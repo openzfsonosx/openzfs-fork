@@ -1,17 +1,25 @@
-sbin_PROGRAMS   += mount_zfs
-CPPCHECKTARGETS += mount_zfs
+#
+# Linux steals the "mount_zfs" name first, and since it's one
+# giant Makefile you can no longer have two tools with the same name.
+#
+bin_PROGRAMS += macos_mount_zfs
+CPPCHECKTARGETS += macos_mount_zfs
 
 AM_CPPFLAGS += -I$(top_srcdir)/lib/libzfs
 
-mount_zfs_SOURCES = \
+macos_mount_zfs_SOURCES = \
 	%D%/mount_zfs.c
 
-mount_zfs_LDADD = \
+macos_mount_zfs_LDADD = \
 	libzfs.la \
 	libzfs_core.la \
 	libnvpair.la
 
-mount_zfs_LDADD += $(LTLIBINTL)
+macos_mount_zfs_LDADD += $(LTLIBINTL)
+
+
+mount_zfs: macos_mount_zfs
+	cp "$^" "$@"
 
 INSTALL_DATA_HOOKS += mount_zfs-install-exec-hook
 mount_zfs-install-exec-hook:

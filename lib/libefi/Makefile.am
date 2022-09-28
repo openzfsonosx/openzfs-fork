@@ -5,9 +5,6 @@ libefi_la_CFLAGS += -fvisibility=hidden
 noinst_LTLIBRARIES += libefi.la
 CPPCHECKTARGETS    += libefi.la
 
-
-$(info "Here $BUILD_MACOS and $BUILD_LINUX and $CONFIG_USER")
-
 libefi_la_SOURCES =
 libefi_la_LDFLAGS =
 
