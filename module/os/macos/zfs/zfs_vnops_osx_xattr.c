@@ -541,7 +541,8 @@ zpl_xattr_set_sa(struct vnode *ip, const char *name, zfs_uio_t *uio,
 		 * instead.
 		 */
 		if (zfs_uio_segflg(uio) != UIO_SYSSPACE) {
-			buf = kmem_alloc(len, len, UIO_WRITE, uio);
+			buf = kmem_alloc(len, KM_SLEEP);
+			zfs_uiomove(buf, len, UIO_WRITE, uio);
 		}
 
 		error = -nvlist_add_byte_array(nvl, name,
