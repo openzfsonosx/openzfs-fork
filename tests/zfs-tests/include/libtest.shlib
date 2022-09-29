@@ -125,7 +125,6 @@ function is_dilos
 	else
 		return 1
 	fi
->>>>>>> 66e38a98c... Upstream: zfs-tests to support macOS
 }
 
 # Determine if this is a 32-bit system
@@ -187,7 +186,7 @@ function ismounted
 		ext*)
 			df -t $fstype $1 > /dev/null 2>&1
 		;;
-        hfs)
+		hfs)
 			out=$(df -T $fstype $1 | sed -e /^Filesystem/d 2>/dev/null)
 			ret=$?
 			(($ret != 0)) && return $ret
@@ -1458,6 +1457,7 @@ function unshare_nfs #fs
 		if [[ $? != 0 ]]; then
 			/sbin/nfsd start
 		fi
+		;;
 	*)
 		log_must unshare -F nfs $fs
 		;;
