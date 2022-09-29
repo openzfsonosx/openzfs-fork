@@ -666,30 +666,6 @@ zfs_vdev_raidz_impl_set(const char *val, zfs_kernel_param_t *kp)
 	return (vdev_raidz_impl_set(val));
 }
 
-static int
-zfs_vdev_raidz_impl_get(char *buffer, zfs_kernel_param_t *kp)
-{
-	int i, cnt = 0;
-	char *fmt;
-	const uint32_t impl = RAIDZ_IMPL_READ(zfs_vdev_raidz_impl);
-
-	ASSERT(raidz_math_initialized);
-
-	/* list mandatory options */
-	for (i = 0; i < ARRAY_SIZE(math_impl_opts) - 2; i++) {
-		fmt = (impl == math_impl_opts[i].sel) ? "[%s] " : "%s ";
-		cnt += sprintf(buffer + cnt, fmt, math_impl_opts[i].name);
-	}
-
-	/* list all supported implementations */
-	for (i = 0; i < raidz_supp_impl_cnt; i++) {
-		fmt = (i == impl) ? "[%s] " : "%s ";
-		cnt += sprintf(buffer + cnt, fmt, raidz_supp_impl[i]->name);
-	}
-
-	return (cnt);
-}
-
 module_param_call(zfs_vdev_raidz_impl, zfs_vdev_raidz_impl_set,
     zfs_vdev_raidz_impl_get, NULL, 0644);
 MODULE_PARM_DESC(zfs_vdev_raidz_impl, "Select raidz implementation.");
