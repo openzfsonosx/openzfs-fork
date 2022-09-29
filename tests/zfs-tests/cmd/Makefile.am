@@ -87,7 +87,9 @@ scripts_zfs_tests_bin_PROGRAMS += %D%/send_doall
 	libnvpair.la
 
 scripts_zfs_tests_bin_PROGRAMS += %D%/stride_dd
+if !BUILD_MACOS
 %C%_stride_dd_LDADD = -lrt
+endif
 
 scripts_zfs_tests_bin_PROGRAMS += %D%/threadsappend
 %C%_threadsappend_LDADD = -lpthread
