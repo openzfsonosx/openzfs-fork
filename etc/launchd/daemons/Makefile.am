@@ -9,17 +9,17 @@ launchddaemon_DATA = \
 	$(top_srcdir)/etc/launchd/daemons/org.openzfsonosx.InvariantDisks.plist
 
 dist_launchddaemon_DATA = \
-	$(DAEMON_DIR)/org.openzfsonosx.zconfigd.plist.in \
-	$(DAEMON_DIR)/org.openzfsonosx.zed.plist.in \
-	$(DAEMON_DIR)/org.openzfsonosx.zpool-import.plist.in \
-	$(DAEMON_DIR)/org.openzfsonosx.zpool-import-all.plist.in \
-	$(DAEMON_DIR)/org.openzfsonosx.InvariantDisks.plist.in
+	%D%/org.openzfsonosx.zconfigd.plist.in \
+	%D%/org.openzfsonosx.zed.plist.in \
+	%D%/org.openzfsonosx.zpool-import.plist.in \
+	%D%/org.openzfsonosx.zpool-import-all.plist.in \
+	%D%/org.openzfsonosx.InvariantDisks.plist.in
 
-$(DAEMON_DIR)/org.openzfsonosx.zconfigd.plist: $(DAEMON_DIR)/org.openzfsonosx.zconfigd.plist.in
-$(DAEMON_DIR)/org.openzfsonosx.zed.plist: $(DAEMON_DIR)/org.openzfsonosx.zed.plist.in
-$(DAEMON_DIR)/org.openzfsonosx.zpool-import.plist: $(DAEMON_DIR)/org.openzfsonosx.zpool-import.plist.in
-$(DAEMON_DIR)/org.openzfsonosx.zpool-import-all.plist: $(DAEMON_DIR)/org.openzfsonosx.zpool-import-all.plist.in
-$(DAEMON_DIR)/org.openzfsonosx.InvariantDisks.plist: $(DAEMON_DIR)/org.openzfsonosx.InvariantDisks.plist.in
+%D%/org.openzfsonosx.zconfigd.plist: %D%/org.openzfsonosx.zconfigd.plist.in
+%D%/org.openzfsonosx.zed.plist: %D%/org.openzfsonosx.zed.plist.in
+%D%/org.openzfsonosx.zpool-import.plist: %D%/org.openzfsonosx.zpool-import.plist.in
+%D%/org.openzfsonosx.zpool-import-all.plist: %D%/org.openzfsonosx.zpool-import-all.plist.in
+%D%/org.openzfsonosx.InvariantDisks.plist: %D%/org.openzfsonosx.InvariantDisks.plist.in
 
 $(launchddaemon_DATA):
 	-$(SED) -e 's,@bindir\@,$(bindir),g' \

@@ -430,7 +430,7 @@ INSTALL_DATA_HOOKS += kext-install-exec-local
 kext-install-exec-local: zfs.kext
 	rm -rf $(KERNEL_MODDIR)
 	mkdir -p $(KERNEL_MODDIR)
-	rsync -r zfs.kext/ $(KERNEL_MODDIR)
+	rsync -r %D%/zfs.kext/ $(KERNEL_MODDIR)
 	chown -R root:wheel $(KERNEL_MODDIR) || echo "Unable to chown root:wheel $(KERNEL_MODDIR)"
 	@echo
 	@echo "To load module: kextload -v $(KERNEL_MODDIR)"

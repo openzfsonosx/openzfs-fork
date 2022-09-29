@@ -1,7 +1,7 @@
 
 CLEANFILES += $(launchdscript_SCRIPTS)
 
-launch_ddir = $(sysconfdir)/etc/launchd/launchd.d
+launch_ddir = $(sysconfdir)/launchd/launchd.d
 dist_launch_d_DATA = \
 	$(top_srcdir)/%D%/zpool-import-all.sh.in
 

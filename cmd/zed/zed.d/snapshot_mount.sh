@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2154
 #
 # Helper to mount and unmount snapshots when asked to by kernel.
 #
