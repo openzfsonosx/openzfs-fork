@@ -2327,7 +2327,7 @@ vmem_create_common(const char *name, void *base, size_t size, size_t quantum,
 	    vmem_alloc_update_lowest_cb, vmp);
 #endif
 
-	printf("SPL: %s:%d: setup of %s done\n",
+	dprintf("SPL: %s:%d: setup of %s done\n",
 	    __func__, __LINE__, vmp->vm_name);
 
 	return (vmp);
