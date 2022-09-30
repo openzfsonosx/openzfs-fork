@@ -1341,10 +1341,6 @@ spa_activate(spa_t *spa, spa_mode_t mode)
 
 	spa_activate_os(spa);
 
-#if defined(_KERNEL) && defined(__APPLE__)
-	spa_activate_os(spa);
-#endif
-
 	spa_keystore_init(&spa->spa_keystore);
 
 	/*
