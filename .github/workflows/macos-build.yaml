@@ -3,7 +3,12 @@ on: push
 
 jobs:
   build:
-    runs-on: macos-latest
+    name: "macOS x64 (BUILD)"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-12, macos-11, macos-10.15]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
@@ -18,7 +23,7 @@ jobs:
       #    sudo spctl kext-consent disable
       - name: install deps
         run: |
-          brew install automake libtool gawk coreutils
+          brew install automake libtool gawk coreutils gnu-sed
       - name: install deps
         run: |
           #brew install openssl@3
@@ -28,7 +33,7 @@ jobs:
       - name: configure
         run: |
           #https://stackoverflow.com/a/62591864
-          ./configure CPPFLAGS="-I/usr/local/opt/gettext/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/opt/gettext/lib/ -L/usr/local/opt/openssl/lib"
+          ./configure CPPFLAGS="-I/usr/local/opt/gettext/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/opt/gettext/lib/ -L/usr/local/opt/openssl/lib" CFLAGS="-O2 -g" --sysconfdir=/etc --localstatedir=/var --prefix=/usr/local/zfs/ --sbindir=/usr/local/zfs/bin --libexecdir=/usr/local/zfs/libexec --enable-pam=NO SED=gsed
       - name: build
         run: |
           make -j 2
