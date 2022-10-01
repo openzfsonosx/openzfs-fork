@@ -232,6 +232,8 @@ zio_crypt_key_init(uint64_t crypt, zio_crypt_key_t *key)
 	keydata_len = zio_crypt_table[crypt].ci_keylen;
 	memset(key, 0, sizeof (zio_crypt_key_t));
 
+	rw_init(&key->zk_salt_lock, NULL, RW_DEFAULT, NULL);
+
 	/* fill keydata buffers and salt with random data */
 	ret = random_get_bytes((uint8_t *)&key->zk_guid, sizeof (uint64_t));
 	if (ret != 0)
@@ -282,7 +284,6 @@ zio_crypt_key_init(uint64_t crypt, zio_crypt_key_t *key)
 	key->zk_crypt = crypt;
 	key->zk_version = ZIO_CRYPT_KEY_CURRENT_VERSION;
 	key->zk_salt_count = 0;
-	rw_init(&key->zk_salt_lock, NULL, RW_DEFAULT, NULL);
 
 	return (0);
 
