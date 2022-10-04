@@ -40,10 +40,12 @@ nodist_libicp_la_SOURCES = \
 	module/icp/core/kcf_mech_tabs.c \
 	module/icp/core/kcf_prov_tabs.c
 
+if !BUILD_MACOS
 if TARGET_CPU_AARCH64
 nodist_libicp_la_SOURCES += \
 	module/icp/asm-aarch64/blake3/b3_aarch64_sse2.S \
 	module/icp/asm-aarch64/blake3/b3_aarch64_sse41.S
+endif
 endif
 
 if TARGET_CPU_POWERPC

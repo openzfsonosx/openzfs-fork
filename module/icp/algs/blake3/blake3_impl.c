@@ -28,6 +28,11 @@
 
 #include "blake3_impl.h"
 
+#ifdef __APPLE__
+/* Sadly, toolchain sets this, but M1 don't have normal NEON */
+#undef __aarch64__
+#endif
+
 static const blake3_ops_t *const blake3_impls[] = {
 	&blake3_generic_impl,
 #if defined(__aarch64__) || \
