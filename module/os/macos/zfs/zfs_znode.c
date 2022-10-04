@@ -1160,10 +1160,15 @@ again:
 		 * the simpler vnode_get() in the ASYNC cases. We verify the
 		 * vids match below.
 		 */
+#if 0
+// Let's try just using vnode_get() for now, avoid zfs_get_data #ifdef
 		if ((flags & ZGET_FLAG_ASYNC))
 			err = vnode_get(vp);
 		else
 			err = vnode_getwithvid(vp, vid);
+#else
+		err = vnode_get(vp);
+#endif
 
 		if (err != 0) {
 			dprintf("ZFS: vnode_get() returned %d\n", err);
