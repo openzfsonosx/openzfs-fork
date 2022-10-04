@@ -2759,8 +2759,8 @@ zfsvfs_update_fromname_callback(mount_t mp, void *arg)
 	fromname_t *frna = (fromname_t *)arg;
 	struct vfsstatfs *vsf = vfs_statfs(mp);
 
-	if (vsf->f_mntfromname, frna->oldname,
-	    sizeof (vsf->f_mntfromname) == 0) {
+	if (strncmp(vsf->f_mntfromname, frna->oldname,
+	    sizeof (vsf->f_mntfromname)) == 0) {
 		vfs_mountedfrom(mp, frna->newname);
 		return (VFS_RETURNED_DONE);
 	}
@@ -2775,8 +2775,8 @@ zfsvfs_update_fromname(const char *oldname, const char *newname)
 
 	// find oldname's vfsp
 	// vfs_mountedfrom(vfsp, newname);
-	frna.oldname = oldname;
-	frna.newname = newname;
+	frna.oldname = (char *)oldname;
+	frna.newname = (char *)newname;
 	vfs_iterate(0, zfsvfs_update_fromname_callback, (void *)&frna);
 }
 

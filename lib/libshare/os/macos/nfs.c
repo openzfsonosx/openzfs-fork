@@ -216,7 +216,7 @@ nfs_fini_tmpfile(char *tmpfile)
  * This function copies all entries from the exports file to "filename",
  * omitting any entries for the specified mountpoint.
  */
-int
+static int
 nfs_copy_entries(char *filename, const char *mountpoint)
 {
 	int error = SA_OK;
@@ -284,7 +284,7 @@ nfs_enable_share(sa_share_impl_t impl_share)
 		nfs_exports_unlock();
 		return (SA_SYSTEM_ERR);
 	}
-	char *shareopts = impl_share->sa_shareopts;
+	const char *shareopts = impl_share->sa_shareopts;
 	if (strcmp(shareopts, "on") == 0)
 		shareopts = "";
 
@@ -349,7 +349,7 @@ nfs_is_shared(sa_share_impl_t impl_share)
 	static char line[MAXLINESIZE];
 	char *s, last;
 	size_t len;
-	char *mntpoint = impl_share->sa_mountpoint;
+	const char *mntpoint = impl_share->sa_mountpoint;
 	size_t mntlen = strlen(mntpoint);
 
 	FILE *fp = fopen(ZFS_EXPORTS_FILE, "r");
@@ -381,6 +381,7 @@ nfs_is_shared(sa_share_impl_t impl_share)
 static int
 nfs_validate_shareopts(const char *shareopts)
 {
+	(void) shareopts;
 	return (SA_OK);
 }
 

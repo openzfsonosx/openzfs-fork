@@ -394,6 +394,10 @@ void
 zfs_adjust_mount_options(zfs_handle_t *zhp, const char *mntpoint,
     char *mntopts, char *mtabopt)
 {
+	(void) zhp;
+	(void) mntopts;
+	(void) mtabopt;
+
 	/* A hint used to determine an auto-mounted snapshot mount point */
 	append_mntopt(MNTOPT_MNTPOINT, mntpoint, mntopts, NULL, B_FALSE);
 }
@@ -549,8 +553,8 @@ do_mount(zfs_handle_t *zhp, const char *dir, const char *optptr, int mflag)
 static int
 do_unmount_impl(const char *mntpt, int flags)
 {
-	char force_opt[] = "force";
-	char *argv[7] = {
+	const char force_opt[] = "force";
+	const char *argv[7] = {
 		"/usr/sbin/diskutil",
 		"unmount",
 		NULL, NULL, NULL, NULL };
@@ -561,8 +565,9 @@ do_unmount_impl(const char *mntpt, int flags)
 		count++;
 	}
 
-	argv[count] = (char *)mntpt;
-	rc = libzfs_run_process(argv[0], argv, STDOUT_VERBOSE|STDERR_VERBOSE);
+	argv[count] = (const char *)mntpt;
+	rc = libzfs_run_process(argv[0], (char **)argv,
+	    STDOUT_VERBOSE|STDERR_VERBOSE);
 
 	/*
 	 * There is a bug, where we can not unmount, with the error
@@ -571,7 +576,7 @@ do_unmount_impl(const char *mntpt, int flags)
 	 * re-test this: 202004/lundman
 	 */
 	if (rc != 0) {
-		char *argv[7] = {
+		const char *argv[7] = {
 		    "/sbin/umount",
 		    NULL, NULL, NULL, NULL };
 		int count = 1;
@@ -580,8 +585,8 @@ do_unmount_impl(const char *mntpt, int flags)
 			argv[count] = "-f";
 			count++;
 		}
-		argv[count] = (char *)mntpt;
-		rc = libzfs_run_process(argv[0], argv,
+		argv[count] = (const char *)mntpt;
+		rc = libzfs_run_process(argv[0], (char **)argv,
 		    STDOUT_VERBOSE|STDERR_VERBOSE);
 	}
 
@@ -644,6 +649,8 @@ unmount_snapshots(zfs_handle_t *zhp, const char *mntpt, int flags)
 {
 	struct mnttab entry;
 	int mntlen = strlen(mntpt);
+
+	(void) flags;
 
 	if (zhp == NULL)
 		return;
@@ -855,8 +862,8 @@ out:
 static int
 do_unmount_volume(const char *mntpt, int flags)
 {
-	char force_opt[] = "force";
-	char *argv[7] = {
+	const char force_opt[] = "force";
+	const char *argv[7] = {
 	    "/usr/sbin/diskutil",
 	    NULL, NULL, NULL, NULL };
 	int rc, count = 1;
@@ -876,8 +883,9 @@ do_unmount_volume(const char *mntpt, int flags)
 		count++;
 	}
 
-	argv[count] = (char *)mntpt;
-	rc = libzfs_run_process(argv[0], argv, STDOUT_VERBOSE|STDERR_VERBOSE);
+	argv[count] = (const char *)mntpt;
+	rc = libzfs_run_process(argv[0], (char **)argv,
+	    STDOUT_VERBOSE|STDERR_VERBOSE);
 
 	return (rc ? EINVAL : 0);
 }
@@ -991,5 +999,6 @@ zpool_disable_datasets_os(zpool_handle_t *zhp, boolean_t force)
 {
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 
+	(void) force;
 	zfs_iter_root(hdl, zpool_disable_volumes, (void *)zpool_get_name(zhp));
 }

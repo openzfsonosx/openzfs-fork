@@ -192,6 +192,7 @@ zpool_label_disk_wait(const char *path, int timeout_ms)
 boolean_t
 is_mpath_whole_disk(const char *path)
 {
+	(void) path;
 	return (B_FALSE);
 }
 
@@ -202,5 +203,6 @@ is_mpath_whole_disk(const char *path)
 boolean_t
 zfs_dev_is_dm(const char *dev_name)
 {
+	(void) dev_name;
 	return (B_FALSE);
 }

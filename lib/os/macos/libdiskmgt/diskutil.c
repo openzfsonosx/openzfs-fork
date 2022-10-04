@@ -128,7 +128,7 @@ get_diskutil_cs_info(char *slice, DU_Info *info)
 {
 	int status = 0;
 	int out_length = 0;
-	char *cc[] = { "/usr/sbin/diskutil", "cs", "info", "-plist",
+	const char *cc[] = { "/usr/sbin/diskutil", "cs", "info", "-plist",
 	    slice, NULL};
 	char *output = NULL;
 	CFPropertyListRef plist = NULL;
@@ -140,7 +140,7 @@ get_diskutil_cs_info(char *slice, DU_Info *info)
 		*info = (DU_Info)plist;
 	} else {
 		*info = NULL;
-		status = run_command(cc, &out_length);
+		status = run_command((char **)cc, &out_length);
 
 		if (WIFEXITED(status) && (WEXITSTATUS(status) == 0)) {
 			output = (char *)malloc(out_length);
@@ -180,7 +180,8 @@ get_diskutil_info(char *slice, DU_Info *info)
 {
 	int status = 0;
 	int out_length = 0;
-	char *cc[] = {"/usr/sbin/diskutil", "info", "-plist", slice, NULL};
+	const char *cc[] = {"/usr/sbin/diskutil", "info", "-plist",
+	    slice, NULL};
 	char *output = NULL;
 	CFPropertyListRef plist = NULL;
 	CFStringRef slice_str = CFStringCreateWithCString(NULL, slice,
@@ -191,7 +192,7 @@ get_diskutil_info(char *slice, DU_Info *info)
 		*info = (DU_Info)plist;
 	} else {
 		*info = NULL;
-		status = run_command(cc, &out_length);
+		status = run_command((char **)cc, &out_length);
 
 		if (WIFEXITED(status) && (WEXITSTATUS(status) == 0)) {
 			output = (char *)malloc(out_length);

@@ -77,6 +77,11 @@
 #include <sys/resource.h>
 #include <err.h>
 
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic \
+	ignored "-Wincompatible-pointer-types-discards-qualifiers"
+
 struct ctlname topname[] = CTL_NAMES;
 struct ctlname kernname[] = CTL_KERN_NAMES;
 struct ctlname vmname[] = CTL_VM_NAMES;
@@ -85,8 +90,12 @@ struct ctlname username[] = CTL_USER_NAMES;
 struct ctlname debugname[CTL_DEBUG_MAXID];
 struct ctlname *vfsname;
 #ifdef CTL_MACHDEP_NAMES
-struct ctlname machdepname[] = CTL_MACHDEP_NAMES;
+struct ctlname machdepname[] = (char *)CTL_MACHDEP_NAMES;
 #endif
+
+#pragma GCC diagnostic pop
+
+
 char names[BUFSIZ];
 int lastused;
 
@@ -246,7 +255,7 @@ int flags;
 		newval = cp;
 		newsize = strlen(cp);
 	}
-	if ((indx = findname(string, "top", &bufp, &toplist)) == -1)
+	if ((indx = findname(string, (char *)"top", &bufp, &toplist)) == -1)
 		return;
 	mib[0] = indx;
 	if (indx == CTL_VFS)
@@ -264,7 +273,7 @@ int flags;
 		listall(topname[indx].ctl_name, lp);
 		return;
 	}
-	if ((indx = findname(string, "second", &bufp, lp)) == -1)
+	if ((indx = findname(string, (char *)"second", &bufp, lp)) == -1)
 		return;
 	mib[1] = indx;
 	type = lp->list[indx].ctl_type;

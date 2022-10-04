@@ -51,7 +51,8 @@ void dm_get_usage_string(char *what, char *how, char **usage_string);
 
 
 void
-libdiskmgt_add_str(nvlist_t *attrs, char *name, char *val, int *errp)
+libdiskmgt_add_str(nvlist_t *attrs, const char *name, const char *val,
+    int *errp)
 {
 	if (*errp == 0) {
 		*errp = nvlist_add_string(attrs, name, val);

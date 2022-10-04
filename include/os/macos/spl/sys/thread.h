@@ -124,7 +124,7 @@ thread_latency_qos_policy_data_t;
 #endif
 
 #define	thread_exit spl_thread_exit
-extern void spl_thread_exit(void);
+extern void spl_thread_exit(void) __attribute__((noreturn));
 
 extern kthread_t *spl_current_thread(void);
 

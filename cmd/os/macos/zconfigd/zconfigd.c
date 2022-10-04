@@ -110,6 +110,7 @@ static io_iterator_t gKextLoadedIter;
 static void
 SignalHandler(int sigraised)
 {
+	(void) sigraised;
 	fprintf(stderr, "\nInterrupted\n");
 
 	// Clean up here
@@ -135,6 +136,7 @@ ZFSKextLoaded(void *refCon, io_iterator_t iterator)
 	io_service_t myservice;
 	Boolean doAction = FALSE;
 	struct stat sbuf;
+	(void) refCon;
 
 	while ((myservice = IOIteratorNext(iterator))) {
 		fprintf(stderr, "Found match\n");
@@ -158,6 +160,9 @@ main(int argc, const char *argv[])
 	CFRunLoopSourceRef runLoopSource;
 	kern_return_t kr;
 	sig_t oldHandler;
+
+	(void) argc;
+	(void) argv;
 
 	// Set up a signal handler so we can clean up when we're interrupted
 	// from the command line. Otherwise we stay in our run loop forever.

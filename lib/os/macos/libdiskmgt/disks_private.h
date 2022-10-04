@@ -70,8 +70,8 @@ extern "C" {
 	int inuse_active_zpool(char *slice, nvlist_t *attrs, int *errp);
 	int inuse_exported_zpool(char *slice, nvlist_t *attrs, int *errp);
 
-	void libdiskmgt_add_str(nvlist_t *attrs, char *name, char *val,
-	    int *errp);
+	void libdiskmgt_add_str(nvlist_t *attrs, const char *name,
+	    const char *val, int *errp);
 
 	nvlist_t *slice_get_stats(char *slice, int stat_type, int *errp);
 

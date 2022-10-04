@@ -428,6 +428,7 @@ getmntent(FILE *fp, struct mnttab *mp)
 {
 	static int index = -1;
 	int error = 0;
+	(void) fp;
 
 	if (index < 0) {
 		error = statfs_init();

@@ -59,7 +59,7 @@ static libzfs_handle_t		*zfs_hdl;
 static void	*init_zpool(void);
 
 static int
-inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
+inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, const char *type)
 {
 	int		found = 0;
 	char		*name;

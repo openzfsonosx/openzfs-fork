@@ -145,14 +145,14 @@ smb_retrieve_shares(void)
 	smb_share_t *shares, *new_shares = NULL;
 	int fd;
 	FILE *file = NULL;
-	char *argv[8] = {
+	const char *argv[8] = {
 		"/usr/bin/dscl",
 		".",
 		"-readall",
 		"/SharePoints"
 	};
 
-	fd = spawn_with_pipe(argv[0], argv, 0);
+	fd = spawn_with_pipe(argv[0], (char **)argv, 0);
 
 	if (fd < 0)
 		return (SA_SYSTEM_ERR);
@@ -243,9 +243,10 @@ smb_retrieve_shares(void)
 static int
 smb_enable_share_one(const char *sharename, const char *sharepath)
 {
-	char *argv[10];
+	const char *argv[10];
 	int rc;
 	smb_share_t *shares = smb_shares;
+	(void) sharename;
 
 	/* Loop through shares and check if our share is also smbshared */
 	while (shares != NULL) {
@@ -261,13 +262,13 @@ smb_enable_share_one(const char *sharename, const char *sharepath)
 	 *   and -g 001 specifies to enable guest on smb.
 	 * Note that the OS X 10.11 man-page incorrectly claims 010 for smb
 	 */
-	argv[0] = SHARING_CMD_PATH;
-	argv[1] = (char *)"-a";
-	argv[2] = (char *)sharepath;
-	argv[3] = (char *)"-s";
-	argv[4] = (char *)"001";
-	argv[5] = (char *)"-g";
-	argv[6] = (char *)"001";
+	argv[0] = (const char *)SHARING_CMD_PATH;
+	argv[1] = "-a";
+	argv[2] = sharepath;
+	argv[3] = "-s";
+	argv[4] = "001";
+	argv[5] = "-g";
+	argv[6] = "001";
 	argv[7] = NULL;
 
 #ifdef DEBUG
@@ -276,7 +277,7 @@ smb_enable_share_one(const char *sharename, const char *sharepath)
 	    sharename, sharepath);
 #endif
 
-	rc = libzfs_run_process(argv[0], argv, 0);
+	rc = libzfs_run_process(argv[0], (char **)argv, 0);
 	if (rc < 0)
 		return (SA_SYSTEM_ERR);
 
@@ -292,7 +293,7 @@ smb_enable_share_one(const char *sharename, const char *sharepath)
 static int
 smb_enable_share(sa_share_impl_t impl_share)
 {
-	char *shareopts;
+	const char *shareopts;
 
 	if (!smb_available())
 		return (SA_SYSTEM_ERR);
@@ -319,7 +320,7 @@ static int
 smb_disable_share_one(const char *sharename)
 {
 	int rc;
-	char *argv[8];
+	const char *argv[8];
 
 	/* CMD: sharing -r name */
 	argv[0] = SHARING_CMD_PATH;
@@ -332,7 +333,7 @@ smb_disable_share_one(const char *sharename)
 	    sharename);
 #endif
 
-	rc = libzfs_run_process(argv[0], argv, 0);
+	rc = libzfs_run_process(argv[0], (char **)argv, 0);
 	if (rc < 0)
 		return (SA_SYSTEM_ERR);
 	else

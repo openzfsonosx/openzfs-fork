@@ -2737,7 +2737,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			 * used mainly by the testing environment, as it
 			 * expects "/" by default.
 			 */
-			char *default_mountpoint;
+			const char *default_mountpoint;
 			default_mountpoint =
 			    getenv("__ZFS_MAIN_MOUNTPOINT_DIR");
 			if (!default_mountpoint)

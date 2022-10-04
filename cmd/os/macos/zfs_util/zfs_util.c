@@ -425,7 +425,7 @@ struct probe_args {
 };
 typedef struct probe_args probe_args_t;
 
-char *UNKNOWN_STRING = "Unknown";
+const char *UNKNOWN_STRING = "Unknown";
 
 static int
 zfs_probe(const char *devpath, probe_args_t *args)

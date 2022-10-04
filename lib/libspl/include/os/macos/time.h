@@ -52,9 +52,13 @@ struct itimerspec {
 struct sigevent;
 
 static inline int
-timer_create(clockid_t clockid, struct sigevent *sevp,
+timer_create(clockid_t clockid,
+    struct sigevent *sevp,
     timer_t *timerid)
 {
+	(void) clockid;
+	(void) sevp;
+	(void) timerid;
 	return (0);
 }
 
@@ -62,12 +66,17 @@ static inline int
 timer_settime(timer_t id, int flags,
     const struct itimerspec *its, struct itimerspec *remainvalue)
 {
+	(void) id;
+	(void) flags;
+	(void) its;
+	(void) remainvalue;
 	return (0);
 }
 
 static inline int
 timer_delete(timer_t id)
 {
+	(void) id;
 	return (0);
 }
 

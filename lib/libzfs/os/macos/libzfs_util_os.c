@@ -103,7 +103,7 @@ libzfs_module_loaded(const char *module)
 static int
 libzfs_load_module_impl(const char *module)
 {
-	char *argv[4] = {"/sbin/kextload", (char *)module, (char *)0};
+	const char *argv[4] = {"/sbin/kextload", (char *)module, (char *)0};
 	char *load_str, *timeout_str;
 	long timeout = 10; /* seconds */
 	long busy_timeout = 10; /* milliseconds */
@@ -122,7 +122,8 @@ libzfs_load_module_impl(const char *module)
 		}
 
 		if (load) {
-			if (libzfs_run_process("/sbin/kextload", argv, 0))
+			if (libzfs_run_process("/sbin/kextload", (char **)argv,
+			    0))
 				return (ENOEXEC);
 		}
 
@@ -175,6 +176,7 @@ libzfs_load_module(void)
 int
 find_shares_object(differ_info_t *di)
 {
+	(void) di;
 	return (0);
 }
 
@@ -400,6 +402,7 @@ static int pipe_relay_pid = 0;
 
 static void pipe_io_relay_intr(int signum)
 {
+	(void) signum;
 	signal_received = 1;
 }
 

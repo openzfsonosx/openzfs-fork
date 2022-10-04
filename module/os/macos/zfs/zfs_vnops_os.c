@@ -1725,7 +1725,7 @@ out:
 	return (error);
 }
 
-ulong_t zfs_fsync_sync_cnt = 4;
+static ulong_t zfs_fsync_sync_cnt = 4;
 
 /* Explore if we can use zfs/zfs_vnops.c's zfs_fsync() */
 int

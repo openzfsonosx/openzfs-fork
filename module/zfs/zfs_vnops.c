@@ -56,9 +56,10 @@
 #include <sys/zfs_znode.h>
 
 
+#ifndef __APPLE__
+
 static ulong_t zfs_fsync_sync_cnt = 4;
 
-#ifndef __APPLE__
 int
 zfs_fsync(znode_t *zp, int syncflag, cred_t *cr)
 {

@@ -48,6 +48,7 @@ rwlock_init(rwlock_t *rwlp, int type, void *arg)
 {
 	pthread_rwlockattr_t attr;
 	int err = 0;
+	(void) arg;
 
 	VERIFY0(pthread_rwlockattr_init(&attr));
 	switch (type) {

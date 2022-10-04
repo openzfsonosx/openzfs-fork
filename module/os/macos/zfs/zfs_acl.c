@@ -705,68 +705,6 @@ zfs_copy_ace_2_fuid(zfsvfs_t *zfsvfs, vtype_t obj_type, zfs_acl_t *aclp,
 	return (0);
 }
 
-/*
- * Copy ZFS ACEs to fixed size ace_t layout
- */
-static void
-zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, cred_t *cr,
-    void *datap, int filter)
-{
-	uint64_t who;
-	uint32_t access_mask;
-	uint16_t iflags, type;
-	zfs_ace_hdr_t *zacep = NULL;
-	ace_t *acep = datap;
-	ace_object_t *objacep;
-	zfs_object_ace_t *zobjacep;
-	size_t ace_size;
-	uint16_t entry_type;
-
-	while ((zacep = zfs_acl_next_ace(aclp, zacep,
-	    &who, &access_mask, &iflags, &type))) {
-
-		switch (type) {
-		case ACE_ACCESS_ALLOWED_OBJECT_ACE_TYPE:
-		case ACE_ACCESS_DENIED_OBJECT_ACE_TYPE:
-		case ACE_SYSTEM_AUDIT_OBJECT_ACE_TYPE:
-		case ACE_SYSTEM_ALARM_OBJECT_ACE_TYPE:
-			if (filter) {
-				continue;
-			}
-			zobjacep = (zfs_object_ace_t *)zacep;
-			objacep = (ace_object_t *)acep;
-			memcpy(
-			    objacep->a_obj_type,
-			    zobjacep->z_object_type,
-			    sizeof (zobjacep->z_object_type));
-			memcpy(
-			    objacep->a_inherit_obj_type,
-			    zobjacep->z_inherit_type,
-			    sizeof (zobjacep->z_inherit_type));
-			ace_size = sizeof (ace_object_t);
-			break;
-		default:
-			ace_size = sizeof (ace_t);
-			break;
-		}
-
-		entry_type = (iflags & ACE_TYPE_FLAGS);
-		if ((entry_type != ACE_OWNER &&
-		    entry_type != OWNING_GROUP &&
-		    entry_type != ACE_EVERYONE)) {
-			acep->a_who = zfs_fuid_map_id(zfsvfs, who,
-			    cr, (entry_type & ACE_IDENTIFIER_GROUP) ?
-			    ZFS_ACE_GROUP : ZFS_ACE_USER);
-		} else {
-			acep->a_who = (uid_t)(int64_t)who;
-		}
-		acep->a_access_mask = access_mask;
-		acep->a_flags = iflags;
-		acep->a_type = type;
-		acep = (ace_t *)((caddr_t)acep + ace_size);
-	}
-}
-
 static int
 zfs_copy_ace_2_oldace(vtype_t obj_type, zfs_acl_t *aclp, ace_t *acep,
     zfs_oldace_t *z_acl, int aclcnt, size_t *size)
@@ -1669,7 +1607,7 @@ zfs_acl_ids_create(znode_t *dzp, int flag, vattr_t *vap, cred_t *cr,
 				acl_ids->z_fgid = 0;
 		}
 		if (acl_ids->z_fgid == 0) {
-			char		*domain;
+			const char		*domain;
 			uint32_t	rid;
 
 			acl_ids->z_fgid = dzp->z_gid;
@@ -1803,7 +1741,7 @@ zfs_getacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 		return (ENOMEM);
 	}
 
-	dprintf("acl_count %d\n", aclp->z_acl_count);
+	dprintf("acl_count %llu\n", aclp->z_acl_count);
 
 	k_acl->acl_entrycount = aclp->z_acl_count;
 	k_acl->acl_flags = 0;
@@ -1841,7 +1779,8 @@ zfs_getacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 			/* Try to get a guid from our uid */
 		} else {
 
-			dprintf("ZFS: trying to map uid %d flags %x type %x\n",
+			dprintf(
+			    "ZFS: trying to map uid %llu flags %x type %x\n",
 			    who, flags, type);
 
 			if (flags & OWNING_GROUP) {
@@ -1943,7 +1882,7 @@ zfs_addacl_trivial(znode_t *zp, ace_t *aces, int *nentries, int seen_type)
 		return (error);
 	}
 
-	dprintf("ondisk acl_count %d\n", aclp->z_acl_count);
+	dprintf("ondisk acl_count %llu\n", aclp->z_acl_count);
 
 	// Start at the end
 	i = *nentries;
@@ -1977,8 +1916,8 @@ zfs_addacl_trivial(znode_t *zp, ace_t *aces, int *nentries, int seen_type)
 		aces[i].a_flags = flags;
 		aces[i].a_type = type;
 
-		dprintf("zfs: adding entry %d for type %x sizeof %d\n", i, type,
-		    sizeof (aces[i]));
+		dprintf("zfs: adding entry %d for type %x sizeof %lu\n",
+		    i, type, sizeof (aces[i]));
 		i++;
 	}
 

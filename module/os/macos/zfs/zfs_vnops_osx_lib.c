@@ -504,7 +504,7 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 
 	if (ishardlink) {
 		dprintf("ZFS:getattr(%s,%llu,%llu) parent %llu: cache_parent "
-		    "%llu: va_nlink %u\n", VATTR_IS_ACTIVE(vap, va_name) ?
+		    "%llu: va_nlink %llu\n", VATTR_IS_ACTIVE(vap, va_name) ?
 		    vap->va_name : zp->z_name_cache,
 		    vap->va_fileid,
 		    VATTR_IS_ACTIVE(vap, va_linkid) ? vap->va_linkid : 0,
@@ -654,7 +654,7 @@ zfs_getbsdflags(znode_t *zp)
 	 * if (zflags & ZFS_ARCHIVE)
 	 * bsdflags |= SF_ARCHIVED;
 	 */
-	dprintf("getbsd changing zfs %08lx to osx %08lx\n",
+	dprintf("getbsd changing zfs %08llx to osx %08x\n",
 	    zflags, bsdflags);
 	return (bsdflags);
 }
@@ -718,7 +718,7 @@ zfs_setbsdflags(znode_t *zp, uint32_t bsdflags)
 		zflags &= ~ZFS_SAPPENDONLY;
 
 	zp->z_pflags = zflags;
-	dprintf("setbsd changing osx %08lx to zfs %08lx\n",
+	dprintf("setbsd changing osx %08x to zfs %08llx\n",
 	    bsdflags, zflags);
 
 	/*
@@ -2034,7 +2034,7 @@ zfs_hardlink_addmap(znode_t *zp, uint64_t parentid, uint32_t linkid)
 		return (0);
 	}
 
-	dprintf("Addmap('%s' parentid %llu linkid %lu (ZFS parentid %llu)\n",
+	dprintf("Addmap('%s' parentid %llu linkid %u (ZFS parentid %llu)\n",
 	    zp->z_name_cache, parentid, linkid,
 	    INO_XNUTOZFS(parentid, zfsvfs->z_root));
 	parentid = INO_XNUTOZFS(parentid, zfsvfs->z_root);

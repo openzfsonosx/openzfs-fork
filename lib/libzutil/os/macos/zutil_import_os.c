@@ -83,7 +83,7 @@
 
 #define	DEV_BYID_PATH "/private/var/run/disk/by-id/"
 
-static char *
+static const char *
 zpool_default_import_path[DEFAULT_IMPORT_PATH_SIZE] = {
 	"/private/var/run/disk/by-id",
 	"/private/var/run/disk/by-path",
@@ -108,6 +108,7 @@ is_watchdog_dev(const char *dev)
 int
 zfs_dev_flush(int fd)
 {
+	(void) fd;
 //	return (ioctl(fd, BLKFLSBUF));
 	return (0);
 }
@@ -396,7 +397,8 @@ zpool_find_import_blkid(libpc_handle_t *hdl, pthread_mutex_t *lock,
 	int i, dirs;
 	struct dirent *dp;
 	char path[MAXPATHLEN];
-	char *end, **dir;
+	char *end;
+	const char **dir;
 	size_t pathleft;
 	avl_index_t where;
 	rdsk_node_t *slice;
@@ -511,12 +513,18 @@ typedef struct vdev_dev_strs {
 int
 zfs_device_get_devid(struct udev_device *dev, char *bufptr, size_t buflen)
 {
+	(void) dev;
+	(void) bufptr;
+	(void) buflen;
 	return (ENODATA);
 }
 
 int
 zfs_device_get_physical(struct udev_device *dev, char *bufptr, size_t buflen)
 {
+	(void) dev;
+	(void) bufptr;
+	(void) buflen;
 	return (ENODATA);
 }
 
@@ -528,6 +536,9 @@ static int
 encode_device_strings(const char *path, vdev_dev_strs_t *ds,
     boolean_t wholedisk)
 {
+	(void) path;
+	(void) ds;
+	(void) wholedisk;
 	return (ENOENT);
 }
 
@@ -615,4 +626,5 @@ update_vdev_config_dev_strs(nvlist_t *nv)
 void
 update_vdevs_config_dev_sysfs_path(nvlist_t *config)
 {
+	(void) config;
 }

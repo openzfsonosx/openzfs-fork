@@ -86,7 +86,8 @@ inuse_corestorage(char *slice, nvlist_t *attrs, int *errp)
 					libdiskmgt_add_str(attrs, DM_USED_NAME,
 					    lv_status_str, errp);
 				} else {
-					libdiskmgt_add_str(attrs, DM_USED_NAME,
+					libdiskmgt_add_str(attrs,
+					    DM_USED_NAME,
 					    "Unknown", errp);
 				}
 				in_use = 1;

@@ -625,6 +625,7 @@ efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc)
 int
 efi_rescan(int fd)
 {
+	(void) fd;
 	return (0);
 }
 
@@ -1503,33 +1504,6 @@ void
 efi_free(struct dk_gpt *ptr)
 {
 	free(ptr);
-}
-
-/*
- * Input: File descriptor
- * Output: 1 if disk has an EFI label, or > 2TB with no VTOC or legacy MBR.
- * Otherwise 0.
- */
-int
-efi_type(int fd)
-{
-#if 0
-	struct vtoc vtoc;
-	struct extvtoc extvtoc;
-
-	if (ioctl(fd, DKIOCGEXTVTOC, &extvtoc) == -1) {
-		if (errno == ENOTSUP)
-			return (1);
-		else if (errno == ENOTTY) {
-			if (ioctl(fd, DKIOCGVTOC, &vtoc) == -1)
-				if (errno == ENOTSUP)
-					return (1);
-		}
-	}
-	return (0);
-#else
-	return (ENOSYS);
-#endif
 }
 
 void

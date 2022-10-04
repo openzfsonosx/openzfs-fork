@@ -43,6 +43,8 @@
 boolean_t
 check_sector_size_database(char *path, int *sector_size)
 {
+	(void) path;
+	(void) sector_size;
 	return (B_FALSE);
 }
 
@@ -195,4 +197,5 @@ check_file(const char *file, boolean_t force, boolean_t isspare)
 void
 after_zpool_upgrade(zpool_handle_t *zhp)
 {
+	(void) zhp;
 }
