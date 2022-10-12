@@ -15,13 +15,13 @@ zfs_util_LDFLAGS = -static -framework IOKit
 
 # build the /Library/Filesystems/zfs.fs/ bundle
 
-zfs_fs_SOURCES =
+noinst_zfs_fs_SOURCES =
 
-bin_PROGRAMS += zfs.fs
+bin_PROGRAMS += noinst_zfs.fs
 
 dist_noinst_DATA += $(INFO_PLIST) $(INFOPLIST_STRINGS) $(PKGINFO)
 
-zfs.fs$(EXEEXT): zfs_util
+noinst_zfs.fs$(EXEEXT): zfs_util
 	rm -rf zfs.fs
 	mkdir -p zfs.fs/Contents/Resources/English.lproj
 	cp -f $(PKGINFO) zfs.fs/Contents/
@@ -32,7 +32,7 @@ zfs.fs$(EXEEXT): zfs_util
 	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(ZFS_META_VERSION)" zfs.fs/Contents/Info.plist
 	plutil -convert binary1 zfs.fs/Contents/Resources/English.lproj/InfoPlist.strings
 
-install-exec-local:: zfs.fs
+install-exec-local:: noinst_zfs.fs
 	rm -f $(FS_BUNDLEDIR)/Contents/$(PKGINFO)
 	rm -f $(FS_BUNDLEDIR)/Contents/$(INFO_PLIST)
 	rm -f $(FS_BUNDLEDIR)/Contents/Resources/English.lproj/$(INFOPLIST_STRINGS)
@@ -42,11 +42,18 @@ install-exec-local:: zfs.fs
 	ln -fs /usr/bin/true $(FS_BUNDLEDIR)/Contents/Resources/newfs_zfs
 	chown -R root:wheel $(FS_BUNDLEDIR) || echo "Unable to chown root:wheel in $(FS_BUNDLEDIR)"
 
-clean-binPROGRAMS:
-	rm -rf zfs.fs/
 
-clean:
-	rm -rf zfs.fs
+CLEANFILES += zfs.fs/Contents/Resources/English.lproj/InfoPlist.strings \
+	zfs.fs/Contents/Resources/zfs_util \
+	zfs.fs/Contents/Info.plist \
+	zfs.fs/Contents/PkgInfo \
+	zfs.fs/Contents/Resources/English.lproj/InfoPlist.strings \
+	zfs.fs/Contents/Resources/fsck_zfs \
+	zfs.fs/Contents/Resources/newfs_zfs
 
-uninstall-hook:
-	rm -rf "$(FS_BUNDLEDIR)"
+CLEAN_LOCAL += zfsutil_clean_local
+zfsutil_clean_local:
+	@rmdir zfs.fs/Contents/Resources/English.lproj \
+	zfs.fs/Contents/Resources \
+	zfs.fs/Contents \
+	zfs.fs || true
