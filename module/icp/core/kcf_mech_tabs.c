@@ -75,21 +75,9 @@
 
 /* RFE 4687834 Will deal with the extensibility of these tables later */
 
-static kcf_mech_entry_t kcf_digest_mechs_tab[KCF_MAXDIGEST]
-#ifdef __APPLE__
-	= {{ "NOTUSED", 0, 0, {0}}, {{0}, 0, 0, {0}}}
-#endif
-	;
-static kcf_mech_entry_t kcf_cipher_mechs_tab[KCF_MAXCIPHER]
-#ifdef __APPLE__
-	= {{ "NOTUSED", 0, 0, {0}}, {{0}, 0, 0, {0}}}
-#endif
-	;
-static kcf_mech_entry_t kcf_mac_mechs_tab[KCF_MAXMAC]
-#ifdef __APPLE__
-	= {{ "NOTUSED", 0, 0, {0}}, {{0}, 0, 0, {0}}}
-#endif
-	;
+static kcf_mech_entry_t kcf_digest_mechs_tab[KCF_MAXDIGEST];
+static kcf_mech_entry_t kcf_cipher_mechs_tab[KCF_MAXCIPHER];
+static kcf_mech_entry_t kcf_mac_mechs_tab[KCF_MAXMAC];
 
 const kcf_mech_entry_tab_t kcf_mech_tabs_tab[KCF_LAST_OPSCLASS + 1] = {
 	{0, NULL},				/* No class zero */
