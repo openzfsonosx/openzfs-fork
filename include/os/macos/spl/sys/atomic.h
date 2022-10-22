@@ -336,6 +336,9 @@ ATOMIC_SWAP(ulong, ulong_t)
 ATOMIC_SWAP(ushort, ushort_t)
 /* END CSTYLED */
 
+extern void *
+atomic_cas_ptr(volatile void *target, void *cmp,  void *newval);
+
 static inline uint64_t
 atomic_load_64(volatile uint64_t *target)
 {
