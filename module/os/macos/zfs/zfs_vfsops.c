@@ -2251,6 +2251,12 @@ zfs_vfs_unmount(struct mount *mp, int mntflags, vfs_context_t context)
 	VERIFY(zfsvfs_teardown(zfsvfs, B_TRUE) == 0);
 	os = zfsvfs->z_os;
 
+#ifdef CLOSE_ON_UNMOUNT
+	/* See rant in vdev_file.c */
+	extern void vdev_file_close_all(objset_t *);
+	vdev_file_close_all(os);
+#endif
+
 	/*
 	 * z_os will be NULL if there was an error in
 	 * attempting to reopen zfsvfs.
