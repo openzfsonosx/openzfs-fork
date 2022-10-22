@@ -58,7 +58,11 @@ typedef struct {
 	enum xdr_op	x_op;	/* Stream direction */
 } XDR;
 
+#ifdef _KERNEL
 typedef bool_t (*xdrproc_t)(XDR *xdrs, void *ptr);
+#else
+typedef bool_t (*xdrproc_t)(XDR *xdrs, void *ptr, unsigned int u);
+#endif
 
 struct xdr_ops {
 	bool_t (*xdr_control)(XDR *, int, void *);

@@ -390,7 +390,11 @@ xdr_enc_array(XDR *xdrs, caddr_t *arrp, uint_t *sizep, const uint_t maxsize,
 		return (FALSE);
 
 	for (i = 0; i < *sizep; i++) {
+#ifdef _KERNEL
 		if (!elproc(xdrs, addr))
+#else
+		if (!elproc(xdrs, addr, 0))
+#endif
 			return (FALSE);
 		addr += elsize;
 	}
