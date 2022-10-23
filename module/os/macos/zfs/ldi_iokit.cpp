@@ -1738,13 +1738,13 @@ handle_get_media_info_ext_iokit(struct ldi_handle *lhp,
 	uint64_t blkcount;
 
 	if (!lhp || !dkmext) {
-		dprintf("%s missing lhp or dkmext\n", __func__);
+		printf("zfs: %s missing lhp or dkmext\n", __func__);
 		return (EINVAL);
 	}
 
 	/* Validate IOMedia */
 	if (!OSDynamicCast(IOMedia, LH_MEDIA(lhp))) {
-		dprintf("%s invalid IOKit handle\n", __func__);
+		printf("zfs: %s invalid IOKit handle\n", __func__);
 		return (ENODEV);
 	}
 
@@ -1756,7 +1756,7 @@ handle_get_media_info_ext_iokit(struct ldi_handle *lhp,
 
 	number = OSDynamicCast(OSNumber, prop);
 	if (!prop || !number) {
-		dprintf("%s couldn't get physical blocksize\n", __func__);
+		printf("zfs: %s couldn't get physical blocksize\n", __func__);
 		LH_MEDIA(lhp)->release();
 		return (ENXIO);
 	}
@@ -1766,13 +1766,13 @@ handle_get_media_info_ext_iokit(struct ldi_handle *lhp,
 	prop = 0;
 
 	if ((blksize = LH_MEDIA(lhp)->getPreferredBlockSize()) == 0) {
-		dprintf("%s invalid blocksize\n", __func__);
+		printf("zfs: %s invalid blocksize\n", __func__);
 		LH_MEDIA(lhp)->release();
 		return (ENXIO);
 	}
 
 	if ((blkcount = LH_MEDIA(lhp)->getSize() / blksize) == 0) {
-		dprintf("%s invalid block count\n", __func__);
+		printf("ZFS: %s invalid block count\n", __func__);
 		LH_MEDIA(lhp)->release();
 		return (ENXIO);
 	}
@@ -1780,14 +1780,40 @@ handle_get_media_info_ext_iokit(struct ldi_handle *lhp,
 	LH_MEDIA(lhp)->release();
 
 #ifdef DEBUG
-	dprintf("%s phys blksize %u, logical blksize %u, blockcount %llu\n",
+	printf("ZFS: %s phys blksize %u, logical blksize %u, blockcount %llu\n",
 	    __func__, pblksize, blksize, blkcount);
 #endif
 
+	/*
+	 * The Preferred Block Size may be smaler than the Physical Block
+	 * Size.  The latter is what is bubbled up to "diskutil info -plist"'s
+	 * <key>DeviceBlockSize</key>.
+	 *
+	 * In theory this should only lower-limit the ashift when adding a
+	 * vdev.  It also is what "zpool get ashift pool vdev" returns.
+	 *
+	 * In practice, different external enclosures can return different
+	 * physical block sizes for the same physical storage device, which
+	 * results in zpool status -vx reporting mismatches, and problems with
+	 * scrubs triggering vdev.bad_ashift and ejecting the physical device
+	 * if it is moved from a working enclousre to a different enclosure.
+	 *
+	 * Therefore return the smaller of kIOPropertyPhysicalBlockSizeKey
+	 * and getPreferredBlockSize in dki_pbsize.
+	 */
+
 	/* Set the return values */
+
+	if (pblksize > blksize) {
+		printf("ZFS: %s set dki_pbsize to %u instead of %u\n",
+		    __func__, blksize, pblksize);
+		dkmext->dki_pbsize = blksize;
+	} else {
+		dkmext->dki_pbsize = pblksize;
+	}
+
 	dkmext->dki_capacity = blkcount;
 	dkmext->dki_lbsize = blksize;
-	dkmext->dki_pbsize = pblksize;
 
 	return (0);
 }
