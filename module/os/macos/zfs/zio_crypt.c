@@ -115,7 +115,7 @@
  * Similarly to ZIL blocks, the core part of each dnode_phys_t needs to be left
  * in plaintext for scrubbing and claiming, but the bonus buffers might contain
  * sensitive user data. The function zio_crypt_init_uios_dnode() handles parsing
- * which which pieces of the block need to be encrypted. For more details about
+ * which pieces of the block need to be encrypted. For more details about
  * dnode authentication and encryption, see zio_crypt_init_uios_dnode().
  *
  * OBJECT SET AUTHENTICATION:
@@ -186,7 +186,7 @@
 #define	ZFS_KEY_MAX_SALT_USES_DEFAULT	400000000
 #define	ZFS_CURRENT_MAX_SALT_USES	\
 	(MIN(zfs_key_max_salt_uses, ZFS_KEY_MAX_SALT_USES_DEFAULT))
-unsigned long zfs_key_max_salt_uses = ZFS_KEY_MAX_SALT_USES_DEFAULT;
+static unsigned long zfs_key_max_salt_uses = ZFS_KEY_MAX_SALT_USES_DEFAULT;
 
 typedef struct blkptr_auth_buf {
 	uint64_t bab_prop;			/* blk_prop - portable mask */
@@ -231,7 +231,6 @@ zio_crypt_key_init(uint64_t crypt, zio_crypt_key_t *key)
 
 	keydata_len = zio_crypt_table[crypt].ci_keylen;
 	memset(key, 0, sizeof (zio_crypt_key_t));
-
 	rw_init(&key->zk_salt_lock, NULL, RW_DEFAULT, NULL);
 
 	/* fill keydata buffers and salt with random data */
@@ -1035,17 +1034,23 @@ zio_crypt_do_dnode_hmac_updates(crypto_context_t ctx, uint64_t version,
     boolean_t should_bswap, dnode_phys_t *dnp)
 {
 	int ret, i;
-	dnode_phys_t *adnp;
+	dnode_phys_t *adnp, tmp_dncore;
+	size_t dn_core_size = offsetof(dnode_phys_t, dn_blkptr);
 	boolean_t le_bswap = (should_bswap == ZFS_HOST_BYTEORDER);
 	crypto_data_t cd;
-	uint8_t tmp_dncore[offsetof(dnode_phys_t, dn_blkptr)];
 
 	cd.cd_format = CRYPTO_DATA_RAW;
 	cd.cd_offset = 0;
 
-	/* authenticate the core dnode (masking out non-portable bits) */
-	memcpy(tmp_dncore, dnp, sizeof (tmp_dncore));
-	adnp = (dnode_phys_t *)tmp_dncore;
+	/*
+	 * Authenticate the core dnode (masking out non-portable bits).
+	 * We only copy the first 64 bytes we operate on to avoid the overhead
+	 * of copying 512-64 unneeded bytes. The compiler seems to be fine
+	 * with that.
+	 */
+	memcpy(&tmp_dncore, dnp, dn_core_size);
+	adnp = &tmp_dncore;
+
 	if (le_bswap) {
 		adnp->dn_datablkszsec = BSWAP_16(adnp->dn_datablkszsec);
 		adnp->dn_bonuslen = BSWAP_16(adnp->dn_bonuslen);
@@ -1055,7 +1060,7 @@ zio_crypt_do_dnode_hmac_updates(crypto_context_t ctx, uint64_t version,
 	adnp->dn_flags &= DNODE_CRYPT_PORTABLE_FLAGS_MASK;
 	adnp->dn_used = 0;
 
-	cd.cd_length = sizeof (tmp_dncore);
+	cd.cd_length = dn_core_size;
 	cd.cd_raw.iov_base = (char *)adnp;
 	cd.cd_raw.iov_len = cd.cd_length;
 
@@ -1190,29 +1195,31 @@ zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data,
 
 	/*
 	 * This is necessary here as we check next whether
-	 * OBJSET_FLAG_USERACCOUNTING_COMPLETE or
-	 * OBJSET_FLAG_USEROBJACCOUNTING are set in order to
-	 * decide if the local_mac should be zeroed out.
+	 * OBJSET_FLAG_USERACCOUNTING_COMPLETE is set in order to
+	 * decide if the local_mac should be zeroed out. That flag will always
+	 * be set by dmu_objset_id_quota_upgrade_cb() and
+	 * dmu_objset_userspace_upgrade_cb() if useraccounting has been
+	 * completed.
 	 */
 	intval = osp->os_flags;
 	if (should_bswap)
 		intval = BSWAP_64(intval);
+	boolean_t uacct_incomplete =
+	    !(intval & OBJSET_FLAG_USERACCOUNTING_COMPLETE);
 
 	/*
 	 * The local MAC protects the user, group and project accounting.
 	 * If these objects are not present, the local MAC is zeroed out.
 	 */
-	if ((datalen >= OBJSET_PHYS_SIZE_V3 &&
+	if (uacct_incomplete ||
+	    (datalen >= OBJSET_PHYS_SIZE_V3 &&
 	    osp->os_userused_dnode.dn_type == DMU_OT_NONE &&
 	    osp->os_groupused_dnode.dn_type == DMU_OT_NONE &&
 	    osp->os_projectused_dnode.dn_type == DMU_OT_NONE) ||
 	    (datalen >= OBJSET_PHYS_SIZE_V2 &&
 	    osp->os_userused_dnode.dn_type == DMU_OT_NONE &&
 	    osp->os_groupused_dnode.dn_type == DMU_OT_NONE) ||
-	    (datalen <= OBJSET_PHYS_SIZE_V1) ||
-	    (((intval & OBJSET_FLAG_USERACCOUNTING_COMPLETE) == 0 ||
-	    (intval & OBJSET_FLAG_USEROBJACCOUNTING_COMPLETE) == 0) &&
-	    key->zk_version > 0)) {
+	    (datalen <= OBJSET_PHYS_SIZE_V1)) {
 		memset(local_mac, 0, ZIO_OBJSET_MAC_LEN);
 		return (0);
 	}
@@ -1253,6 +1260,14 @@ zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data,
 	if (osp->os_groupused_dnode.dn_type != DMU_OT_NONE) {
 		ret = zio_crypt_do_dnode_hmac_updates(ctx, key->zk_version,
 		    should_bswap, &osp->os_groupused_dnode);
+		if (ret)
+			goto error;
+	}
+
+	if (osp->os_projectused_dnode.dn_type != DMU_OT_NONE &&
+	    datalen >= OBJSET_PHYS_SIZE_V3) {
+		ret = zio_crypt_do_dnode_hmac_updates(ctx, key->zk_version,
+		    should_bswap, &osp->os_projectused_dnode);
 		if (ret)
 			goto error;
 	}
@@ -1315,7 +1330,7 @@ zio_crypt_do_indirect_mac_checksum_impl(boolean_t generate, void *buf,
 		return (0);
 	}
 
-	if (memcmp(cksum, digestbuf, ZIO_DATA_MAC_LEN) != 0)
+	if (memcmp(digestbuf, cksum, ZIO_DATA_MAC_LEN) != 0)
 		return (SET_ERROR(ECKSUM));
 
 	return (0);
@@ -1396,6 +1411,7 @@ zio_crypt_init_uios_zil(boolean_t encrypt, uint8_t *plainbuf,
 		nr_src = 1;
 		nr_dst = 0;
 	}
+	memset(dst, 0, datalen);
 
 	/* find the start and end record of the log block */
 	zilc = (zil_chain_t *)src;
@@ -1754,6 +1770,7 @@ zio_crypt_init_uios_normal(boolean_t encrypt, uint8_t *plainbuf,
     uint8_t *cipherbuf, uint_t datalen, zfs_uio_t *puio, zfs_uio_t *cuio,
     uint_t *enc_len)
 {
+	(void) encrypt;
 	int ret;
 	uint_t nr_plain = 1, nr_cipher = 2;
 	iovec_t *plain_iovecs = NULL, *cipher_iovecs = NULL;
@@ -1886,7 +1903,7 @@ zio_do_crypt_data(boolean_t encrypt, zio_crypt_key_t *key,
 	rw_enter(&key->zk_salt_lock, RW_READER);
 	locked = B_TRUE;
 
-	if (memcmp(key->zk_salt, salt, ZIO_DATA_SALT_LEN) == 0) {
+	if (memcmp(salt, key->zk_salt, ZIO_DATA_SALT_LEN) == 0) {
 		ckey = &key->zk_current_key;
 		tmpl = key->zk_current_tmpl;
 	} else {
