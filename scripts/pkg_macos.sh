@@ -50,7 +50,7 @@ WORKDIR="/private/var/tmp/${WORKNAME}"
 # If there are two dots "10.15.4", eat it
 OS=$(sw_vers | awk '{if ($1 == "ProductVersion:") print $2;}')
 OS=$(echo "$OS" | awk -F . '{if ($1 == 10) print $1"."$2; else print $1}')
-
+RC=$(grep Release: META | awk '$2 ~ /rc/ { print $2}')
 
 function usage
 {
@@ -110,6 +110,7 @@ fi
 
 echo "Version is $version"
 echo "Prefix set to $prefix"
+echo "RC, if set: $RC"
 echo ""
 
 sleep 3
@@ -442,9 +443,9 @@ fi
 
 arch=$(uname -m)
 if [ x"$arch" == x"arm64" ]; then
-   name="OpenZFSonOsX-${version}-${friendly}-${OS}-${arch}.pkg"
+   name="OpenZFSonOsX-${version}${RC}-${friendly}-${OS}-${arch}.pkg"
 else
-   name="OpenZFSonOsX-${version}-${friendly}-${OS}.pkg"
+   name="OpenZFSonOsX-${version}${RC}-${friendly}-${OS}.pkg"
 fi
 
 mv my_package_new.pkg "${name}"
