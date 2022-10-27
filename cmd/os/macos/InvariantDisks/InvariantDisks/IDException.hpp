@@ -17,6 +17,7 @@
 #include <sstream>
 
 #include <CoreFoundation/CFError.h>
+#include <CoreFoundation/CFString.h>
 
 namespace ID
 {
