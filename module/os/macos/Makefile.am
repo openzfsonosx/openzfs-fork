@@ -406,11 +406,11 @@ macos_zfs_SOURCES = \
         $(zfs_ASM_SOURCES_AS)
 
 # Ensure these files are always built with -O2 to avoid stack overflow.
-%D%/../../zfs/zfs-dsl_scan.$(OBJEXT): CFLAGS := $(CFLAGS:-O0%=-O2)
-%D%/../../lua/zfs-lvm.$(OBJEXT): CFLAGS := $(CFLAGS:-O0%=-O2)
+%D%/../../zfs/macos_zfs-dsl_scan.$(OBJEXT): CFLAGS := $(CFLAGS:-O0%=-O2)
+%D%/../../lua/macos_zfs-lvm.$(OBJEXT): CFLAGS := $(CFLAGS:-O0%=-O2)
 
 # Zstd uses -O3 by default, so we should follow
-%D%/../../zstd/lib/zfs-zstd.$(OBJEXT): CFLAGS := -fno-tree-vectorize -O3
+%D%/../../zstd/lib/macos_zfs-zstd.$(OBJEXT): CFLAGS := -fno-tree-vectorize -O3
 
 
 KERNEL_MODDIR=  $(DESTDIR)@KERNEL_MODPREFIX@/zfs.kext
