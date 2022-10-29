@@ -101,5 +101,5 @@ endif
 if BUILD_MACOS
 include $(srcdir)/%D%/launchd/Makefile.am
 include $(srcdir)/%D%/paths.d/Makefile.am
+include $(srcdir)/%D%/launchd.d/Makefile.am
 endif
-
