@@ -41,6 +41,10 @@ if BUILD_FREEBSD
 zpool_LDADD += -lgeom
 endif
 
+if BUILD_MACOS
+zpool_LDFLAGS = -sectcreate __TEXT __info_plist %D%/os/macos/Info-zpool.plist
+endif
+
 zpool_LDADD += -lm $(LIBBLKID_LIBS) $(LIBUUID_LIBS)
 
 dist_noinst_DATA += %D%/zpool.d/README
