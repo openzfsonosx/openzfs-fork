@@ -42,7 +42,8 @@ zpool_LDADD += -lgeom
 endif
 
 if BUILD_MACOS
-zpool_LDFLAGS = -sectcreate __TEXT __info_plist %D%/os/macos/Info-zpool.plist
+zpool_LDFLAGS  = -sectcreate __TEXT __info_plist %D%/os/macos/Info-zpool.plist
+zpool_LDFLAGS += -sectcreate __TEXT __entitlements %D%/os/macos/zpool-entitlements.plist
 endif
 
 zpool_LDADD += -lm $(LIBBLKID_LIBS) $(LIBUUID_LIBS)

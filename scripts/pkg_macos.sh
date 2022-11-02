@@ -438,7 +438,9 @@ rm -f my_package_new.pkg
 productbuild --distribution distribution_new.xml --resources "${BASE_DIR}/../contrib/macOS/resources/"  --scripts "${BASE_DIR}/../contrib/macOS/product-scripts" "${sign[@]}" --package-path ./my_package.pkg my_package_new.pkg
 
 if [ -n "$PKG_NOTARIZE_KEY" ]; then
+    SECONDS=0
     do_notarize
+    echo "Notarize took $SECONDS seconds to complete"
 fi
 
 arch=$(uname -m)
