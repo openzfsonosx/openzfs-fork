@@ -318,6 +318,8 @@ constrain_path() {
 	elif [ "$UNAME" = "FreeBSD" ] ; then
 		ln -fs /usr/local/bin/ksh93 "$STF_PATH/ksh"
 	elif [ "$UNAME" = "Darwin" ] ; then
+		[ -f "/usr/local/bin/gdd" ] && ln -fs /usr/local/bin/gdd "$STF_PATH/dd"
+		[ -f "/usr/local/bin/gsed" ] && ln -fs /usr/local/bin/gsed "$STF_PATH/gsed"
 		ln -fs /bin/ksh "$STF_PATH/ksh"
 		ln -fs /sbin/fsck_hfs "$STF_PATH/fsck"
 		ln -fs /sbin/newfs_hfs "$STF_PATH/newfs_hfs"
@@ -329,8 +331,6 @@ constrain_path() {
 		ln -fs /usr/sbin/dseditgroup "$STF_PATH/dseditgroup"
 		ln -fs /usr/bin/xattr "$STF_PATH/xattr"
 		ln -fs /usr/sbin/createhomedir "$STF_PATH/createhomedir"
-		[ -f "/usr/local/bin/gdd" ] && ln -fs /usr/local/bin/gdd "$STF_PATH/dd" || true
-		[ -f "/usr/local/bin/gsed" ] && ln -fs /usr/local/bin/gsed "$STF_PATH/gsed" || true
 	fi
 }
 
