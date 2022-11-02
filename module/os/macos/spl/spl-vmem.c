@@ -451,6 +451,11 @@ extern uint64_t total_memory;
 
 extern void IOSleep(unsigned milliseconds);
 
+#define INITIAL_BLOCK_SIZE 16ULL*1024ULL*1024ULL
+static char *initial_default_block = NULL;
+void *IOMallocAligned(vm_size_t size, vm_offset_t alignment);
+void IOFreeAligned(void * address, vm_size_t size);
+
 /*
  * Get a vmem_seg_t from the global segfree list.
  */
@@ -3558,8 +3563,12 @@ vmem_init(const char *heap_name,
 	// o3x is not so lucky, so we start with this
 	// Intel can go with 4096 alignment, but arm64 needs 16384. So
 	// we just use the larger.
-	static char initial_default_block[16ULL*1024ULL*1024ULL]
-	    __attribute__((aligned(16384))) = { 0 };
+	initial_default_block =
+	    IOMallocAligned(INITIAL_BLOCK_SIZE, 16384);
+
+	VERIFY3P(initial_default_block, !=, NULL);
+
+	memset(initial_default_block, 0, INITIAL_BLOCK_SIZE);
 
 	// The default arena is very low-bandwidth; it supplies the initial
 	// large allocation for the heap arena below, and it serves as the
@@ -3567,7 +3576,7 @@ vmem_init(const char *heap_name,
 	// or 3 parent_alloc calls (to spl_vmem_default_alloc) in total.
 
 	spl_default_arena = vmem_create("spl_default_arena", // id 1
-	    initial_default_block, 16ULL*1024ULL*1024ULL,
+	    initial_default_block, INITIAL_BLOCK_SIZE,
 	    heap_quantum, spl_vmem_default_alloc, spl_vmem_default_free,
 	    spl_default_arena_parent, 131072,
 	    VM_SLEEP | VMC_POPULATOR | VMC_NO_QCACHE);
@@ -3663,17 +3672,12 @@ vmem_init(const char *heap_name,
 	// kstat.vmem.vmem.bucket_heap.parent_{alloc+free}, and improves with
 	// increasing initial fixed allocation size.
 
-	const size_t mib = 1024ULL * 1024ULL;
-	const size_t gib = 1024ULL * mib;
-	size_t resv_size = 128ULL * mib;
-	extern uint64_t real_total_memory;
+	/*
+	 * Add an initial segment to spl_heap_arena for convenience.
+	 */
 
-	if (real_total_memory >= 4ULL * gib)
-		resv_size = 256ULL * mib;
-	if (real_total_memory >= 8ULL * gib)
-		resv_size = 512ULL * mib;
-	if (real_total_memory >= 16ULL * gib)
-		resv_size = gib;
+	const size_t mib = 1024ULL * 1024ULL;
+	const size_t resv_size = 128ULL * mib;
 
 	dprintf("SPL: %s adding fixed allocation of %llu to the bucket_heap\n",
 	    __func__, (uint64_t)resv_size);
@@ -3685,6 +3689,7 @@ vmem_init(const char *heap_name,
 
 	VERIFY(spl_heap_arena_initial_alloc != NULL);
 
+	/* remember size we allocated */
 	spl_heap_arena_initial_alloc_size = resv_size;
 
 	// kstat.vmem.vmem.heap : kmem_cache_alloc() and similar calls
@@ -3960,11 +3965,14 @@ vmem_fini(vmem_t *heap)
 
 	dprintf("\nSPL: %s destroying spl_default_arena\n", __func__);
 	vmem_destroy(spl_default_arena); // parent: spl_default_arena_parent
-	dprintf("\nSPL: %s destroying spl_default_arena_parant\n", __func__);
+	dprintf("\nSPL: %s destroying spl_default_arena_parent\n", __func__);
 	vmem_destroy(spl_default_arena_parent);
 
 	dprintf("SPL: %s destroying vmem_vmem_arena\n", __func__);
 	vmem_destroy_internal(vmem_vmem_arena);
+
+	printf("SPL: %s: freeing initial_default_block\n", __func__);
+	IOFreeAligned(initial_default_block, INITIAL_BLOCK_SIZE);
 
 	printf("SPL: arenas removed, now try destroying mutexes... ");
 
