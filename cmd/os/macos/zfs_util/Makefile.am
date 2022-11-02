@@ -22,7 +22,6 @@ bin_PROGRAMS += noinst_zfs.fs
 dist_noinst_DATA += $(INFO_PLIST) $(INFOPLIST_STRINGS) $(PKGINFO)
 
 noinst_zfs.fs$(EXEEXT): zfs_util
-	rm -rf zfs.fs
 	mkdir -p zfs.fs/Contents/Resources/English.lproj
 	cp -f $(PKGINFO) zfs.fs/Contents/
 	cp -f $(INFO_PLIST) zfs.fs/Contents/
@@ -32,7 +31,8 @@ noinst_zfs.fs$(EXEEXT): zfs_util
 	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(ZFS_META_VERSION)" zfs.fs/Contents/Info.plist
 	plutil -convert binary1 zfs.fs/Contents/Resources/English.lproj/InfoPlist.strings
 
-install-exec-local:: noinst_zfs.fs
+INSTALL_DATA_HOOKS += fs-install-exec-local
+fs-install-exec-local: noinst_zfs.fs
 	rm -f $(FS_BUNDLEDIR)/Contents/$(PKGINFO)
 	rm -f $(FS_BUNDLEDIR)/Contents/$(INFO_PLIST)
 	rm -f $(FS_BUNDLEDIR)/Contents/Resources/English.lproj/$(INFOPLIST_STRINGS)
