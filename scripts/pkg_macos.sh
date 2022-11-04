@@ -201,7 +201,8 @@ function do_codesign
     do_unlock "${PKG_CODESIGN_KEY}"
 
     echo "OS $OS"
-    if [ x"$OS" == x"10.11" ] ||
+    if [ x"$OS" == x"10.12" ] ||
+       [ x"$OS" == x"10.11" ] ||
        [ x"$OS" == x"10.10" ] ||
        [ x"$OS" == x"10.9" ]; then
 	extra=""

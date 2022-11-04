@@ -47,7 +47,7 @@
 #define	CLOCK_MONOTONIC 6
 
 static inline int
-clock_gettime(clockid_t maybe_unused clk_id, struct timespec *tp)
+clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
 	int retval = 0;
 	struct timeval now;

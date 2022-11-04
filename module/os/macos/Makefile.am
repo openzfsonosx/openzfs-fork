@@ -68,10 +68,10 @@ macos_zfs_CPPFLAGS += @KERNEL_DEBUG_CPPFLAGS@
 
 macos_zfs_CFLAGS = -Wno-sign-conversion -Wno-shorten-64-to-32 \
 	-Wno-conditional-uninitialized -Wno-shadow \
-	-Wno-implicit-int-conversion -finline-hint-functions
+	-Wno-implicit-int-conversion $(INLINE_HINT_FUNCTIONS) 
 
 macos_zfs_CXXFLAGS = -Wno-sign-conversion -Wno-shorten-64-to-32 \
-	-Wno-conditional-uninitialized -std=gnu++11 -finline-hint-functions
+	-Wno-conditional-uninitialized -std=gnu++11 $(INLINE_HINT_FUNCTIONS)
 
 macos_zfs_LDFLAGS = \
 	-Xlinker \
