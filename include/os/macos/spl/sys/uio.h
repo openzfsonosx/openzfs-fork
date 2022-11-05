@@ -177,7 +177,8 @@ zfs_uio_iovlen(zfs_uio_t *uio, unsigned int idx)
 {
 	if (uio->uio_iov == NULL) {
 		user_size_t iov_len;
-		uio_getiov(uio->uio_xnu, idx, NULL, &iov_len);
+		if (uio_getiov(uio->uio_xnu, idx, NULL, &iov_len) < 0)
+			return (0ULL);
 		return (iov_len);
 	}
 	return (uio->uio_iov[idx].iov_len);
@@ -188,7 +189,8 @@ zfs_uio_iovbase(zfs_uio_t *uio, unsigned int idx)
 {
 	if (uio->uio_iov == NULL) {
 		user_addr_t iov_base;
-		uio_getiov(uio->uio_xnu, idx, &iov_base, NULL);
+		if (uio_getiov(uio->uio_xnu, idx, &iov_base, NULL) < 0)
+			return (NULL);
 		return ((void *)iov_base);
 	}
 	return (uio->uio_iov[(idx)].iov_base);
