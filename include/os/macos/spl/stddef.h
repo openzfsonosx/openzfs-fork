@@ -35,4 +35,7 @@
 #include_next <stddef.h>
 #endif
 
+/* Older macOS does not have size_t in stddef.h */
+#include <sys/types.h>
+
 #endif

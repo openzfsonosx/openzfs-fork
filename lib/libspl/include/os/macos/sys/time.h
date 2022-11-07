@@ -72,7 +72,7 @@ clock_gettime(clockid_t clk_id, struct timespec *tp)
 			tp->tv_nsec = now.tv_usec * 1000;
 			break;
 	}
-	return (0);
+	return (retval);
 }
 #endif
 
