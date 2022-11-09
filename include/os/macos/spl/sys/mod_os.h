@@ -159,6 +159,11 @@ extern "C" {
 		sysctl_unregister_oid(&sysctl_ ## parent ## _ ## name ); \
 	}
 
+/*
+ * Too few arguments? You probably added a new MODULE_PARAM_CALL
+ * but have yet to create a #define for it below, see for example
+ * blake3_param_set_args - ie, "func" + "_args"
+ */
 #define	ZFS_MODULE_PARAM_CALL(scope_prefix, name_prefix, name, func, _, perm, desc) \
     ZFS_MODULE_PARAM_CALL_IMPL(_tunable_ ## scope_prefix, name, perm, func ## _args(name_prefix ## name), desc)
 
@@ -212,9 +217,32 @@ extern "C" {
 #define	blake3_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, blake3_param, "A"
 
-#define	module_param_call(a, b, c, d, e)
+#define	icp_gcm_avx_set_chunk_size_args(var) \
+    CTLTYPE_STRING, var, 0, param_icp_gcm_avx_set_chunk_size, "A"
+
+#define	icp_gcm_impl_set_args(var)	\
+    CTLTYPE_STRING, var, 0, param_icp_gcm_impl_set, "A"
+
+#define	icp_aes_impl_set_args(var) \
+    CTLTYPE_STRING, var, 0, param_icp_aes_impl_set, "A"
+
+#define	zfs_vdev_raidz_impl_set_args(var) \
+    CTLTYPE_STRING, var, 0, param_zfs_vdev_raidz_impl_set, "A"
+
+/*
+ * Too few arguments? You probably added a new MODULE_PARAM_CALL
+ * but have yet to create a #define for it above, see for example
+ * blake3_param_set_args - ie, "func" + "_args". As well as
+ * possible handler in os/macos/zfs/syscall_os.c
+ */
+#define	module_param_call(name, _set, _get, var, mode) \
+	extern int param_ ## func(ZFS_MODULE_PARAM_ARGS);	   \
+    ZFS_MODULE_PARAM_CALL_IMPL(_tunable, name, ZMOD_RW,   \
+		_set ## _args(var), "xxx")
+
 #define	module_param_named(a, b, c, d)
-#define	module_init_early(fn)	\
+
+#define	module_init_early(fn) \
 void \
 wrap_ ## fn(void *dummy __unused) \
 {	\
