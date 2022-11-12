@@ -653,13 +653,15 @@ zfs_vdev_raidz_impl_get(char *buffer, zfs_kernel_param_t *kp)
 	/* list mandatory options */
 	for (i = 0; i < ARRAY_SIZE(math_impl_opts) - 2; i++) {
 		fmt = (impl == math_impl_opts[i].sel) ? "[%s] " : "%s ";
-		cnt += sprintf(buffer + cnt, fmt, math_impl_opts[i].name);
+		cnt += snprintf(buffer + cnt, MODULE_PARAM_MAX - cnt,
+		    fmt, math_impl_opts[i].name);
 	}
 
 	/* list all supported implementations */
 	for (i = 0; i < raidz_supp_impl_cnt; i++) {
 		fmt = (i == impl) ? "[%s] " : "%s ";
-		cnt += sprintf(buffer + cnt, fmt, raidz_supp_impl[i]->name);
+		cnt += snprintf(buffer + cnt, MODULE_PARAM_MAX - cnt,
+		    fmt, raidz_supp_impl[i]->name);
 	}
 
 	return (cnt);

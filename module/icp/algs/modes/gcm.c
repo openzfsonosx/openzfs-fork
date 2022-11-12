@@ -1020,13 +1020,15 @@ icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
 		}
 #endif
 		fmt = (impl == gcm_impl_opts[i].sel) ? "[%s] " : "%s ";
-		cnt += sprintf(buffer + cnt, fmt, gcm_impl_opts[i].name);
+		cnt += snprintf(buffer + cnt, MODULE_PARAM_MAX + cnt,
+		    fmt, gcm_impl_opts[i].name);
 	}
 
 	/* list all supported implementations */
 	for (i = 0; i < gcm_supp_impl_cnt; i++) {
 		fmt = (i == impl) ? "[%s] " : "%s ";
-		cnt += sprintf(buffer + cnt, fmt, gcm_supp_impl[i]->name);
+		cnt += snprintf(buffer + cnt, MODULE_PARAM_MAX - cnt,
+		    fmt, gcm_supp_impl[i]->name);
 	}
 
 	return (cnt);
