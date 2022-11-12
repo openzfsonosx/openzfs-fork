@@ -223,6 +223,10 @@ void sysctl_os_fini(void);
 /* See rant in vdev_file.c */
 #define	CLOSE_ON_UNMOUNT
 
+#ifndef MODULE_PARAM_MAX
+#define	MODULE_PARAM_MAX 1024
+#endif
+
 #endif // _KERNEL
 
 #endif
