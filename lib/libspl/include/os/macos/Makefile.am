@@ -1,1 +1,0 @@
-SUBDIRS = mach rpc sys

@@ -112,9 +112,6 @@ extern "C" {
 #define	SA_ZPL_PAD(z)		z->z_attr_table[ZPL_PAD]
 #define	SA_ZPL_PROJID(z)	z->z_attr_table[ZPL_PROJID]
 
-#define	SA_ZPL_ADDTIME(z)	z->z_attr_table[ZPL_ADDTIME]
-#define	SA_ZPL_DOCUMENTID(z)	z->z_attr_table[ZPL_DOCUMENTID]
-
 /*
  * Is ID ephemeral?
  */

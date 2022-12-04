@@ -23,10 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#if defined(__APPLE__)
-#define _ASM
-#include <osx/asm_linkage.h>
-#else
+
 #define	ENTRY(x) \
 	.text; \
 	.align	8; \
@@ -36,7 +33,7 @@ x:
 
 #define	SET_SIZE(x) \
 	.size	x, [.-x]
-#endif
+
 
 #if defined(__linux__) && defined(CONFIG_SLS)
 #define	RET	ret; int3

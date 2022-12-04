@@ -48,7 +48,6 @@ extern "C" {
 #include <sys/systm.h>    /* memcpy, memset */
 #elif defined(__linux__)
 #include <linux/string.h> /* memcpy, memset */
-#elif defined(__APPLE__)
 #else
 #error "Unsupported platform"
 #endif

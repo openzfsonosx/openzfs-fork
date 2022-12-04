@@ -25,9 +25,3 @@ libshare_la_SOURCES += \
 	%D%/os/freebsd/nfs.c \
 	%D%/os/freebsd/smb.c
 endif
-
-if BUILD_MACOS
-libshare_la_SOURCES += \
-	%D%/os/macos/nfs.c \
-	%D%/os/macos/smb.c
-endif

@@ -18,10 +18,8 @@ libzfsbootenv_la_LIBADD = \
 
 libzfsbootenv_la_LDFLAGS =
 
-if !BUILD_MACOS
 if !ASAN_ENABLED
 libzfsbootenv_la_LDFLAGS += -Wl,-z,defs
-endif
 endif
 
 libzfsbootenv_la_LDFLAGS += -version-info 1:0:0

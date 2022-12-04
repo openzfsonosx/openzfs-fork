@@ -615,7 +615,7 @@ spa_deadman(void *arg)
 	zfs_dbgmsg("slow spa_sync: started %llu seconds ago, calls %llu",
 	    (gethrtime() - spa->spa_sync_starttime) / NANOSEC,
 	    (u_longlong_t)++spa->spa_deadman_calls);
-	if (zfs_deadman_enabled && spa->spa_root_vdev != NULL)
+	if (zfs_deadman_enabled)
 		vdev_deadman(spa->spa_root_vdev, FTAG);
 
 	spa->spa_deadman_tqid = taskq_dispatch_delay(system_delay_taskq,

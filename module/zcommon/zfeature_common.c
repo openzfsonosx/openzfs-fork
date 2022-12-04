@@ -175,8 +175,7 @@ struct zfs_mod_supported_features {
 struct zfs_mod_supported_features *
 zfs_mod_list_supported(const char *scope)
 {
-#if defined(__FreeBSD__) || defined(__APPLE__) || \
-	defined(_KERNEL) || defined(LIB_ZPOOL_BUILD)
+#if defined(__FreeBSD__) || defined(_KERNEL) || defined(LIB_ZPOOL_BUILD)
 	(void) scope;
 	return (NULL);
 #else
@@ -237,8 +236,7 @@ nomem:
 void
 zfs_mod_list_supported_free(struct zfs_mod_supported_features *list)
 {
-#if !defined(__FreeBSD__) && !defined(__APPLE__) && \
-	!defined(_KERNEL) && !defined(LIB_ZPOOL_BUILD)
+#if !defined(__FreeBSD__) && !defined(_KERNEL) && !defined(LIB_ZPOOL_BUILD)
 	if (list) {
 		tdestroy(list->tree, free);
 		free(list);
@@ -312,8 +310,7 @@ zfs_mod_supported_feature(const char *name,
 	 * that all features are supported.
 	 */
 
-#if defined(_KERNEL) || defined(LIB_ZPOOL_BUILD) || \
-	defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(_KERNEL) || defined(LIB_ZPOOL_BUILD) || defined(__FreeBSD__)
 	(void) name, (void) sfeatures;
 	return (B_TRUE);
 #else
