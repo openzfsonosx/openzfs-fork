@@ -313,7 +313,7 @@ zfs_znode_held(zfsvfs_t *zfsvfs, uint64_t obj)
 	return (held);
 }
 
-static znode_hold_t *
+znode_hold_t *
 zfs_znode_hold_enter(zfsvfs_t *zfsvfs, uint64_t obj)
 {
 	znode_hold_t *zh, *zh_new, search;
@@ -347,7 +347,7 @@ zfs_znode_hold_enter(zfsvfs_t *zfsvfs, uint64_t obj)
 	return (zh);
 }
 
-static void
+void
 zfs_znode_hold_exit(zfsvfs_t *zfsvfs, znode_hold_t *zh)
 {
 	int i = ZFS_OBJ_HASH(zfsvfs, zh->zh_obj);
