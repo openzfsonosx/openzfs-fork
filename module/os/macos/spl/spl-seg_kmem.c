@@ -290,7 +290,7 @@ segkmem_abd_init()
 	extern vmem_t *spl_heap_arena;
 
 	abd_arena = vmem_create("abd_cache", NULL, 0,
-	    PAGESIZE, vmem_alloc, vmem_free, spl_heap_arena,
+	    PAGESIZE, vmem_alloc_impl, vmem_free_impl, spl_heap_arena,
 	    131072, VM_SLEEP | VMC_NO_QCACHE | VM_FIRSTFIT);
 
 	VERIFY3P(abd_arena, !=, NULL);
@@ -306,7 +306,7 @@ segkmem_abd_init()
 	 */
 
 	abd_subpage_arena = vmem_create("abd_subpage_cache", NULL, 0,
-	    512, vmem_alloc, vmem_free, abd_arena,
+	    512, vmem_alloc_impl, vmem_free_impl, abd_arena,
 	    131072, VM_SLEEP | VMC_NO_QCACHE | VM_FIRSTFIT);
 
 	VERIFY3P(abd_subpage_arena, !=, NULL);

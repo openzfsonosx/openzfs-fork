@@ -1033,9 +1033,9 @@ kmem_log_init(size_t logsize)
 	mutex_init(&lhp->lh_lock, NULL, MUTEX_DEFAULT, NULL);
 	lhp->lh_nchunks = nchunks;
 	lhp->lh_chunksize = P2ROUNDUP(logsize / nchunks + 1, PAGESIZE);
-	lhp->lh_base = vmem_alloc(kmem_log_arena,
+	lhp->lh_base = vmem_alloc_impl(kmem_log_arena,
 	    lhp->lh_chunksize * nchunks, VM_SLEEP);
-	lhp->lh_free = vmem_alloc(kmem_log_arena,
+	lhp->lh_free = vmem_alloc_impl(kmem_log_arena,
 	    nchunks * sizeof (int), VM_SLEEP);
 	memset(lhp->lh_base, 0, lhp->lh_chunksize * nchunks);
 
@@ -1069,9 +1069,10 @@ kmem_log_fini(kmem_log_header_t *lhp)
 		mutex_destroy(&clhp->clh_lock);
 	}
 
-	vmem_free(kmem_log_arena, lhp->lh_free, nchunks * sizeof (int));
+	vmem_free_impl(kmem_log_arena, lhp->lh_free, nchunks * sizeof (int));
 
-	vmem_free(kmem_log_arena, lhp->lh_base, lhp->lh_chunksize * nchunks);
+	vmem_free_impl(kmem_log_arena, lhp->lh_base,
+	    lhp->lh_chunksize * nchunks);
 
 	mutex_destroy(&lhp->lh_lock);
 
@@ -1158,7 +1159,7 @@ kmem_slab_create(kmem_cache_t *cp, int kmflag)
 		color = cp->cache_mincolor;
 	cp->cache_color = color;
 
-	slab = vmem_alloc(vmp, slabsize, kmflag & KM_VMFLAGS);
+	slab = vmem_alloc_impl(vmp, slabsize, kmflag & KM_VMFLAGS);
 
 	if (slab == NULL)
 		goto vmem_alloc_failure;
@@ -1240,7 +1241,7 @@ bufctl_alloc_failure:
 
 slab_alloc_failure:
 
-	vmem_free(vmp, slab, slabsize);
+	vmem_free_impl(vmp, slab, slabsize);
 
 vmem_alloc_failure:
 
@@ -1273,7 +1274,7 @@ kmem_slab_destroy(kmem_cache_t *cp, kmem_slab_t *sp)
 		kmem_cache_free(kmem_slab_cache, sp);
 	}
 	kpreempt(KPREEMPT_SYNC);
-	vmem_free(vmp, slab, cp->cache_slabsize);
+	vmem_free_impl(vmp, slab, cp->cache_slabsize);
 }
 
 static void *
@@ -2662,7 +2663,7 @@ zfs_kmem_alloc(size_t size, int kmflag)
 
 	} else {
 
-		buf = vmem_alloc(kmem_oversize_arena, size,
+		buf = vmem_alloc_impl(kmem_oversize_arena, size,
 		    kmflag & KM_VMFLAGS);
 		if (buf == NULL)
 			kmem_log_event(kmem_failure_log, NULL, NULL,
@@ -2708,7 +2709,7 @@ zfs_kmem_free(void *buf, size_t size)
 		/* fall through to kmem_cache_free() */
 
 	} else {
-		vmem_free(kmem_oversize_arena, buf, size);
+		vmem_free_impl(kmem_oversize_arena, buf, size);
 		return;
 	}
 
@@ -3040,7 +3041,7 @@ kmem_hash_rescale(kmem_cache_t *cp)
 	if ((old_size >> 1) <= new_size && new_size <= (old_size << 1))
 		return;
 
-	new_table = vmem_alloc(kmem_hash_arena, new_size * sizeof (void *),
+	new_table = vmem_alloc_impl(kmem_hash_arena, new_size * sizeof (void *),
 	    VM_NOSLEEP);
 	if (new_table == NULL)
 		return;
@@ -3069,7 +3070,7 @@ kmem_hash_rescale(kmem_cache_t *cp)
 
 	mutex_exit(&cp->cache_lock);
 
-	vmem_free(kmem_hash_arena, old_table, old_size * sizeof (void *));
+	vmem_free_impl(kmem_hash_arena, old_table, old_size * sizeof (void *));
 }
 
 /*
@@ -3714,7 +3715,7 @@ kmem_cache_create(
 	    sizeof (kmem_slab_t), offsetof(kmem_slab_t, slab_link));
 
 	if (cp->cache_flags & KMF_HASH) {
-		cp->cache_hash_table = vmem_alloc(kmem_hash_arena,
+		cp->cache_hash_table = vmem_alloc_impl(kmem_hash_arena,
 		    KMEM_HASH_INITIAL * sizeof (void *),
 		    VM_SLEEP);
 		memset(cp->cache_hash_table, 0,
@@ -3956,7 +3957,7 @@ kmem_cache_destroy(kmem_cache_t *cp)
 	kstat_delete(cp->cache_kstat);
 
 	if (cp->cache_hash_table != NULL)
-		vmem_free(kmem_hash_arena, cp->cache_hash_table,
+		vmem_free_impl(kmem_hash_arena, cp->cache_hash_table,
 		    (cp->cache_hash_mask + 1) * sizeof (void *));
 
 	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++)
@@ -3965,7 +3966,7 @@ kmem_cache_destroy(kmem_cache_t *cp)
 	mutex_destroy(&cp->cache_depot_lock);
 	mutex_destroy(&cp->cache_lock);
 
-	vmem_free(kmem_cache_arena, cp, KMEM_CACHE_SIZE(max_ncpus));
+	vmem_free_impl(kmem_cache_arena, cp, KMEM_CACHE_SIZE(max_ncpus));
 }
 
 static void
@@ -4111,12 +4112,12 @@ kmem_cache_init(int pass, int use_large_pages)
 	if (pass == 2) {
 		kmem_va_arena = vmem_create(KMEM_VA_PREFIX,
 		    NULL, 0, PAGESIZE,
-		    vmem_alloc, vmem_free, heap_arena,
+		    vmem_alloc_impl, vmem_free_impl, heap_arena,
 		    2 * PAGESIZE, VM_SLEEP);
 
 		kmem_default_arena = vmem_create("kmem_default",
 		    NULL, 0, PAGESIZE,
-		    vmem_alloc, vmem_free, kmem_va_arena,
+		    vmem_alloc_impl, vmem_free_impl, kmem_va_arena,
 		    0, VMC_DUMPSAFE | VM_SLEEP);
 
 		/* Figure out what our maximum cache size is */
@@ -4218,7 +4219,7 @@ kmem_cache_build_slablist(kmem_cache_t *cp)
 	kstat_delete(cp->cache_kstat);
 
 	if (cp->cache_hash_table != NULL)
-		vmem_free(kmem_hash_arena, cp->cache_hash_table,
+		vmem_free_impl(kmem_hash_arena, cp->cache_hash_table,
 		    (cp->cache_hash_mask + 1) * sizeof (void *));
 
 	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++)
@@ -4227,7 +4228,7 @@ kmem_cache_build_slablist(kmem_cache_t *cp)
 	mutex_destroy(&cp->cache_depot_lock);
 	mutex_destroy(&cp->cache_lock);
 
-	vmem_free(kmem_cache_arena, cp, KMEM_CACHE_SIZE(max_ncpus));
+	vmem_free_impl(kmem_cache_arena, cp, KMEM_CACHE_SIZE(max_ncpus));
 }
 
 
@@ -4256,7 +4257,7 @@ kmem_cache_fini()
 	while ((fs = list_head(&freelist))) {
 		i++;
 		list_remove(&freelist, fs);
-		vmem_free(fs->vmp, fs->slab, fs->slabsize);
+		vmem_free_impl(fs->vmp, fs->slab, fs->slabsize);
 		FREE(fs, M_TEMP);
 
 	}
@@ -5330,25 +5331,25 @@ spl_kmem_init(uint64_t xtotal_memory)
 	kernelheap_init();
 
 	kmem_metadata_arena = vmem_create("kmem_metadata", NULL, 0, PAGESIZE,
-	    vmem_alloc, vmem_free, heap_arena, 8 * PAGESIZE,
+	    vmem_alloc_impl, vmem_free_impl, heap_arena, 8 * PAGESIZE,
 	    VM_SLEEP | VMC_NO_QCACHE);
 
 	kmem_msb_arena = vmem_create("kmem_msb", NULL, 0,
-	    PAGESIZE, vmem_alloc, vmem_free, kmem_metadata_arena, 0,
+	    PAGESIZE, vmem_alloc_impl, vmem_free_impl, kmem_metadata_arena, 0,
 	    VMC_DUMPSAFE | VM_SLEEP);
 
 	kmem_cache_arena = vmem_create("kmem_cache", NULL, 0, KMEM_ALIGN,
-	    vmem_alloc, vmem_free, kmem_metadata_arena, 0, VM_SLEEP);
+	    vmem_alloc_impl, vmem_free_impl, kmem_metadata_arena, 0, VM_SLEEP);
 
 	kmem_hash_arena = vmem_create("kmem_hash", NULL, 0, KMEM_ALIGN,
-	    vmem_alloc, vmem_free, kmem_metadata_arena, 0, VM_SLEEP);
+	    vmem_alloc_impl, vmem_free_impl, kmem_metadata_arena, 0, VM_SLEEP);
 
 	kmem_log_arena = vmem_create("kmem_log", NULL, 0, KMEM_ALIGN,
-	    vmem_alloc, vmem_free, kmem_metadata_arena, 0, VM_SLEEP);
+	    vmem_alloc_impl, vmem_free_impl, kmem_metadata_arena, 0, VM_SLEEP);
 
 	/* temporary oversize arena for mod_read_system_file */
 	kmem_oversize_arena = vmem_create("kmem_oversize", NULL, 0, PAGESIZE,
-	    vmem_alloc, vmem_free, heap_arena, 0, VM_SLEEP);
+	    vmem_alloc_impl, vmem_free_impl, heap_arena, 0, VM_SLEEP);
 
 	// statically declared above kmem_reap_interval = 15 * hz;
 
