@@ -29,22 +29,9 @@
  *
  */
 
+#include <sys/asm_linkage.h>
 
 #ifdef __aarch64__
-
-#define	ENTRY(sym) \
-	.text; \
-	.globl	sym; \
-	.align	2; \
-	.type	sym,#function; \
-sym:
-
-#ifdef __APPLE__
-#define	END(sym)
-#else
-#define	END(sym) \
-	.size	sym, . - sym
-#endif
 
 ENTRY(setjmp)
 	/* Store the stack pointer */
@@ -62,7 +49,7 @@ ENTRY(setjmp)
 	/* Return value */
 	mov	x0, #0
 	ret
-END(setjmp)
+SET_SIZE(setjmp)
 
 ENTRY(longjmp)
 	/* Restore the stack pointer */
@@ -80,7 +67,7 @@ ENTRY(longjmp)
 	/* Load the return value */
 	mov	x0, x1
 	ret
-END(longjmp)
+SET_SIZE(longjmp)
 
 #ifdef __ELF__
 .section .note.GNU-stack,"",%progbits
