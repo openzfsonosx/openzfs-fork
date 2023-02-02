@@ -68,7 +68,7 @@ macos_zfs_CPPFLAGS += @KERNEL_DEBUG_CPPFLAGS@
 
 macos_zfs_CFLAGS = -Wno-sign-conversion -Wno-shorten-64-to-32 \
 	-Wno-conditional-uninitialized -Wno-shadow \
-	-Wno-implicit-int-conversion $(INLINE_HINT_FUNCTIONS) 
+	-Wno-implicit-int-conversion $(INLINE_HINT_FUNCTIONS)
 
 macos_zfs_CXXFLAGS = -Wno-sign-conversion -Wno-shorten-64-to-32 \
 	-Wno-conditional-uninitialized -std=gnu++11 $(INLINE_HINT_FUNCTIONS)
@@ -113,17 +113,17 @@ zfs_ASM_SOURCES_C = \
 	%D%/../../zfs/vdev_raidz_math_avx512f.c \
 	%D%/../../zfs/vdev_raidz_math_avx512bw.c
 zfs_ASM_SOURCES_AS = \
-	%D%/../../icp/asm-x86_64/os/macos/aes/aes_amd64.S \
-	%D%/../../icp/asm-x86_64/os/macos/aes/aes_aesni.S \
-	%D%/../../icp/asm-x86_64/os/macos/modes/aesni-gcm-x86_64.S \
-	%D%/../../icp/asm-x86_64/os/macos/modes/ghash-x86_64.S \
-	%D%/../../icp/asm-x86_64/os/macos/modes/gcm_pclmulqdq.S \
-	%D%/../../icp/asm-x86_64/os/macos/sha2/sha256_impl.S \
-	%D%/../../icp/asm-x86_64/os/macos/sha2/sha512_impl.S \
-	%D%/../../icp/asm-x86_64/os/macos/blake3/blake3_avx2.S \
-	%D%/../../icp/asm-x86_64/os/macos/blake3/blake3_avx512.S \
-	%D%/../../icp/asm-x86_64/os/macos/blake3/blake3_sse2.S \
-	%D%/../../icp/asm-x86_64/os/macos/blake3/blake3_sse41.S
+	%D%/../../icp/asm-x86_64/aes/aes_amd64.S \
+	%D%/../../icp/asm-x86_64/aes/aes_aesni.S \
+	%D%/../../icp/asm-x86_64/modes/aesni-gcm-x86_64.S \
+	%D%/../../icp/asm-x86_64/modes/ghash-x86_64.S \
+	%D%/../../icp/asm-x86_64/modes/gcm_pclmulqdq.S \
+	%D%/../../icp/asm-x86_64/sha2/sha256_impl.S \
+	%D%/../../icp/asm-x86_64/sha2/sha512_impl.S \
+	%D%/../../icp/asm-x86_64/blake3/blake3_avx2.S \
+	%D%/../../icp/asm-x86_64/blake3/blake3_avx512.S \
+	%D%/../../icp/asm-x86_64/blake3/blake3_sse2.S \
+	%D%/../../icp/asm-x86_64/blake3/blake3_sse41.S
 else
 zfs_ASM_SOURCES_C =
 zfs_ASM_SOURCES_AS =

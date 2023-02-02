@@ -124,11 +124,6 @@ libsplmacos_mach_HEADERS = \
 	%D%/os/macos/mach/boolean.h \
 	%D%/os/macos/mach/task.h
 
-# To be removed with Unify Assembler
-libsplmacos_osxdir = $(libsplmacosdir)/osx
-libsplmacos_osx_HEADERS = \
-	%D%/os/macos/osx/asm_linkage.h
-
 libsplmacos_sysdir = $(libsplmacosdir)/sys
 libsplmacos_sys_HEADERS = \
 	%D%/os/macos/sys/byteorder.h \

@@ -39,7 +39,7 @@
 #define	ASMABI	__attribute__((sysv_abi))
 
 #define	SECTION_TEXT .text
-#define	SECTION_STATIC .section .rodata
+#define	SECTION_STATIC .const
 
 #ifdef	__cplusplus
 extern "C" {
@@ -133,21 +133,20 @@ extern "C" {
 	.text; \
 	.balign	ASM_ENTRY_ALIGN; \
 	.globl	x; \
-x:	MCOUNT(x)
+x:
 
 #define	ENTRY_NP(x) \
 	.text; \
 	.balign	ASM_ENTRY_ALIGN; \
 	.globl	_##x; \
-	.globl	x; \
-_##x: \
-x:
+_##x:
+
 
 #define	ENTRY_ALIGN(x, a) \
 	.text; \
 	.balign	a; \
-	.globl	x; \
-x:
+	.globl	_##x; \
+_##x:
 
 #define	FUNCTION(x) \
 x:
@@ -160,7 +159,7 @@ x:
 	.balign	ASM_ENTRY_ALIGN; \
 	.globl	x, y; \
 x:; \
-y:	MCOUNT(x)
+y:
 
 #define	ENTRY_NP2(x, y) \
 	.text; \
