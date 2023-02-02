@@ -43,7 +43,6 @@ nodist_libicp_la_SOURCES = \
 	module/icp/core/kcf_prov_tabs.c \
 	module/zfs/zfs_impl.c
 
-if !BUILD_MACOS
 if TARGET_CPU_AARCH64
 nodist_libicp_la_SOURCES += \
 	module/icp/asm-aarch64/aes/aesv8-armx.S \
@@ -57,7 +56,6 @@ if TARGET_CPU_ARM
 nodist_libicp_la_SOURCES += \
 	module/icp/asm-arm/sha2/sha256-armv7.S \
 	module/icp/asm-arm/sha2/sha512-armv7.S
-endif
 endif
 
 if TARGET_CPU_POWERPC
