@@ -1923,10 +1923,11 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 #endif
 {
 	DECLARE_CRED(ap);
-	vattr_t *vap = ap->a_vap;
 	uint_t mask;
 	int error = 0;
 	znode_t *zp = VTOZ(ap->a_vp);
+	vattr_t *vap = ap->a_vap;
+	xvattr_t xva; /* va_flags */
 
 	/* Translate OS X requested mask to ZFS */
 	mask = vap->va_mask;
@@ -1951,7 +1952,9 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 			return (error);
 		(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_MODE(zp->z_zfsvfs), &mode,
 		    sizeof (mode));
-		vap->va_mode = mode;
+
+		VATTR_RETURN(vap, va_mode, mode);
+
 		zfs_exit(zp->z_zfsvfs, FTAG);
 	}
 	if (VATTR_IS_ACTIVE(vap, va_flags)) {
@@ -1997,15 +2000,17 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 				dprintf("setattr failed to delete xattr?!\n");
 
 		}
+
+
 		/* Map OS X file flags to zfs file flags */
-		zfs_setbsdflags(zp, vap->va_flags);
-		dprintf("OS X flags %08x changed to ZFS %04llx\n",
-		    vap->va_flags, zp->z_pflags);
-		vap->va_flags = zp->z_pflags;
-
+		error = zfs_setbsdflags(zp, vap->va_flags, &xva);
+		if (!error) {
+			memcpy(&xva.xva_vattr, vap, sizeof (vattr_t));
+			/* memcpy overwrote */
+			xva.xva_vattr.va_mask |= ATTR_XVATTR;
+			vap = (vattr_t *)&xva;
+		}
 	}
-
-	vap->va_mask = mask;
 
 	/*
 	 * If z_skip_truncate_undo_decmpfs is set, and they are trying to
@@ -2026,7 +2031,7 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 
 	}
 
-	error = zfs_setattr(VTOZ(ap->a_vp), ap->a_vap, /* flag */0, cr,
+	error = zfs_setattr(VTOZ(ap->a_vp), vap, /* flag */0, cr,
 	    NULL);
 
 	dprintf("vnop_setattr: called on vp %p with mask %04x, err=%d\n",
@@ -2060,6 +2065,11 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 			VATTR_SET_SUPPORTED(vap, va_backup_time);
 		if (VATTR_IS_ACTIVE(vap, va_flags)) {
 			VATTR_SET_SUPPORTED(vap, va_flags);
+			/* Copy everything back from xvattr */
+			/* Don't leak to XNU */
+			xva.xva_vattr.va_mask &= ~ATTR_XVATTR;
+			vap = ap->a_vap;
+			memcpy(vap, &xva.xva_vattr, sizeof (vattr_t));
 		}
 
 		/*

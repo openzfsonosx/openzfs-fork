@@ -198,7 +198,6 @@ extern int zfsfstype;
 
 extern int zfs_znode_parent_and_name(struct znode *zp, struct znode **dzpp,
     char *buf);
-extern uint32_t zfs_getbsdflags(struct znode *zp);
 extern void zfs_setattr_generate_id(struct znode *, uint64_t, char *name);
 
 extern int zfs_setattr_set_documentid(struct znode *zp,
@@ -208,7 +207,7 @@ extern int zfs_setattr_set_documentid(struct znode *zp,
 #define	FNV1_32A_INIT ((uint32_t)0x811c9dc5)
 uint32_t fnv_32a_str(const char *str, uint32_t hval);
 
-void zfs_setbsdflags(struct znode *, uint32_t bsdflags);
+int zfs_setbsdflags(struct znode *, uint32_t bsdflags, xvattr_t *);
 uint32_t zfs_getbsdflags(struct znode *zp);
 
 #ifdef	__cplusplus

@@ -97,12 +97,8 @@ enum create	{ CRCREAT, CRMKNOD, CRMKDIR };	/* reason for create */
 #define	ATTR_CRTIME		VNODE_ATTR_va_create_time
 #define	ATTR_SIZE		VNODE_ATTR_va_data_size
 #define	ATTR_NOSET		0
-/*
- * OSX uses separate vnop getxattr and setxattr to deal with XATTRs, so
- * we never get vop&XVATTR set from VFS. All internal checks for it in
- * ZFS is not required.
- */
-#define	ATTR_XVATTR	0
+
+#define	ATTR_XVATTR	(1LL<<63) /* See XNU: bsd/sys/vnode.h */
 #define	AT_XVATTR ATTR_XVATTR
 
 #define	va_size			va_data_size

@@ -1996,8 +1996,8 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr,
 	dmu_tx_t	*tx;
 	vattr_t		oldva;
 	xvattr_t	tmpxvattr;
-	uint_t		mask = vap->va_mask;
-	uint_t		saved_mask = 0;
+	uint64_t		mask = vap->va_mask; /* Upstream is 32 bit */
+	uint64_t		saved_mask = 0;
 	uint64_t	saved_mode;
 	int		trim_mask = 0;
 	uint64_t	new_mode;
@@ -2055,7 +2055,6 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr,
 	 * optional attributes.  If this is NULL, then we have a vattr_t.
 	 */
 	xoap = xva_getxoptattr(xvap);
-
 	xva_init(&tmpxvattr);
 
 	/*

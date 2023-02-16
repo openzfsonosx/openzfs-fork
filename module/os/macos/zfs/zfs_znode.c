@@ -1046,6 +1046,23 @@ zfs_xvattr_set(znode_t *zp, xvattr_t *xvap, dmu_tx_t *tx)
 		    zp->z_pflags, tx);
 		XVA_SET_RTN(xvap, XAT_SPARSE);
 	}
+
+	/* macOS */
+	if (XVA_ISSET_REQ(xvap, XAT_TRACKED)) {
+		ZFS_ATTR_SET(zp, ZFS_TRACKED, xoap->xoa_tracked,
+		    zp->z_pflags, tx);
+		XVA_SET_RTN(xvap, XAT_TRACKED);
+	}
+	if (XVA_ISSET_REQ(xvap, XAT_SAPPENDONLY)) {
+		ZFS_ATTR_SET(zp, ZFS_SAPPENDONLY, xoap->xoa_sappendonly,
+		    zp->z_pflags, tx);
+		XVA_SET_RTN(xvap, XAT_SAPPENDONLY);
+	}
+	if (XVA_ISSET_REQ(xvap, XAT_SIMMUTABLE)) {
+		ZFS_ATTR_SET(zp, ZFS_SIMMUTABLE, xoap->xoa_simmutable,
+		    zp->z_pflags, tx);
+		XVA_SET_RTN(xvap, XAT_SIMMUTABLE);
+	}
 }
 
 int

@@ -259,7 +259,9 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 		vap->va_backup_time.tv_nsec = 0;
 		VATTR_SET_SUPPORTED(vap, va_backup_time);
 	}
+
 	vap->va_flags = zfs_getbsdflags(zp);
+
 	/*
 	 * On Mac OS X we always export the root directory id as 2
 	 * and its parent as 1
@@ -622,6 +624,11 @@ zfs_vnop_ioctl_fullfsync(struct vnode *vp, vfs_context_t ct, zfsvfs_t *zfsvfs)
 	return (0);
 }
 
+
+/*
+ * Nobody seems to use xvattr to get the extended flags,
+ * so we'll have a direct convert as well.
+ */
 uint32_t
 zfs_getbsdflags(znode_t *zp)
 {
@@ -640,9 +647,9 @@ zfs_getbsdflags(znode_t *zp)
 		bsdflags |= UF_HIDDEN;
 	if (zflags & ZFS_TRACKED)
 		bsdflags |= UF_TRACKED;
-	if (zflags & ZFS_COMPRESSED)
-		bsdflags |= UF_COMPRESSED;
 
+	if (zflags & ZFS_NOUNLINK)
+		bsdflags |= SF_NOUNLINK;
 	if (zflags & ZFS_SIMMUTABLE)
 		bsdflags |= SF_IMMUTABLE;
 	if (zflags & ZFS_SAPPENDONLY)
@@ -659,72 +666,54 @@ zfs_getbsdflags(znode_t *zp)
 	return (bsdflags);
 }
 
-void
-zfs_setbsdflags(znode_t *zp, uint32_t bsdflags)
+int
+zfs_setbsdflags(znode_t *zp, uint32_t ioctl_flags, xvattr_t *xva)
 {
-	uint64_t zflags;
-	VERIFY(sa_lookup(zp->z_sa_hdl, SA_ZPL_FLAGS(zp->z_zfsvfs),
-	    &zflags, sizeof (zflags)) == 0);
+	uint64_t zfs_flags;
+	xoptattr_t *xoap;
 
-	if (bsdflags & UF_NODUMP)
-		zflags |= ZFS_NODUMP;
-	else
-		zflags &= ~ZFS_NODUMP;
+	zfs_flags = zp->z_pflags;
 
-	if (bsdflags & UF_IMMUTABLE)
-		zflags |= ZFS_UIMMUTABLE;
-	else
-		zflags &= ~ZFS_UIMMUTABLE;
+	xva_init(xva);
+	xoap = xva_getxoptattr(xva);
 
-	if (bsdflags & UF_APPEND)
-		zflags |= ZFS_UAPPENDONLY;
-	else
-		zflags &= ~ZFS_UAPPENDONLY;
+#define	FLAG_CHANGE(zflag, iflag, xflag, xfield) do {	\
+		if (((ioctl_flags & (iflag)) && !(zfs_flags & (zflag))) || \
+			((zfs_flags & (zflag)) && !(ioctl_flags & (iflag)))) { \
+			XVA_SET_REQ(xva, (xflag)); \
+			(xfield) = ((ioctl_flags & (iflag)) != 0); \
+		} \
+	} while (0)
 
-	if (bsdflags & UF_OPAQUE)
-		zflags |= ZFS_OPAQUE;
-	else
-		zflags &= ~ZFS_OPAQUE;
+	FLAG_CHANGE(ZFS_IMMUTABLE, UF_IMMUTABLE,
+	    XAT_IMMUTABLE, xoap->xoa_immutable);
+	FLAG_CHANGE(ZFS_APPENDONLY, UF_APPEND,
+	    XAT_APPENDONLY, xoap->xoa_appendonly);
+	FLAG_CHANGE(ZFS_NODUMP, UF_NODUMP,
+	    XAT_NODUMP, xoap->xoa_nodump);
+	FLAG_CHANGE(ZFS_HIDDEN, UF_HIDDEN,
+	    XAT_HIDDEN, xoap->xoa_hidden);
+	FLAG_CHANGE(ZFS_OPAQUE, UF_OPAQUE,
+	    XAT_OPAQUE, xoap->xoa_opaque);
+	FLAG_CHANGE(ZFS_TRACKED, UF_TRACKED,
+	    XAT_TRACKED, xoap->xoa_tracked);
 
-	if (bsdflags & UF_HIDDEN)
-		zflags |= ZFS_HIDDEN;
-	else
-		zflags &= ~ZFS_HIDDEN;
+	FLAG_CHANGE(ZFS_SAPPENDONLY, SF_APPEND,
+	    XAT_SAPPENDONLY, xoap->xoa_sappendonly);
+	FLAG_CHANGE(ZFS_SIMMUTABLE, SF_IMMUTABLE,
+	    XAT_SIMMUTABLE, xoap->xoa_simmutable);
+	FLAG_CHANGE(ZFS_ARCHIVE, SF_ARCHIVED,
+	    XAT_ARCHIVE, xoap->xoa_archive);
+	FLAG_CHANGE(ZFS_NOUNLINK, SF_NOUNLINK,
+	    XAT_NOUNLINK, xoap->xoa_nounlink);
+	// FLAG_CHANGE(ZFS_READONLY, XAT_READONLY, xoap->xoa_readonly);
+	// FLAG_CHANGE(ZFS_SYSTEM, XAT_SYSTEM, xoap->xoa_system);
+	// FLAG_CHANGE(ZFS_REPARSE, XAT_REPARSE, xoap->xoa_reparse);
+	// FLAG_CHANGE(ZFS_OFFLINE, XAT_OFFLINE, xoap->xoa_offline);
+	// FLAG_CHANGE(ZFS_SPARSE, XAT_SPARSE, xoap->xoa_sparse);
+#undef FLAG_CHANGE
 
-	if (bsdflags & UF_TRACKED)
-		zflags |= ZFS_TRACKED;
-	else
-		zflags &= ~ZFS_TRACKED;
-
-	if (bsdflags & UF_COMPRESSED)
-		zflags |= ZFS_COMPRESSED;
-	else
-		zflags &= ~ZFS_COMPRESSED;
-
-	/*
-	 * if (bsdflags & SF_ARCHIVED)
-	 *   zflags |= ZFS_ARCHIVE;
-	 * else
-	 *   zflags &= ~ZFS_ARCHIVE;
-	 */
-	if (bsdflags & SF_IMMUTABLE)
-		zflags |= ZFS_SIMMUTABLE;
-	else
-		zflags &= ~ZFS_SIMMUTABLE;
-
-	if (bsdflags & SF_APPEND)
-		zflags |= ZFS_SAPPENDONLY;
-	else
-		zflags &= ~ZFS_SAPPENDONLY;
-
-	zp->z_pflags = zflags;
-	dprintf("setbsd changing osx %08x to zfs %08llx\n",
-	    bsdflags, zflags);
-
-	/*
-	 *  (void )sa_update(zp->z_sa_hdl, SA_ZPL_FLAGS(zp->z_zfsvfs),
-	 * (void *)&zp->z_pflags, sizeof (uint64_t), tx);
-	 */
+	return (0);
 }
 
 /*
