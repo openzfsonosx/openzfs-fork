@@ -261,7 +261,8 @@ extern void spl_cleanup(void);
 #define	offsetof(s, m)  __builtin_offsetof(s, m)
 #endif
 
-#define	SET_ERROR(X) (X)
+#define	SET_ERROR(err) \
+	(__set_error(__FILE__, __func__, __LINE__, err), err)
 
 #ifdef __cplusplus
 }
