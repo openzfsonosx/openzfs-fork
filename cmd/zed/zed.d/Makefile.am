@@ -43,8 +43,8 @@ zedconfdefaults = \
 	statechange-notify.sh \
 	vdev_attach-led.sh \
 	vdev_clear-led.sh \
-	zvol.create.sh \
-        zvol.remove.sh
+	zvol_create.sh \
+        zvol_remove.sh
 
 dist_noinst_DATA += %D%/README
 
