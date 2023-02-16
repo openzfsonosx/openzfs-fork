@@ -47,7 +47,7 @@ echo "Loading and starting org.openzfsonosx.zpool-import"
 date
 
 /bin/launchctl load /Library/LaunchDaemons/org.openzfsonosx.zpool-import.plist
-/bin/launchctl kickstart system/org.openzfsonosx.zpool-import
+/bin/launchctl kickstart -kp system/org.openzfsonosx.zpool-import
 
 echo Status: $?
 

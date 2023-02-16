@@ -15,7 +15,7 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>LaunchOnlyOnce</key>
-	<true/>
+	<false/>
 	<key>StandardErrorPath</key>
 	<string>/private/var/log/org.openzfsonosx.zpool-import-all.log</string>
 	<key>StandardOutPath</key>
