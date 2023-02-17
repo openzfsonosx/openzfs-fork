@@ -3864,6 +3864,17 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 			error = ENOATTR;
 	} else {
 		*svpp = ZTOV(xzp);
+
+		/*
+		 * We have to update the name or mac_vnode_check_open()
+		 * rejects it, hfs sets to name of "file/..namedfork/rsrc"
+		 * But is it enough to just set it to RSRCFORKSPEC ?
+		 */
+		vnode_update_identity(ZTOV(xzp), vp,
+			(const char *)ap->a_name,
+			strlen(ap->a_name),
+			0, VNODE_UPDATE_NAME);
+
 	}
 
 	kmem_free(cn.cn_nameptr, cn.cn_namelen);
@@ -3871,26 +3882,6 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 out:
 	if (xdzp)
 		zrele(xdzp);
-
-#if 0 // Disabled, not sure its required and empty vnodes are odd.
-	/*
-	 * If the lookup is NS_OPEN, they are accessing "..namedfork/rsrc"
-	 * to which we should return 0 with empty vp to empty file.
-	 * See hfs_vnop_getnamedstream()
-	 */
-	if ((error == ENOATTR) &&
-		ap->a_operation == NS_OPEN) {
-
-		if ((error = zfs_get_xattrdir(zp, &xdvp, cr,
-		    CREATE_XATTR_DIR)) == 0) {
-			/* Lookup or create the named attribute. */
-			error = zpl_obtain_xattr(VTOZ(xdvp), ap->a_name,
-			    VTOZ(vp)->z_mode, cr, ap->a_svpp,
-			    ZNEW);
-			vnode_put(xdvp);
-		}
-	}
-#endif
 
 	zfs_exit(zfsvfs, FTAG);
 	if (error) dprintf("%s vp %p: error %d\n", __func__, ap->a_vp, error);
@@ -3951,13 +3942,17 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 
 	VATTR_INIT(&vattr);
 	VATTR_SET(&vattr, va_type, VREG);
-	VATTR_SET(&vattr, va_mode, VTOZ(vp)->z_mode & ~S_IFMT);
+	VATTR_SET(&vattr, va_mode,
+	    S_IFREG |
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 
 	error = zfs_create(xdzp, (char *)ap->a_name, &vattr, NONEXCL,
 	    VTOZ(vp)->z_mode, &xzp, cr, 0, NULL, NULL);
 
-	if (error == 0)
+	if (error == 0) {
 		*ap->a_svpp = ZTOV(xzp);
+		/* It is interesting we don't need to set name here */
+	}
 
 out:
 	if (xdzp)
