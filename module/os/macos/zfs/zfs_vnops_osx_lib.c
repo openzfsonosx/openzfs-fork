@@ -1843,6 +1843,7 @@ aces_from_acl(ace_t *aces, int *nentries, struct kauth_acl *k_acl,
 void
 finderinfo_update(uint8_t *finderinfo, znode_t *zp)
 {
+#if 0
 	u_int8_t *finfo = NULL;
 
 	/* Advance finfo by 16 bytes to the 2nd half of the finderinfo */
@@ -1874,7 +1875,7 @@ finderinfo_update(uint8_t *finderinfo, znode_t *zp)
 		extinfo->date_added = 0;
 		extinfo->write_gen_counter = 0;
 	}
-
+#endif
 }
 
 /*
