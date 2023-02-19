@@ -856,9 +856,12 @@ zfs_mode_compute(uint64_t fmode, zfs_acl_t *aclp,
 		 * HFS: -rw-r--r--+ 1 root  wheel  0 Nov 12 12:39 file.txt
 		 *       0: user:root allow execute
 		 */
-
+#ifdef __APPLE__
+		if (entry_type == ACE_OWNER) {
+#else
 		if (entry_type == ACE_OWNER || (entry_type == 0 &&
 		    who == fuid)) {
+#endif
 			if ((access_mask & ACE_READ_DATA) &&
 			    (!(seen & S_IRUSR))) {
 				seen |= S_IRUSR;
@@ -880,8 +883,12 @@ zfs_mode_compute(uint64_t fmode, zfs_acl_t *aclp,
 					mode |= S_IXUSR;
 				}
 			}
+#ifdef __APPLE__
+		} else if (entry_type == OWNING_GROUP) {
+#else
 		} else if (entry_type == OWNING_GROUP ||
 		    (entry_type == ACE_IDENTIFIER_GROUP && who == fgid)) {
+#endif
 			if ((access_mask & ACE_READ_DATA) &&
 			    (!(seen & S_IRGRP))) {
 				seen |= S_IRGRP;
@@ -1002,8 +1009,8 @@ zfs_acl_node_read(znode_t *zp, boolean_t have_lock, zfs_acl_t **aclpp,
     boolean_t will_modify)
 {
 	zfs_acl_t	*aclp;
-	int		aclsize;
-	int		acl_count;
+	int		aclsize = 0;
+	int		acl_count = 0;
 	zfs_acl_node_t	*aclnode;
 	zfs_acl_phys_t	znode_acl;
 	int		version;
@@ -1403,7 +1410,6 @@ zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 		    (zp->z_zfsvfs->z_acl_mode == ZFS_ACL_GROUPMASK), *aclp);
 	}
 	mutex_exit(&zp->z_acl_lock);
-
 	return (error);
 }
 
@@ -1930,7 +1936,7 @@ zfs_addacl_trivial(znode_t *zp, ace_t *aces, int *nentries, int seen_type)
 }
 
 int
-zfs_vsec_2_aclp(zfsvfs_t *zfsvfs, umode_t obj_type,
+zfs_vsec_2_aclp(zfsvfs_t *zfsvfs, vtype_t obj_type,
     vsecattr_t *vsecp, cred_t *cr, zfs_fuid_info_t **fuidp, zfs_acl_t **zaclp)
 {
 	zfs_acl_t *aclp;
@@ -1992,7 +1998,7 @@ zfs_setacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 {
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	ulong_t		mask = vsecp->vsa_mask & (VSA_ACE | VSA_ACECNT);
+	// ulong_t		mask = vsecp->vsa_mask & (VSA_ACE | VSA_ACECNT);
 	dmu_tx_t	*tx;
 	int		error;
 	zfs_acl_t	*aclp;
@@ -2000,8 +2006,8 @@ zfs_setacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 	boolean_t	fuid_dirtied;
 	uint64_t	acl_obj;
 
-	if (mask == 0)
-		return (SET_ERROR(ENOSYS));
+	// if (mask == 0)
+	//	return (SET_ERROR(ENOSYS));
 
 	if (zp->z_pflags & ZFS_IMMUTABLE)
 		return (SET_ERROR(EPERM));
@@ -2018,10 +2024,10 @@ zfs_setacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 	 * If ACL wide flags aren't being set then preserve any
 	 * existing flags.
 	 */
-	if (!(vsecp->vsa_mask & VSA_ACE_ACLFLAGS)) {
-		aclp->z_hints |=
-		    (zp->z_pflags & V4_ACL_WIDE_FLAGS);
-	}
+	// if (!(vsecp->vsa_mask & VSA_ACE_ACLFLAGS)) {
+	//	aclp->z_hints |=
+	//	    (zp->z_pflags & V4_ACL_WIDE_FLAGS);
+	// }
 top:
 	mutex_enter(&zp->z_acl_lock);
 

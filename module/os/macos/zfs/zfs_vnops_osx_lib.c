@@ -202,7 +202,6 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 		} else {
 			VATTR_SET_SUPPORTED(vap, va_acl);
 		}
-
 	}
 
 	mutex_enter(&zp->z_lock);

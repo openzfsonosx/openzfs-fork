@@ -2418,10 +2418,94 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr,
 	}
 	tx = dmu_tx_create(os);
 
+	/*
+	 * Translate XNU ACL to ZFS ACL
+	 */
+	if (VATTR_IS_ACTIVE(vap, va_acl)) {
+		vsecattr_t vsecattr;
+		int seen_type = 0;
+		int aclbsize; /* size of acl list in bytes */
+		ace_t *aaclp;
+		struct kauth_acl *kauth;
+
+		printf("special xnu \n");
+
+		if ((vap->va_acl != (kauth_acl_t)KAUTH_FILESEC_NONE) &&
+		    (vap->va_acl->acl_entrycount > 0) &&
+		    (vap->va_acl->acl_entrycount != KAUTH_FILESEC_NOACL)) {
+
+			vsecattr.vsa_mask = VSA_ACE;
+			kauth = vap->va_acl;
+
+#if HIDE_TRIVIAL_ACL
+			/*
+			 * We might have to add <up to> 3 trivial acls,
+			 * depending on what was handed to us.
+			 */
+			aclbsize = (3 + kauth->acl_entrycount) * sizeof (ace_t);
+			dprintf("%d ACLs, adding 3\n", kauth->acl_entrycount);
+#else
+			aclbsize = kauth->acl_entrycount * sizeof (ace_t);
+			dprintf("%d ACLs\n", kauth->acl_entrycount);
+#endif
+
+			vsecattr.vsa_aclentp = kmem_zalloc(aclbsize, KM_SLEEP);
+			aaclp = vsecattr.vsa_aclentp;
+			vsecattr.vsa_aclentsz = aclbsize;
+
+#if HIDE_TRIVIAL_ACL
+			/*
+			 * Add in the trivials, keep "seen_type" as a bit
+			 * pattern of  which trivials we have seen
+			 */
+			seen_type = 0;
+			dprintf("aces_from_acl %d entries\n",
+			    kauth->acl_entrycount);
+			aces_from_acl(vsecattr.vsa_aclentp,
+			    &vsecattr.vsa_aclcnt, kauth, &seen_type);
+
+			/* Add in trivials at end, based on the "seen_type". */
+			zfs_addacl_trivial(zp, vsecattr.vsa_aclentp,
+			    &vsecattr.vsa_aclcnt, seen_type);
+			dprintf("together at last: %d\n", vsecattr.vsa_aclcnt);
+#else
+			aces_from_acl(vsecattr.vsa_aclentp,
+			    &vsecattr.vsa_aclcnt, kauth);
+#endif
+			error = zfs_setacl(zp, &vsecattr, B_TRUE, cr);
+			kmem_free(aaclp, aclbsize);
+
+		} else {
+
+			seen_type = 0;
+			vsecattr.vsa_mask = VSA_ACE;
+			vsecattr.vsa_aclcnt = 0;
+			aclbsize = (3) * sizeof (ace_t);
+			vsecattr.vsa_aclentp = kmem_zalloc(aclbsize, KM_SLEEP);
+			aaclp = vsecattr.vsa_aclentp;
+			vsecattr.vsa_aclentsz = aclbsize;
+			/* Clearing, we need to pass in the trivials only */
+			zfs_addacl_trivial(zp, vsecattr.vsa_aclentp,
+			    &vsecattr.vsa_aclcnt, seen_type);
+
+			if ((error = zfs_setacl(zp, &vsecattr, B_TRUE, cr)))
+				dprintf("setattr: setacl failed: %d\n", error);
+
+			kmem_free(aaclp, aclbsize);
+
+		} /* blank ACL? */
+	} /* VATTR_IS_ACTIVE(vap, va_acl) */
+
+
 	if (mask & ATTR_MODE) {
 		uint64_t pmode = zp->z_mode;
 		uint64_t acl_obj;
-		new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
+
+		/* APPLE - strip flags if NOT acl */
+		new_mode = pmode;
+		if (!VATTR_IS_ACTIVE(vap, va_acl)) {
+			new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
+		}
 
 		if (zp->z_zfsvfs->z_acl_mode == ZFS_ACL_RESTRICTED &&
 		    !(zp->z_pflags & ZFS_ACL_TRIVIAL)) {
@@ -2569,15 +2653,23 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr,
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MODE(zfsvfs), NULL,
 		    &new_mode, sizeof (new_mode));
 		zp->z_mode = new_mode;
-		ASSERT3U((uintptr_t)aclp, !=, 0);
-		err = zfs_aclset_common(zp, aclp, cr, tx);
-		ASSERT0(err);
-		if (zp->z_acl_cached)
-			zfs_acl_free(zp->z_acl_cached);
-		zp->z_acl_cached = aclp;
-		aclp = NULL;
-	}
 
+		/*
+		 * Mode change needs to trigger corresponding update to
+		 * trivial ACLs. ACL change already does this, and another
+		 * call to zfs_aclset_common would overwrite our explicit
+		 * ACL changes. APPLE
+		 */
+		if (!VATTR_IS_ACTIVE(vap, va_acl)) {
+			ASSERT3U((uintptr_t)aclp, !=, 0);
+			err = zfs_aclset_common(zp, aclp, cr, tx);
+			ASSERT0(err);
+			if (zp->z_acl_cached)
+				zfs_acl_free(zp->z_acl_cached);
+			zp->z_acl_cached = aclp;
+			aclp = NULL;
+		}
+	}
 
 	if (mask & ATTR_ATIME) {
 		ZFS_TIME_ENCODE(&vap->va_atime, zp->z_atime);

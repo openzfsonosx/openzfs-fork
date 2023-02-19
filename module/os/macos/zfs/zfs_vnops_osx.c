@@ -1923,14 +1923,10 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 #endif
 {
 	DECLARE_CRED(ap);
-	uint_t mask;
 	int error = 0;
 	znode_t *zp = VTOZ(ap->a_vp);
 	vattr_t *vap = ap->a_vap;
 	xvattr_t xva; /* va_flags */
-
-	/* Translate OS X requested mask to ZFS */
-	mask = vap->va_mask;
 
 	if (VATTR_IS_ACTIVE(vap, va_access_time)) {
 		ZFS_TIME_ENCODE(&vap->va_access_time, zp->z_atime);
@@ -1944,8 +1940,6 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 	    !VATTR_IS_ACTIVE(vap, va_mode)) {
 		uint64_t mode;
 
-		mask |= ATTR_MODE;
-
 		dprintf("fetching MODE for FLAGS or ACL\n");
 
 		if ((error = zfs_enter_verify_zp(zp->z_zfsvfs, zp, FTAG)) != 0)
@@ -1954,6 +1948,7 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 		    sizeof (mode));
 
 		VATTR_RETURN(vap, va_mode, mode);
+		VATTR_WANTED(vap, va_mode);
 
 		zfs_exit(zp->z_zfsvfs, FTAG);
 	}
@@ -2001,7 +1996,6 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 
 		}
 
-
 		/* Map OS X file flags to zfs file flags */
 		error = zfs_setbsdflags(zp, vap->va_flags, &xva);
 		if (!error) {
@@ -2034,8 +2028,8 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 	error = zfs_setattr(VTOZ(ap->a_vp), vap, /* flag */0, cr,
 	    NULL);
 
-	dprintf("vnop_setattr: called on vp %p with mask %04x, err=%d\n",
-	    ap->a_vp, mask, error);
+	dprintf("vnop_setattr: called on vp %p with mask %llx, err=%d\n",
+	    ap->a_vp, vap->va_mask, error);
 
 	if (!error) {
 		/* If successful, tell OS X which fields ZFS set. */
