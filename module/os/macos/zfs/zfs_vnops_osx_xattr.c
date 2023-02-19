@@ -493,7 +493,7 @@ zpl_xattr_set_dir(struct vnode *ip, const char *name, zfs_uio_t *uio,
 	error = 0;
 
 	/* Remove a specific name xattr when value is set to NULL. */
-	if (uio == NULL || zfs_uio_resid(uio) == 0) {
+	if (uio == NULL) {
 		if (xzp)
 			error = zfs_remove(dxzp, (char *)name, cr, 0);
 
@@ -578,7 +578,7 @@ zpl_xattr_set_sa(struct vnode *ip, const char *name, zfs_uio_t *uio,
 	ASSERT(zp->z_xattr_cached);
 	nvl = zp->z_xattr_cached;
 
-	if (uio == NULL || zfs_uio_resid(uio) == 0) {
+	if (uio == NULL) {
 		error = nvlist_remove(nvl, name, DATA_TYPE_BYTE_ARRAY);
 		if (error == ENOENT)
 			error = zpl_xattr_set_dir(ip, name, NULL, flags, cr);
