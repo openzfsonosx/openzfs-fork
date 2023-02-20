@@ -2059,9 +2059,13 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr,
 
 	/*
 	 * Immutable files can only alter immutable bit and atime
+	 * Apple - we have to turn on ATTR_MODE, which would trip
+	 * this, so we change to allow oldmode == newmode.
 	 */
 	if ((zp->z_pflags & ZFS_IMMUTABLE) &&
-	    ((mask & (ATTR_SIZE|ATTR_UID|ATTR_GID|ATTR_MTIME|ATTR_MODE)) ||
+	    ((mask & (ATTR_SIZE|ATTR_UID|ATTR_GID|ATTR_MTIME
+	    /* |ATTR_MODE */)) ||
+	    (vap->va_mode != zp->z_mode) ||
 	    ((mask & ATTR_XVATTR) && XVA_ISSET_REQ(xvap, XAT_CREATETIME)))) {
 		zfs_exit(zfsvfs, FTAG);
 		return (SET_ERROR(EPERM));
