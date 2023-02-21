@@ -348,10 +348,20 @@ mimic_changed_cb(void *arg, uint64_t newval)
 	struct vfsstatfs *vfsstatfs;
 	vfsstatfs = vfs_statfs(zfsvfs->z_vfs);
 
-	if (newval == 0) {
-		strlcpy(vfsstatfs->f_fstypename, "zfs", MFSTYPENAMELEN);
-	} else {
-		strlcpy(vfsstatfs->f_fstypename, "hfs", MFSTYPENAMELEN);
+	zfsvfs->z_mimic = newval;
+
+	switch (newval) {
+		default:
+		case ZFS_MIMIC_OFF:
+			strlcpy(vfsstatfs->f_fstypename, "zfs", MFSTYPENAMELEN);
+			break;
+		case ZFS_MIMIC_HFS:
+			strlcpy(vfsstatfs->f_fstypename, "hfs", MFSTYPENAMELEN);
+			break;
+		case ZFS_MIMIC_APFS:
+			strlcpy(vfsstatfs->f_fstypename, "apfs",
+			    MFSTYPENAMELEN);
+			break;
 	}
 }
 
@@ -1079,11 +1089,7 @@ zfs_domount(struct mount *vfsp, dev_t mount_dev, char *osname,
 	 * If we are readonly (ie, waiting for rootmount) we need to reply
 	 * honestly, so launchd runs fsck_zfs and mount_zfs
 	 */
-	if (mimic) {
-		struct vfsstatfs *vfsstatfs;
-		vfsstatfs = vfs_statfs(vfsp);
-		strlcpy(vfsstatfs->f_fstypename, "hfs", MFSTYPENAMELEN);
-	}
+	mimic_changed_cb(zfsvfs, mimic);
 
 	/*
 	 * Set features for file system.
@@ -1267,7 +1273,7 @@ zfs_vfs_mountroot(struct mount *mp, struct vnode *devvp, vfs_context_t ctx)
 	 * to reply with true "zfs" until root has been remounted RW, so
 	 * that launchd tries to run mount_zfs instead of mount_hfs
 	 */
-	mimic_changed_cb(zfsvfs, B_FALSE);
+	mimic_changed_cb(zfsvfs, ZFS_MIMIC_OFF);
 
 	/*
 	 * Leave rootvp held.  The root file system is never unmounted.
@@ -1507,12 +1513,6 @@ zfs_vfs_getattr(struct mount *mp, struct vfs_attr *fsap,
 	if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
 		return (error);
 
-	int mimic_on = 0;
-	struct vfsstatfs *vfsstatfs;
-	vfsstatfs = vfs_statfs(zfsvfs->z_vfs);
-	if (strcmp(vfsstatfs->f_fstypename, "zfs") != 0)
-		mimic_on = 1;
-
 	/*
 	 * Finder will show the old/incorrect size, we can force a sync of the
 	 * pool to make it correct, but that has side effects which are
@@ -1678,7 +1678,7 @@ zfs_vfs_getattr(struct mount *mp, struct vfs_attr *fsap,
 			    VOL_CAP_INT_EXTENDED_ATTR;
 		}
 
-		if (mimic_on) {
+		if (zfsvfs->z_mimic != ZFS_MIMIC_OFF) {
 			fsap->f_capabilities.capabilities[
 			    VOL_CAPABILITIES_FORMAT] |=
 			    VOL_CAP_FMT_DECMPFS_COMPRESSION;
@@ -1876,7 +1876,7 @@ zfs_vfs_getattr(struct mount *mp, struct vfs_attr *fsap,
 	}
 
 	/* If we are mimicking, we need userland know we are really ZFS */
-	if (mimic_on) {
+	if (zfsvfs->z_mimic != ZFS_MIMIC_OFF) {
 		VFSATTR_RETURN(fsap, f_fssubtype,
 		    zfsvfs->z_case == ZFS_CASE_SENSITIVE ? 2 : 0);
 	} else {

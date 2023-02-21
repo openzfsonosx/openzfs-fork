@@ -140,6 +140,7 @@ struct zfsvfs {
 
 	uint64_t	z_findernotify_space;
 
+	zfs_mimic_t z_mimic;
 #endif
 	uint64_t	z_replay_eof;	/* New end of file - replay only */
 	sa_attr_type_t	*z_attr_table;	/* SA attr mapping->id */

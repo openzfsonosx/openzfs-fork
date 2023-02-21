@@ -1842,8 +1842,18 @@ aces_from_acl(ace_t *aces, int *nentries, struct kauth_acl *k_acl,
 void
 finderinfo_update(uint8_t *finderinfo, znode_t *zp)
 {
-#if 0
+	zfsvfs_t *zfsvfs;
 	u_int8_t *finfo = NULL;
+
+	if (zp == NULL)
+		return;
+
+	zfsvfs = zp->z_zfsvfs;
+	if (zfsvfs == NULL)
+		return;
+
+	if (zfsvfs->z_mimic != ZFS_MIMIC_HFS)
+		return;
 
 	/* Advance finfo by 16 bytes to the 2nd half of the finderinfo */
 	finfo = (u_int8_t *)finderinfo + 16;
@@ -1874,7 +1884,7 @@ finderinfo_update(uint8_t *finderinfo, znode_t *zp)
 		extinfo->date_added = 0;
 		extinfo->write_gen_counter = 0;
 	}
-#endif
+
 }
 
 /*
