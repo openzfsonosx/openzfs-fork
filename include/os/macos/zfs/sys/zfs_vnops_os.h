@@ -250,6 +250,7 @@ extern int zpl_xattr_get(struct vnode *ip, const char *name,
     zfs_uio_t *uio, ssize_t *, cred_t *cr);
 extern int zpl_xattr_set(struct vnode *ip, const char *name,
     zfs_uio_t *uio, int flags, cred_t *cr);
+extern const char *zpl_xattr_prefixname(const char *name);
 
 #ifdef	__cplusplus
 }

@@ -678,7 +678,11 @@ _zpl_xattr_set(struct vnode *ip, const char *name, zfs_uio_t *uio, int flags,
 			goto out;
 	}
 
-	/* Preferentially store the xattr as a SA for better performance */
+	/*
+	 * Preferentially store the xattr as a SA for better performance
+	 * We must not do this for "com.apple.ResourceFork" as it can
+	 * be opened as a vnode.
+	 */
 	if (zfsvfs->z_use_sa && zp->z_is_sa &&
 	    (zfsvfs->z_xattr_sa ||
 	    (uio == NULL && where & XATTR_IN_SA))) {
@@ -707,6 +711,20 @@ out:
 out1:
 
 	return (error);
+}
+
+/*
+ * Return an allocated (caller free()s) string potentially prefixed
+ * based on the xattr_compat tunable.
+ */
+const char *
+zpl_xattr_prefixname(const char *name)
+{
+	if (zfs_xattr_compat) {
+		return (spa_strdup(name));
+	} else {
+		return (kmem_asprintf("%s%s", XATTR_USER_PREFIX, name));
+	}
 }
 
 int
@@ -755,6 +773,19 @@ zpl_xattr_set(struct vnode *ip, const char *name, zfs_uio_t *uio, int flags,
 	 */
 	if (error == 0)
 		flags &= ~XATTR_REPLACE;
+
+	/*
+	 * Special case for macOS com.apple.ResourceFork
+	 */
+	if (memcmp(XATTR_RESOURCEFORK_NAME, name,
+	    sizeof (XATTR_RESOURCEFORK_NAME)) == 0) {
+		/* Clear any SA */
+		error = zpl_xattr_set_sa(ip, set_name, NULL, flags, cr);
+		/* Always create DIR */
+		error = zpl_xattr_set_dir(ip, set_name, uio, flags, cr);
+		goto out;
+	}
+
 	/*
 	 * Set the new value with the configured name format.
 	 */
