@@ -2014,6 +2014,7 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 	 */
 	if ((VATTR_IS_ACTIVE(vap, va_total_size) ||
 	    VATTR_IS_ACTIVE(vap, va_data_size)) &&
+		vap->va_size == 0 &&
 	    zp->z_skip_truncate_undo_decmpfs) {
 		zp->z_skip_truncate_undo_decmpfs = B_FALSE;
 
@@ -3667,12 +3668,18 @@ zfs_vnop_setxattr(struct vnop_setxattr_args *ap)
 	if (strlen(ap->a_name) >= ZAP_MAXNAMELEN)
 		return (ENAMETOOLONG);
 
+	if (memcmp(XATTR_RESOURCEFORK_NAME, ap->a_name,
+	    sizeof (XATTR_RESOURCEFORK_NAME)) == 0) {
+		if (!vnode_isreg(vp))
+			return (SET_ERROR(EPERM));
+	}
+
 	/*
 	 * We need to do special work on the finderinfo when writing, so
 	 * copyin to local buffer, and modify before passing to lower
 	 */
 	if (memcmp(XATTR_FINDERINFO_NAME, ap->a_name,
-			sizeof (XATTR_FINDERINFO_NAME)) == 0) {
+	    sizeof (XATTR_FINDERINFO_NAME)) == 0) {
 
 		/* Must be 32 bytes */
 		if (zfs_uio_resid(uio) != sizeof (emptyfinfo)) {
@@ -3707,7 +3714,6 @@ zfs_vnop_setxattr(struct vnop_setxattr_args *ap)
 
 		is_finderinfo = B_TRUE;
 	}
-
 
 	error = zpl_xattr_set(vp, ap->a_name,
 	    is_finderinfo ? &local_uio : uio,
@@ -3753,7 +3759,6 @@ zfs_vnop_removexattr(struct vnop_removexattr_args *ap)
 	return (error);
 
 }
-
 
 int
 zfs_vnop_listxattr(struct vnop_listxattr_args *ap)
@@ -3848,14 +3853,16 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 	if ((error = zfs_get_xattrdir(zp, &xdzp, cr, 0)) != 0)
 		goto out;
 
-	cn.cn_namelen = strlen(ap->a_name) + 1;
+	const char *prefixed_name = zpl_xattr_prefixname(ap->a_name);
+
+	cn.cn_namelen = strlen(prefixed_name) + 1;
 	cn.cn_nameptr = (char *)kmem_zalloc(cn.cn_namelen, KM_SLEEP);
 
 	/* Lookup the attribute name. */
-	if ((error = zfs_dirlook(xdzp, (char *)ap->a_name, &xzp, 0, NULL,
+	if ((error = zfs_dirlook(xdzp, (char *)prefixed_name, &xzp, 0, NULL,
 	    &cn))) {
 		if (error == ENOENT)
-			error = ENOATTR;
+			error = SET_ERROR(ENOATTR);
 	} else {
 		*svpp = ZTOV(xzp);
 
@@ -3868,9 +3875,9 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 			(const char *)ap->a_name,
 			strlen(ap->a_name),
 			0, VNODE_UPDATE_NAME);
-
 	}
 
+	kmem_free(prefixed_name, strlen(prefixed_name));
 	kmem_free(cn.cn_nameptr, cn.cn_namelen);
 
 out:
@@ -3879,7 +3886,7 @@ out:
 
 	zfs_exit(zfsvfs, FTAG);
 	if (error) dprintf("%s vp %p: error %d\n", __func__, ap->a_vp, error);
-	return (error);
+	return (SET_ERROR(error));
 }
 
 int
@@ -3928,10 +3935,12 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 	if ((error = zfs_get_xattrdir(zp, &xdzp, cr, CREATE_XATTR_DIR)))
 		goto out;
 
+	const char *prefixed_name = zpl_xattr_prefixname(ap->a_name);
+
 	memset(&cn, 0, sizeof (cn));
 	cn.cn_nameiop = CREATE;
 	cn.cn_flags = ISLASTCN;
-	cn.cn_nameptr = (char *)ap->a_name;
+	cn.cn_nameptr = (char *)prefixed_name;
 	cn.cn_namelen = strlen(cn.cn_nameptr);
 
 	VATTR_INIT(&vattr);
@@ -3940,13 +3949,15 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 	    S_IFREG |
 	    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 
-	error = zfs_create(xdzp, (char *)ap->a_name, &vattr, NONEXCL,
+	error = zfs_create(xdzp, (char *)prefixed_name, &vattr, NONEXCL,
 	    VTOZ(vp)->z_mode, &xzp, cr, 0, NULL, NULL);
 
 	if (error == 0) {
 		*ap->a_svpp = ZTOV(xzp);
 		/* It is interesting we don't need to set name here */
 	}
+
+	kmem_free(prefixed_name, strlen(prefixed_name));
 
 out:
 	if (xdzp)
