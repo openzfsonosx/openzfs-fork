@@ -230,7 +230,7 @@ extern "C" {
     CTLTYPE_STRING, var, 0, param_zfs_vdev_raidz_impl_set, "A"
 
 #define	icp_gcm_isalc_set_chunk_size_args(var) \
-    CTLTYPE_STRING, var, 0, icp_gcm_isalc_set_chunk_size, "A"
+    CTLTYPE_INT, var, sizeof (var), param_icp_gcm_isalc_set_chunk_size, "I"
 
 /*
  * Too few arguments? You probably added a new MODULE_PARAM_CALL
