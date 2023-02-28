@@ -118,6 +118,9 @@ zfs_ASM_SOURCES_AS = \
 	%D%/../../icp/asm-x86_64/modes/aesni-gcm-x86_64.S \
 	%D%/../../icp/asm-x86_64/modes/ghash-x86_64.S \
 	%D%/../../icp/asm-x86_64/modes/gcm_pclmulqdq.S \
+	%D%/../../icp/asm-x86_64/modes/isalc_gcm128_sse.S \
+	%D%/../../icp/asm-x86_64/modes/isalc_gcm192_sse.S \
+	%D%/../../icp/asm-x86_64/modes/isalc_gcm256_sse.S \
 	%D%/../../icp/asm-x86_64/sha2/sha256_impl.S \
 	%D%/../../icp/asm-x86_64/sha2/sha512_impl.S \
 	%D%/../../icp/asm-x86_64/blake3/blake3_avx2.S \

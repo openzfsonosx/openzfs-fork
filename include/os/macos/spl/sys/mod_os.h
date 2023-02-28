@@ -229,6 +229,9 @@ extern "C" {
 #define	zfs_vdev_raidz_impl_set_args(var) \
     CTLTYPE_STRING, var, 0, param_zfs_vdev_raidz_impl_set, "A"
 
+#define	icp_gcm_isalc_set_chunk_size_args(var) \
+    CTLTYPE_STRING, var, 0, icp_gcm_isalc_set_chunk_size, "A"
+
 /*
  * Too few arguments? You probably added a new MODULE_PARAM_CALL
  * but have yet to create a #define for it above, see for example

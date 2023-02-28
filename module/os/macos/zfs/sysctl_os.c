@@ -409,6 +409,12 @@ param_set_arc_int(ZFS_MODULE_PARAM_ARGS)
 	return (0);
 }
 
+int
+param_set_uint(char *v, zfs_kernel_param_t *kp)
+{
+	return (0);
+}
+
 SYSCTL_PROC(_tunable, OID_AUTO, arc_min,
     CTLTYPE_ULONG | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &zfs_arc_min, sizeof (zfs_arc_min), param_set_arc_min, "LU",
