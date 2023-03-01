@@ -43,8 +43,6 @@ dist_libzfs_la_SOURCES += \
 endif
 
 nodist_libzfs_la_SOURCES = \
-	module/icp/algs/sha2/sha2.c \
-	\
 	module/zcommon/cityhash.c \
 	module/zcommon/zfeature_common.c \
 	module/zcommon/zfs_comutil.c \
@@ -60,7 +58,6 @@ nodist_libzfs_la_SOURCES = \
 	module/zcommon/zfs_prop.c \
 	module/zcommon/zpool_prop.c \
 	module/zcommon/zprop_common.c
-
 
 libzfs_la_LIBADD = \
 	libshare.la \
