@@ -229,6 +229,12 @@ extern "C" {
 #define	zfs_vdev_raidz_impl_set_args(var) \
     CTLTYPE_STRING, var, 0, param_zfs_vdev_raidz_impl_set, "A"
 
+#define	sha256_param_set_args(var) \
+    CTLTYPE_STRING, NULL, 0, sha256_param, "A"
+
+#define	sha512_param_set_args(var) \
+    CTLTYPE_STRING, NULL, 0, sha512_param, "A"
+
 /*
  * Too few arguments? You probably added a new MODULE_PARAM_CALL
  * but have yet to create a #define for it above, see for example

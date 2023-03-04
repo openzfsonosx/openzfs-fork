@@ -496,8 +496,21 @@ zfs_pclmulqdq_available(void)
 static inline boolean_t
 zfs_movbe_available(void)
 {
-#if defined(X86_FEATURE_MOVBE)
+#if defined(HAVE_MOVBE)
 	return (!!(spl_cpuid_features() & CPUID_FEATURE_MOVBE));
+#else
+	return (B_FALSE);
+#endif
+}
+
+/*
+ * Check if MOVBE instruction is available
+ */
+static inline boolean_t
+zfs_shani_available(void)
+{
+#if defined(CPUID_LEAF7_FEATURE_SHA_NI)
+	return (!!(spl_cpuid_leaf7_features() & CPUID_LEAF7_FEATURE_SHA_NI));
 #else
 	return (B_FALSE);
 #endif

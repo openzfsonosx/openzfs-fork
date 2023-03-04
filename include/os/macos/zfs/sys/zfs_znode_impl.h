@@ -80,7 +80,8 @@ extern int zfs_zget_ext(zfsvfs_t *zfsvfs, uint64_t obj_num,
 	uint64_t		z_atime[2];	\
 	uint64_t		z_links;	\
 	uint32_t		z_vid;	\
-	uint32_t		z_document_id;	\
+	boolean_t		z_is_mapped;		\
+	uint32_t		z_document_id;		\
 	uint64_t		z_finder_parentid;	\
 	boolean_t		z_finder_hardlink;	\
 	uint64_t		z_write_gencount;	\
@@ -134,7 +135,7 @@ typedef struct zfs_soft_state {
 #define	Z_ISLNK(type)	((type) == VLNK)
 #define	Z_ISDIR(type)	((type) == VDIR)
 
-#define	zn_has_cached_data(zp)	((zp)->z_is_mapped)
+#define	zn_has_cached_data(zp, start, end)	((zp)->z_is_mapped)
 #define	zn_flush_cached_data(zp, sync) \
 	(void) ubc_msync(ZTOV(zp), 0, \
 	ubc_getsize(ZTOV(zp)), NULL, UBC_PUSHALL | UBC_SYNC);
