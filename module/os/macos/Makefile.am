@@ -140,6 +140,7 @@ zfs_common_SRCS = \
 	%D%/../../zfs/bpobj.c \
 	%D%/../../zfs/bptree.c \
 	%D%/../../zfs/bqueue.c \
+	%D%/../../zfs/brt.c \
 	%D%/../../zfs/btree.c \
 	%D%/../../zfs/zfs_chksum.c \
 	%D%/../../zcommon/cityhash.c \

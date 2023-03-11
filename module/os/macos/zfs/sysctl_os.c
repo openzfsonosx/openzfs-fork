@@ -130,6 +130,7 @@ SYSCTL_NODE(_tunable, OID_AUTO, zfs,
 	0, "");
 
 SYSCTL_NODE(_tunable, OID_AUTO, zfs_arc, CTLFLAG_RW, 0, "ZFS adaptive replacement cache");
+SYSCTL_NODE(_tunable, OID_AUTO, zfs_brt, CTLFLAG_RW, 0,	"ZFS Block Reference Table");
 SYSCTL_NODE(_tunable, OID_AUTO, zfs_condense, CTLFLAG_RW, 0, "ZFS condense");
 SYSCTL_NODE(_tunable, OID_AUTO, zfs_dbuf, CTLFLAG_RW, 0, "ZFS disk buf cache");
 SYSCTL_NODE(_tunable, OID_AUTO, zfs_dbuf_cache, CTLFLAG_RW, 0, "ZFS disk buf cache");
@@ -174,6 +175,7 @@ void sysctl_os_init(void)
 	sysctl_register_oid(&sysctl__tunable_zfs);
 
 	sysctl_register_oid(&sysctl__tunable_zfs_arc);
+	sysctl_register_oid(&sysctl__tunable_zfs_brt);
 	sysctl_register_oid(&sysctl__tunable_zfs_condense);
 	sysctl_register_oid(&sysctl__tunable_zfs_dbuf);
 	sysctl_register_oid(&sysctl__tunable_zfs_dbuf_cache);
@@ -232,6 +234,7 @@ void sysctl_os_fini(void)
 	sysctl_unregister_oid(&sysctl__tunable_zfs_dbuf_cache);
 	sysctl_unregister_oid(&sysctl__tunable_zfs_dbuf);
 	sysctl_unregister_oid(&sysctl__tunable_zfs_condense);
+	sysctl_unregister_oid(&sysctl__tunable_zfs_brt);
 	sysctl_unregister_oid(&sysctl__tunable_zfs_arc);
 	sysctl_unregister_oid(&sysctl__tunable_zfs);
 	sysctl_unregister_oid(&sysctl__tunable);
@@ -311,53 +314,94 @@ extern int l2arc_noprefetch;			/* don't cache prefetch bufs */
 extern int l2arc_feed_again;			/* turbo warmup */
 extern int l2arc_norw;			/* no reads during writes */
 
-SYSCTL_UQUAD(_tunable, OID_AUTO, anon_size, CTLFLAG_RD,
-    &ARC_anon.arcs_size.rc_count, 0, "size of anonymous state");
+static int
+param_get_arc_state_size(ZFS_MODULE_PARAM_ARGS)
+{
+	arc_state_t *state = (arc_state_t *)arg1;
+	int64_t val;
+
+	val = zfs_refcount_count(&state->arcs_size[ARC_BUFC_DATA]) +
+	    zfs_refcount_count(&state->arcs_size[ARC_BUFC_METADATA]);
+	return (sysctl_handle_quad(oidp, &val, 0, req));
+}
+
+extern arc_state_t ARC_anon;
+
+SYSCTL_PROC(_tunable, OID_AUTO, anon_size,
+	CTLTYPE_S64 | CTLFLAG_RD,
+	&ARC_anon, 0, param_get_arc_state_size, "Q",
+	"size of anonymous state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, anon_metadata_esize, CTLFLAG_RD,
-    &ARC_anon.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
-    "size of anonymous state");
+	&ARC_anon.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
+	"size of evictable metadata in anonymous state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, anon_data_esize, CTLFLAG_RD,
-    &ARC_anon.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
-    "size of anonymous state");
+	&ARC_anon.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
+	"size of evictable data in anonymous state");
 
-SYSCTL_UQUAD(_tunable, OID_AUTO, mru_size, CTLFLAG_RD,
-    &ARC_mru.arcs_size.rc_count, 0, "size of mru state");
-SYSCTL_UQUAD(_tunable, OID_AUTO, mru_metadata_esize, CTLFLAG_RD,
-    &ARC_mru.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
-    "size of metadata in mru state");
-SYSCTL_UQUAD(_tunable, OID_AUTO, mru_data_esize, CTLFLAG_RD,
-    &ARC_mru.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
-    "size of data in mru state");
+extern arc_state_t ARC_mru_ghost;
 
-SYSCTL_UQUAD(_tunable, OID_AUTO, mru_ghost_size, CTLFLAG_RD,
-    &ARC_mru_ghost.arcs_size.rc_count, 0, "size of mru ghost state");
+SYSCTL_PROC(_tunable, OID_AUTO, mru_ghost_size,
+	CTLTYPE_S64 | CTLFLAG_RD,
+	&ARC_mru_ghost, 0, param_get_arc_state_size, "Q",
+	"size of mru ghost state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, mru_ghost_metadata_esize, CTLFLAG_RD,
-    &ARC_mru_ghost.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
-    "size of metadata in mru ghost state");
+	&ARC_mru_ghost.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
+	"size of evictable metadata in mru ghost state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, mru_ghost_data_esize, CTLFLAG_RD,
-    &ARC_mru_ghost.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
-    "size of data in mru ghost state");
+	&ARC_mru_ghost.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
+	"size of evictable data in mru ghost state");
 
-SYSCTL_UQUAD(_tunable, OID_AUTO, mfu_size, CTLFLAG_RD,
-    &ARC_mfu.arcs_size.rc_count, 0, "size of mfu state");
+extern arc_state_t ARC_mfu;
+
+SYSCTL_PROC(_tunable, OID_AUTO, mfu_size,
+	CTLTYPE_S64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	&ARC_mfu, 0, param_get_arc_state_size, "Q",
+	"size of mfu state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, mfu_metadata_esize, CTLFLAG_RD,
-    &ARC_mfu.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
-    "size of metadata in mfu state");
+	&ARC_mfu.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
+	"size of evictable metadata in mfu state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, mfu_data_esize, CTLFLAG_RD,
-    &ARC_mfu.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
-    "size of data in mfu state");
+	&ARC_mfu.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
+	"size of evictable data in mfu state");
 
-SYSCTL_UQUAD(_tunable, OID_AUTO, mfu_ghost_size, CTLFLAG_RD,
-    &ARC_mfu_ghost.arcs_size.rc_count, 0, "size of mfu ghost state");
+extern arc_state_t ARC_mfu_ghost;
+
+SYSCTL_PROC(_tunable, OID_AUTO, mfu_ghost_size,
+	CTLTYPE_S64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	&ARC_mfu_ghost, 0, param_get_arc_state_size, "Q",
+	"size of mfu ghost state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, mfu_ghost_metadata_esize, CTLFLAG_RD,
-    &ARC_mfu_ghost.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
-    "size of metadata in mfu ghost state");
+	&ARC_mfu_ghost.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
+	"size of evictable metadata in mfu ghost state");
 SYSCTL_UQUAD(_tunable, OID_AUTO, mfu_ghost_data_esize, CTLFLAG_RD,
-    &ARC_mfu_ghost.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
-    "size of data in mfu ghost state");
+	&ARC_mfu_ghost.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
+	"size of evictable data in mfu ghost state");
 
-SYSCTL_UQUAD(_tunable, OID_AUTO, l2c_only_size, CTLFLAG_RD,
-    &ARC_l2c_only.arcs_size.rc_count, 0, "size of mru state");
+extern arc_state_t ARC_uncached;
+
+SYSCTL_PROC(_tunable, OID_AUTO, uncached_size,
+	CTLTYPE_S64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	&ARC_uncached, 0, param_get_arc_state_size, "Q",
+	"size of uncached state");
+SYSCTL_UQUAD(_tunable, OID_AUTO, uncached_metadata_esize, CTLFLAG_RD,
+	&ARC_uncached.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
+	"size of evictable metadata in uncached state");
+SYSCTL_UQUAD(_tunable, OID_AUTO, uncached_data_esize, CTLFLAG_RD,
+	&ARC_uncached.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
+	"size of evictable data in uncached state");
+
+extern arc_state_t ARC_l2c_only;
+
+SYSCTL_PROC(_tunable, OID_AUTO, l2c_only_size,
+	CTLTYPE_S64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	&ARC_l2c_only, 0, param_get_arc_state_size, "Q",
+	"size of l2c_only state");
+
+/* dbuf.c */
+
+/* dmu.c */
+
+/* dmu_zfetch.c */
 
 static int
 sysctl_tunable_arc_no_grow_shift(ZFS_MODULE_PARAM_ARGS)

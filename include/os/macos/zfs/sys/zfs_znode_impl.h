@@ -139,7 +139,8 @@ typedef struct zfs_soft_state {
 #define	zn_flush_cached_data(zp, sync) \
 	(void) ubc_msync(ZTOV(zp), 0, \
 	ubc_getsize(ZTOV(zp)), NULL, UBC_PUSHALL | UBC_SYNC);
-#define	zn_rlimit_fsize(zp, uio)	(0)
+#define	zn_rlimit_fsize(size)		(0)
+#define	zn_rlimit_fsize_uio(zp, uio) (0)
 
 /* Called on entry to each ZFS vnode and vfs operation  */
 static inline int
