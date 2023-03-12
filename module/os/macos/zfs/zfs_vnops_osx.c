@@ -4504,7 +4504,143 @@ zfs_vnop_searchfs(struct vnop_searchfs_args *ap)
 }
 #endif
 
+#ifdef VNODE_CLONEFILE_DEFAULT
+int
+zfs_vnop_clonefile(struct vnop_clonefile_args *ap)
+#if 0
+	struct vnop_clone_args {
+		struct vnodeop_desc *a_desc;
+		vnode_t a_fvp;
+		vnode_t a_dvp;
+		vnode_t *a_vpp;
+		struct componentname *a_cnp;
+		struct vnode_attr *a_vap;
+		uint32_t a_flags;
+		vfs_context_t a_context;
+		/* funcptr only set for VDIR. VREG it is set to NULL, see XNU */
+		int (*a_dir_clone_authorizer)(/* Authorization callback */
+			struct vnode_attr *vap, /* attribute to be authorized */
+			kauth_action_t action,
+			struct vnode_attr *dvap, /* target directory attr */
+			vnode_t sdvp, /* src dir vnode pointer (optional) */
+			mount_t mp,   /* mount point of filesystem */
+			dir_clone_authorizer_op_t vattr_op,
+			uint32_t flags, /* needs value passed to a_flags */
+			vfs_context_t ctx, /* As passed to VNOP */
+			void *reserved); /* Always NULL */
+		void *a_reserved; /* Currently unused */
+	};
+#endif
+{
+	DECLARE_CRED(ap);
+	struct vnode *invp = ap->a_fvp;
+	znode_t *inzp = NULL;
+	znode_t *outzp = NULL;
+	uint64_t inoff = 0ULL;
+	uint64_t outoff = 0ULL;
+	uint64_t len = 0ULL;
+	int error;
+	struct componentname *cnp = ap->a_cnp;
+	vattr_t *vap = ap->a_vap;
+	int mode = 0; /* FIXME */
 
+	dprintf("+vnop_clonefile\n");
+
+	if (invp == NULL)
+		return (SET_ERROR(EINVAL));
+
+	inzp = VTOZ(invp);
+	if (inzp == NULL)
+		return (SET_ERROR(EINVAL));
+
+	/* XNU clonefile allows DIR and REG */
+	if (!vnode_isreg(invp))
+		return (SET_ERROR(EINVAL));
+
+	/*
+	 * It seems FreeBSD is given two vnodes to open/existing files,
+	 * and calls to clone between them.
+	 * XNU gives us the source vnode, and the name of the dest, so
+	 * we create a new entry like zfs_create().
+	 */
+	error = zfs_create(VTOZ(ap->a_dvp), cnp->cn_nameptr, vap, NONEXCL, mode,
+	    &outzp, cr, 0, NULL, NULL);
+
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	/*
+	 * Created entry, fix things up like zfs_create.
+	 * Any failure exit out of here should release outzp
+	 */
+
+	cache_purge_negatives(ap->a_dvp);
+
+	// Also tell XNU what VAPs we handled.
+	if (VATTR_IS_ACTIVE(vap, va_mode))
+		VATTR_SET_SUPPORTED(vap, va_mode);
+	if (VATTR_IS_ACTIVE(vap, va_data_size))
+		VATTR_SET_SUPPORTED(vap, va_data_size);
+	if (VATTR_IS_ACTIVE(vap, va_type))
+		VATTR_SET_SUPPORTED(vap, va_type);
+	if (VATTR_IS_ACTIVE(vap, va_uid))
+		VATTR_SET_SUPPORTED(vap, va_uid);
+	if (VATTR_IS_ACTIVE(vap, va_gid))
+		VATTR_SET_SUPPORTED(vap, va_gid);
+	if (VATTR_IS_ACTIVE(vap, va_flags))
+		VATTR_SET_SUPPORTED(vap, va_flags);
+	if (VATTR_IS_ACTIVE(vap, va_acl))
+		VATTR_SET_SUPPORTED(vap, va_acl);
+	if (VATTR_IS_ACTIVE(vap, va_create_time))
+		VATTR_SET_SUPPORTED(vap, va_create_time);
+	if (VATTR_IS_ACTIVE(vap, va_access_time))
+		VATTR_SET_SUPPORTED(vap, va_access_time);
+	if (VATTR_IS_ACTIVE(vap, va_modify_time))
+		VATTR_SET_SUPPORTED(vap, va_modify_time);
+	if (VATTR_IS_ACTIVE(vap, va_change_time))
+		VATTR_SET_SUPPORTED(vap, va_change_time);
+	if (VATTR_IS_ACTIVE(vap, va_backup_time))
+		VATTR_SET_SUPPORTED(vap, va_backup_time);
+
+	/* Print out any missing VAP flags, so we can fix them */
+	uint64_t missing = 0;
+	missing =
+	    (vap->va_active ^ (vap->va_active & vap->va_supported));
+	if (missing != 0) {
+		dprintf("%s: asked %08llx replied %08llx "
+			" missing %08llx\n", __func__,
+			vap->va_active, vap->va_supported,
+			missing);
+	}
+
+
+	/* Back to clonefile work */
+
+
+	len = inzp->z_size;
+
+
+	/*
+	 * zfs_clone_range(znode_t *inzp, uint64_t *inoffp, znode_t *outzp,
+	 *    uint64_t *outoffp, uint64_t *lenp, cred_t *cr)
+	 */
+	error = zfs_clone_range(inzp, &inoff, outzp, &outoff,
+		&len, cr);
+
+	if (error == 0) {
+		*ap->a_vpp = ZTOV(outzp);
+	} else {
+		if (outzp != NULL)
+			zrele(outzp);
+
+		/* clonefile failed, leave a 0-len file, or remove it ? */
+		zfs_remove(VTOZ(ap->a_dvp), ap->a_cnp->cn_nameptr, cr, 0);
+	}
+
+	dprintf("-vnop_clonefile: %d\n", error);
+	return (error);
+}
+#endif
 
 /*
  * Predeclare these here so that the compiler assumes that this is an "old
@@ -4575,6 +4711,9 @@ struct vnodeopv_entry_desc zfs_dvnodeops_template[] = {
 #ifdef WITH_SEARCHFS
 	{&vnop_searchfs_desc,	(VOPFUNC)zfs_vnop_searchfs},
 #endif
+#ifdef VNODE_CLONEFILE_DEFAULT
+	{&vnop_clonefile_desc,	(VOPFUNC)zfs_vnop_clonefile},
+#endif
 	{NULL, (VOPFUNC)NULL }
 };
 struct vnodeopv_desc zfs_dvnodeop_opv_desc =
@@ -4625,6 +4764,9 @@ struct vnodeopv_entry_desc zfs_fvnodeops_template[] = {
 #endif
 #ifdef WITH_SEARCHFS
 	{&vnop_searchfs_desc,	(VOPFUNC)zfs_vnop_searchfs},
+#endif
+#ifdef VNODE_CLONEFILE_DEFAULT
+	{&vnop_clonefile_desc,	(VOPFUNC)zfs_vnop_clonefile},
 #endif
 	{NULL, (VOPFUNC)NULL }
 };
