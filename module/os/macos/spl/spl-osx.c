@@ -38,6 +38,7 @@
 #include <kern/processor.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#include <sys/processor.h>
 
 #define	_task_user_
 #include <IOKit/IOLib.h>
@@ -517,6 +518,8 @@ spl_start(kmod_info_t *ki, void *d)
 	spl_vnode_init();
 	spl_kmem_thread_init();
 	spl_kmem_mp_init();
+
+	spl_cpuid_features();
 
 	return (KERN_SUCCESS);
 }
