@@ -81,15 +81,51 @@ getcpuid(void)
 uint64_t
 spl_cpuid_features(void)
 {
+	static int first_time = 1;
+
+	_spl_cpuid_has_xgetbv = B_FALSE;
 
 #if defined(__aarch64__)
 
-	// Find arm64 solution.
-	_spl_cpuid_has_xgetbv = B_FALSE; /* Silence unused */
+	if (first_time == 1) {
+		first_time = 0;
+		uint64_t aa64isar0_el1;
+		uint64_t aa64isar1_el1;
+		uint32_t aes, sha1, sha2, sha3, bf16, i8mm;
+
+/* 4,5,6,7 -> GET_BITS(4, 8) */
+#define	GET_BITS(S, F, T) \
+		((S) >> (F)) & ((1 << ((T) - (F))) - 1)
+
+		asm volatile("mrs %0, ID_AA64ISAR0_EL1" :
+		    "=r"(aa64isar0_el1) ::);
+		printf("cpu_features: 0x%016llx \n", aa64isar0_el1);
+
+		aes = GET_BITS(aa64isar0_el1, 4, 8);
+		sha1 = GET_BITS(aa64isar0_el1, 8, 12);
+		sha2 = GET_BITS(aa64isar0_el1, 12, 16);
+		sha3 = GET_BITS(aa64isar0_el1, 32, 36);
+
+		asm volatile("mrs %0, ID_AA64ISAR1_EL1" :
+		    "=r"(aa64isar1_el1) ::);
+		printf("cpu_features: 0x%016llx \n", aa64isar1_el1);
+
+		bf16 = GET_BITS(aa64isar1_el1, 44, 48);
+		i8mm = GET_BITS(aa64isar1_el1, 52, 56);
+
+		printf("cpu_features: %s%s%s%s%s%s%s%s\n",
+		    aes & 3 ? "AES " : "",
+		    aes & 2 ? "PMULL " : "",
+		    sha1    ? "SHA1 " : "",
+		    sha2    ? "SHA256 " : "",
+		    sha2 & 2 ? "SHA512 " : "",
+		    sha3    ? "SHA3 " : "",
+		    bf16    ? "BF16 " : "",
+		    i8mm    ? "I8MM " : "");
+	}
 
 #else /* X64 */
 
-	static int first_time = 1;
 	uint64_t a, b, c, d;
 
 	if (first_time == 1) {

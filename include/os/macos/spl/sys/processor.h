@@ -31,6 +31,7 @@
 #include <sys/types.h>
 
 extern uint32_t getcpuid(void);
+extern uint64_t spl_cpuid_features(void);
 
 typedef int	processorid_t;
 
