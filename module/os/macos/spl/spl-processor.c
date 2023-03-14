@@ -54,11 +54,25 @@ static uint64_t _spl_cpuid_features_leaf7 = 0ULL;
 static boolean_t _spl_cpuid_has_xgetbv = B_FALSE;
 
 uint32_t
-getcpuid()
+getcpuid(void)
 {
 #if defined(__aarch64__)
-	// Find arm64 solution.
-	return (0);
+	uint64_t mpidr_el1;
+
+	asm volatile("mrs %0, mpidr_el1" : "=r" (mpidr_el1));
+	/*
+	 * To save us looking up number of eCores and pCores, we
+	 * just wrap eCores backwards from max_ncpu.
+	 * 0: [P0 P1 P2 ... Px Ex .. E2 E1 E0] : max_ncpu
+	 *
+	 * XNU: Aff2: "1" - PCORE, "0" - ECORE
+	 */
+#define	PCORE_BIT (1ULL << 16)
+	if (mpidr_el1 & PCORE_BIT)
+		return ((uint32_t)mpidr_el1 & 0xff);
+	else
+		return ((max_ncpus -1) - (uint32_t)(mpidr_el1 & 0xff));
+
 #else
 	return ((uint32_t)cpu_number());
 #endif
