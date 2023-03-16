@@ -265,6 +265,13 @@ __attribute__((noinline)) int assfail(const char *str, const char *file,
 
 #define	zfs_fallthrough		__attribute__((__fallthrough__))
 
+/* We can't print pointers on ARM64 anymore */
+#define	PTRP(X) \
+	(uint32_t)((uint64_t)(X) >> 32), (uint32_t)((uint64_t)(X) & 0xffffffff)
+#define	PTRF "0x%08X%08X"
+/* printf("ptr is "PTRF"\n", PTRP(pointer)); */
+
+
 #ifdef  __cplusplus
 }
 #endif

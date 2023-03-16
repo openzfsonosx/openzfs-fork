@@ -267,6 +267,9 @@ function do_prune
 "./${prefix}/share/zfs-macos/runfiles" \
 "./${prefix}/share/zfs-macos/test-runner" \
 "./${prefix}/share/zfs-macos/zfs-tests" \
+"./${prefix}/share/zfs/runfiles" \
+"./${prefix}/share/zfs/test-runner" \
+"./${prefix}/share/zfs/zfs-tests" \
 "./${prefix}/src"
 
     popd || fail "failed to popd"
