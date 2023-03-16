@@ -25,7 +25,7 @@
 
 /* You can set to nothing on Unix platforms */
 #undef ASMABI
-#define	ASMABI	__attribute__((sysv_abi))
+#define	ASMABI
 
 #define	SECTION_TEXT .text
 #define	SECTION_STATIC .const

@@ -89,6 +89,7 @@ static size_t chunk_state_len(const blake3_chunk_state_t *ctx)
 static size_t chunk_state_fill_buf(blake3_chunk_state_t *ctx,
     const uint8_t *input, size_t input_len)
 {
+	ASSERT3U(BLAKE3_BLOCK_LEN, >=, ((size_t)ctx->buf_len));
 	size_t take = BLAKE3_BLOCK_LEN - ((size_t)ctx->buf_len);
 	if (take > input_len) {
 		take = input_len;
@@ -148,6 +149,7 @@ static void output_root_bytes(const blake3_ops_t *ops, const output_t *ctx,
 	while (out_len > 0) {
 		ops->compress_xof(ctx->input_cv, ctx->block, ctx->block_len,
 		    output_block_counter, ctx->flags | ROOT, wide_buf);
+		ASSERT3U(64, >=, offset_within_block);
 		size_t available_bytes = 64 - offset_within_block;
 		size_t memcpy_len;
 		if (out_len > available_bytes) {
@@ -157,6 +159,7 @@ static void output_root_bytes(const blake3_ops_t *ops, const output_t *ctx,
 		}
 		memcpy(out, wide_buf + offset_within_block, memcpy_len);
 		out += memcpy_len;
+		ASSERT3U(out_len, >=, memcpy_len);
 		out_len -= memcpy_len;
 		output_block_counter += 1;
 		offset_within_block = 0;
@@ -169,6 +172,7 @@ static void chunk_state_update(const blake3_ops_t *ops,
 	if (ctx->buf_len > 0) {
 		size_t take = chunk_state_fill_buf(ctx, input, input_len);
 		input += take;
+		ASSERT3U(input_len, >=, take);
 		input_len -= take;
 		if (input_len > 0) {
 			ops->compress_in_place(ctx->cv, ctx->buf,
@@ -186,6 +190,7 @@ static void chunk_state_update(const blake3_ops_t *ops,
 		    ctx->flags|chunk_state_maybe_start_flag(ctx));
 		ctx->blocks_compressed += 1;
 		input += BLAKE3_BLOCK_LEN;
+		ASSERT3U(input_len, >=, BLAKE3_BLOCK_LEN);
 		input_len -= BLAKE3_BLOCK_LEN;
 	}
 
@@ -218,6 +223,7 @@ static size_t left_len(size_t content_len)
 	 * content_len
 	 * should always be greater than BLAKE3_CHUNK_LEN.
 	 */
+	ASSERT3U(content_len, >=, 1);
 	size_t full_chunks = (content_len - 1) / BLAKE3_CHUNK_LEN;
 	return (round_down_to_power_of_2(full_chunks) * BLAKE3_CHUNK_LEN);
 }
@@ -236,6 +242,7 @@ static size_t compress_chunks_parallel(const blake3_ops_t *ops,
 	size_t input_position = 0;
 	size_t chunks_array_len = 0;
 	while (input_len - input_position >= BLAKE3_CHUNK_LEN) {
+		ASSERT3U(input_len, >=, input_position);
 		chunks_array[chunks_array_len] = &input[input_position];
 		input_position += BLAKE3_CHUNK_LEN;
 		chunks_array_len += 1;
@@ -254,6 +261,7 @@ static size_t compress_chunks_parallel(const blake3_ops_t *ops,
 		blake3_chunk_state_t chunk_state;
 		chunk_state_init(&chunk_state, key, flags);
 		chunk_state.chunk_counter = counter;
+		ASSERT3U(input_len, >=, input_position);
 		chunk_state_update(ops, &chunk_state, &input[input_position],
 		    input_len - input_position);
 		output_t output = chunk_state_output(&chunk_state);
@@ -280,6 +288,7 @@ static size_t compress_parents_parallel(const blake3_ops_t *ops,
 	size_t parents_array_len = 0;
 
 	while (num_chaining_values - (2 * parents_array_len) >= 2) {
+		ASSERT3U(num_chaining_values, >=, (2 * parents_array_len));
 		parents_array[parents_array_len] = &child_chaining_values[2 *
 		    parents_array_len * BLAKE3_OUT_LEN];
 		parents_array_len += 1;
@@ -342,6 +351,7 @@ static size_t blake3_compress_subtree_wide(const blake3_ops_t *ops,
 	 * strategy.)
 	 */
 	size_t left_input_len = left_len(input_len);
+	ASSERT3U(input_len, >=, left_input_len);
 	size_t right_input_len = input_len - left_input_len;
 	const uint8_t *right_input = &input[left_input_len];
 	uint64_t right_chunk_counter = chunk_counter +
@@ -452,11 +462,33 @@ static void hasher_merge_cv_stack(BLAKE3_CTX *ctx, uint64_t total_len)
 {
 	size_t post_merge_stack_len = (size_t)popcnt(total_len);
 	while (ctx->cv_stack_len > post_merge_stack_len) {
+		ASSERT3U(ctx->cv_stack_len, >=, 2);
 		uint8_t *parent_node =
 		    &ctx->cv_stack[(ctx->cv_stack_len - 2) * BLAKE3_OUT_LEN];
 		output_t output =
 		    parent_output(parent_node, ctx->key, ctx->chunk.flags);
+#ifndef __APPLE__
 		output_chaining_value(ctx->ops, &output, parent_node);
+#else
+		/*
+		 * We copy in the contents of the output_chaining_value() here
+		 * or we will panic, as "ops" gets overwritten by garbage
+		 * bytes. The real reason remains unknown.
+		 *
+		 * static void output_chaining_value(const blake3_ops_t *ops,
+		 * const output_t *ctx, uint8_t cv[32])
+		 */
+		{
+			uint32_t cv_words[8];
+
+			memcpy(cv_words, (&output)->input_cv, 32);
+			((const blake3_ops_t *)ctx->ops)->compress_in_place(
+			    cv_words, (&output)->block, (&output)->block_len,
+			    (&output)->counter, (&output)->flags);
+			store_cv_words((&output), cv_words);
+		}
+		ASSERT3U(ctx->cv_stack_len, >=, 1);
+#endif
 		ctx->cv_stack_len -= 1;
 	}
 }
@@ -544,6 +576,7 @@ Blake3_Update2(BLAKE3_CTX *ctx, const void *input, size_t input_len)
 		}
 		chunk_state_update(ctx->ops, &ctx->chunk, input_bytes, take);
 		input_bytes += take;
+		ASSERT3U(input_len, >=, take);
 		input_len -= take;
 		/*
 		 * If we've filled the current chunk and there's more coming,
@@ -603,6 +636,7 @@ Blake3_Update2(BLAKE3_CTX *ctx, const void *input, size_t input_len)
 		 * https://github.com/BLAKE3-team/BLAKE3/issues/69.
 		 */
 		while ((((uint64_t)(subtree_len - 1)) & count_so_far) != 0) {
+			ASSERT3U(subtree_len, >=, 1);
 			subtree_len /= 2;
 		}
 		/*
@@ -638,6 +672,7 @@ Blake3_Update2(BLAKE3_CTX *ctx, const void *input, size_t input_len)
 		}
 		ctx->chunk.chunk_counter += subtree_chunks;
 		input_bytes += subtree_len;
+		ASSERT3U(input_len, >=, subtree_len);
 		input_len -= subtree_len;
 	}
 
@@ -669,6 +704,7 @@ Blake3_Update(BLAKE3_CTX *ctx, const void *input, size_t todo)
 		size_t block = (todo >= block_max) ? block_max : todo;
 		Blake3_Update2(ctx, data + done, block);
 		done += block;
+		ASSERT3U(todo, >=, block);
 		todo -= block;
 	}
 }
@@ -708,16 +744,23 @@ Blake3_FinalSeek(const BLAKE3_CTX *ctx, uint64_t seek, uint8_t *out,
 	 * chunk hash, and we start the merge from that.
 	 */
 	output_t output;
+#ifndef __APPLE__
 	size_t cvs_remaining;
+#else
+	/* This can go negative, then while below goes forever */
+	ssize_t cvs_remaining;
+#endif
 	if (chunk_state_len(&ctx->chunk) > 0) {
 		cvs_remaining = ctx->cv_stack_len;
 		output = chunk_state_output(&ctx->chunk);
 	} else {
 		/* There are always at least 2 CVs in the stack in this case. */
+		ASSERT3U(ctx->cv_stack_len, >=, 2);
 		cvs_remaining = ctx->cv_stack_len - 2;
 		output = parent_output(&ctx->cv_stack[cvs_remaining * 32],
 		    ctx->key, ctx->chunk.flags);
 	}
+
 	while (cvs_remaining > 0) {
 		cvs_remaining -= 1;
 		uint8_t parent_block[BLAKE3_BLOCK_LEN];
