@@ -341,7 +341,6 @@ zfs_znode_hold_enter(zfsvfs_t *zfsvfs, uint64_t obj)
 		kmem_cache_free(znode_hold_cache, zh_new);
 
 	ASSERT(MUTEX_NOT_HELD(&zh->zh_lock));
-	ASSERT3S(zfs_refcount_count(&zh->zh_refcount), >, 0);
 	mutex_enter(&zh->zh_lock);
 
 	return (zh);
@@ -354,7 +353,6 @@ zfs_znode_hold_exit(zfsvfs_t *zfsvfs, znode_hold_t *zh)
 	boolean_t remove = B_FALSE;
 
 	ASSERT(zfs_znode_held(zfsvfs, zh->zh_obj));
-	ASSERT3S(zfs_refcount_count(&zh->zh_refcount), >, 0);
 	mutex_exit(&zh->zh_lock);
 
 	mutex_enter(&zfsvfs->z_hold_locks[i]);
