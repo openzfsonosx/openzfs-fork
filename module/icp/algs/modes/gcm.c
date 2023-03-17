@@ -871,6 +871,12 @@ gcm_impl_init(void)
 	 * Set the fastest implementation given the assumption that the
 	 * hardware accelerated version is the fastest.
 	 */
+#if defined(__aarch64__) && defined(HAVE_ARMV8)
+	if (gcm_armv8_impl.is_supported()) {
+		memcpy(&gcm_fastest_impl, &gcm_armv8_impl,
+		    sizeof (gcm_fastest_impl));
+	} else
+#endif
 #if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
 	if (gcm_pclmulqdq_impl.is_supported()) {
 		memcpy(&gcm_fastest_impl, &gcm_pclmulqdq_impl,

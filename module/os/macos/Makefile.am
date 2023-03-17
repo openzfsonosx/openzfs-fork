@@ -85,6 +85,7 @@ if TARGET_CPU_AARCH64
 macos_zfs_CPPFLAGS+=-arch arm64e -arch x86_64
 macos_zfs_LDFLAGS+=-arch arm64e -arch x86_64
 zfs_ASM_SOURCES_C = \
+	%D%/../../icp/asm-aarch64/aes/aesv8-armx.S \
 	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse2.S \
 	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse41.S
 endif
@@ -336,6 +337,7 @@ icp_SRCS = \
 	%D%/../../icp/algs/skein/skein_block.c \
 	%D%/../../icp/algs/skein/skein_iv.c \
 	%D%/../../icp/algs/aes/aes_impl_aesni.c \
+	%D%/../../icp/algs/aes/aes_impl_aesv8.c \
 	%D%/../../icp/algs/aes/aes_impl_generic.c \
 	%D%/../../icp/algs/aes/aes_impl_x86-64.c \
 	%D%/../../icp/algs/aes/aes_impl.c \
