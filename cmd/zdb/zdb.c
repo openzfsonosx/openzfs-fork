@@ -8691,13 +8691,6 @@ main(int argc, char **argv)
 	if (argc < 1) {
 		if (!dump_opt['e'] && dump_opt['C']) {
 			dump_cachefile(spa_config_path);
-
-#ifndef _KERNEL
-extern void aes_benchmark(void);
-	aes_benchmark();
-#endif
-
-
 			return (0);
 		}
 		usage();
