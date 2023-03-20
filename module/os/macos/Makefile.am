@@ -84,9 +84,11 @@ macos_zfs_LDFLAGS = \
 if TARGET_CPU_AARCH64
 macos_zfs_CPPFLAGS+=-arch arm64e -arch x86_64
 macos_zfs_LDFLAGS+=-arch arm64e -arch x86_64
-#zfs_ASM_SOURCES_C = \
-#	%D%/../../icp/asm-aarch64/os/macos/blake3/b3_aarch64_sse2.S \
-#	%D%/../../icp/asm-aarch64/os/macos/blake3/b3_aarch64_sse41.S
+zfs_ASM_SOURCES_C = \
+	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse2.S \
+	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse41.S \
+	%D%/../../icp/asm-aarch64/sha2/sha256-armv8.S \
+	%D%/../../icp/asm-aarch64/sha2/sha512-armv8.S
 endif
 
 macos_zfs_LIBS =
@@ -332,6 +334,9 @@ icp_SRCS = \
 	%D%/../../icp/algs/modes/gcm_generic.c \
 	%D%/../../icp/algs/modes/gcm.c \
 	%D%/../../icp/algs/modes/modes.c \
+	%D%/../../icp/algs/sha2/sha2_generic.c \
+	%D%/../../icp/algs/sha2/sha256_impl.c \
+	%D%/../../icp/algs/sha2/sha512_impl.c \
 	%D%/../../icp/algs/skein/skein.c \
 	%D%/../../icp/algs/skein/skein_block.c \
 	%D%/../../icp/algs/skein/skein_iv.c \

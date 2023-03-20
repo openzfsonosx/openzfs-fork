@@ -229,10 +229,10 @@ extern "C" {
 #define	zfs_vdev_raidz_impl_set_args(var) \
     CTLTYPE_STRING, var, 0, param_zfs_vdev_raidz_impl_set, "A"
 
-#define	sha256_param_set_args(var) \
+#define sha256_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, sha256_param, "A"
 
-#define	sha512_param_set_args(var) \
+#define sha512_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, sha512_param, "A"
 
 /*
