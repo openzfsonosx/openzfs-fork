@@ -800,8 +800,9 @@ abd_iterate_func(abd_t *abd, size_t off, size_t size,
 		abd_iter_map(&aiter);
 
 		size_t len = MIN(aiter.iter_mapsize, size);
+#ifdef __linux__
 		ASSERT3U(len, >, 0);
-
+#endif
 		ret = func(aiter.iter_mapaddr, len, private);
 
 		abd_iter_unmap(&aiter);
