@@ -634,14 +634,16 @@ vdev_raidz_impl_set(const char *val)
 }
 
 #if defined(_KERNEL)
-#if defined(__linux__) || defined(__APPLE__)
 
+#if defined(__linux__)
 static int
 zfs_vdev_raidz_impl_set(const char *val, zfs_kernel_param_t *kp)
 {
 	return (vdev_raidz_impl_set(val));
 }
+#endif
 
+#if defined(__linux__) || defined(__APPLE__)
 static int
 zfs_vdev_raidz_impl_get(char *buffer, zfs_kernel_param_t *kp)
 {

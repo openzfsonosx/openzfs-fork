@@ -51,14 +51,16 @@
     .balign ASM_ENTRY_ALIGN %% \
     .globl _##x %% \
 _##x: %% \
-x:
+x: \
+	bti c // hint	#34
 
 #define	ENTRY_ALIGN(x, a) \
 	.text %% \
 	.balign	a %% \
 	.globl _##x %% \
 _##x: %% \
-x:
+x: \
+	bti c // hint	#34
 
 #define	FUNCTION(x) \
 x:

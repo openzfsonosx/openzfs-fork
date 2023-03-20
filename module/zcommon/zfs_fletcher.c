@@ -949,7 +949,7 @@ fletcher_4_param(ZFS_MODULE_PARAM_ARGS)
 {
 	int err = 0;
 
-	if (req->newptr == NULL) {
+	if ((void *)req->newptr == NULL) {
 		const uint32_t impl = IMPL_READ(fletcher_4_impl_chosen);
 		const int init_buflen = 64;
 		const char *fmt;

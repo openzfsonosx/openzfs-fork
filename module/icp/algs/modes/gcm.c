@@ -889,7 +889,13 @@ gcm_impl_init(void)
 	if (gcm_avx_will_work()) {
 #ifdef HAVE_MOVBE
 		if (zfs_movbe_available() == B_TRUE) {
+#ifdef __APPLE__
+			atomic_swap_32(
+			    (volatile unsigned int *)&gcm_avx_can_use_movbe,
+			    B_TRUE);
+#else
 			atomic_swap_32(&gcm_avx_can_use_movbe, B_TRUE);
+#endif
 		}
 #endif
 		if (GCM_IMPL_READ(user_sel_impl) == IMPL_FASTEST) {
@@ -992,13 +998,16 @@ gcm_impl_set(const char *val)
 }
 
 #if defined(_KERNEL)
-#if defined(__linux__) || defined(__APPLE__)
+
+#if defined(__linux__)
 static int
 icp_gcm_impl_set(const char *val, zfs_kernel_param_t *kp)
 {
 	return (gcm_impl_set(val));
 }
+#endif
 
+#if defined(__linux__) || defined(__APPLE__)
 static int
 icp_gcm_impl_get(char *buffer, zfs_kernel_param_t *kp)
 {
@@ -1120,7 +1129,11 @@ static inline void
 gcm_set_avx(boolean_t val)
 {
 	if (gcm_avx_will_work() == B_TRUE) {
+#ifdef __APPLE__
+		atomic_swap_32((volatile unsigned int *)&gcm_use_avx, val);
+#else
 		atomic_swap_32(&gcm_use_avx, val);
+#endif
 	}
 }
 
@@ -1571,6 +1584,8 @@ gcm_init_avx(gcm_ctx_t *ctx, const uint8_t *iv, size_t iv_len,
 }
 
 #if defined(_KERNEL)
+
+#if defined(__linux__)
 static int
 icp_gcm_avx_set_chunk_size(const char *buf, zfs_kernel_param_t *kp)
 {
@@ -1591,9 +1606,9 @@ icp_gcm_avx_set_chunk_size(const char *buf, zfs_kernel_param_t *kp)
 	error = param_set_uint(val_rounded, kp);
 	return (error);
 }
+#endif
 
 #ifdef __APPLE__
-
 /* Lives in here to have access to GCM macros */
 int
 param_icp_gcm_avx_set_chunk_size(ZFS_MODULE_PARAM_ARGS)
@@ -1622,9 +1637,7 @@ param_icp_gcm_avx_set_chunk_size(ZFS_MODULE_PARAM_ARGS)
 	gcm_avx_chunk_size = val;
 	return (rc);
 }
-
 #endif
-
 
 module_param_call(icp_gcm_avx_chunk_size, icp_gcm_avx_set_chunk_size,
     param_get_uint, &gcm_avx_chunk_size, 0644);

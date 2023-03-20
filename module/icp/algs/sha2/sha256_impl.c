@@ -260,7 +260,7 @@ sha256_param(ZFS_MODULE_PARAM_ARGS)
 	int err;
 
 	generic_impl_init();
-	if (req->newptr == NULL) {
+	if ((void *)req->newptr == NULL) {
 		const uint32_t impl = IMPL_READ(generic_impl_chosen);
 		const int init_buflen = 64;
 		const char *fmt;
