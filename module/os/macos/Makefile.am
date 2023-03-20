@@ -87,7 +87,9 @@ macos_zfs_LDFLAGS+=-arch arm64e -arch x86_64
 zfs_ASM_SOURCES_C = \
 	%D%/../../icp/asm-aarch64/aes/aesv8-armx.S \
 	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse2.S \
-	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse41.S
+	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse41.S \
+	%D%/../../icp/asm-aarch64/sha2/sha256-armv8.S \
+	%D%/../../icp/asm-aarch64/sha2/sha512-armv8.S
 endif
 
 macos_zfs_LIBS =

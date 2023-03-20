@@ -60,7 +60,14 @@ static void Encode64(uint8_t *, uint64_t *, size_t);
 
 void ASMABI SHA512TransformBlocks(SHA2_CTX *ctx, const void *in, size_t num);
 void ASMABI SHA256TransformBlocks(SHA2_CTX *ctx, const void *in, size_t num);
+#elif defined(__aarch64__) /* && defined(_KERNEL) */
+#define	SHA512Transform(ctx, in) \
+	sha512_block_armv8((void *)&(ctx)->state, (in), 1)
+#define	SHA256Transform(ctx, in) \
+	sha256_block_armv8((void *)&(ctx)->state, (in), 1)
 
+void ASMABI sha512_block_armv8(SHA2_CTX *ctx, const void *in, size_t num);
+void ASMABI sha256_block_armv8(SHA2_CTX *ctx, const void *in, size_t num);
 #else
 static void SHA256Transform(SHA2_CTX *, const uint8_t *);
 static void SHA512Transform(SHA2_CTX *, const uint8_t *);
@@ -144,7 +151,12 @@ static const uint8_t PADDING[128] = { 0x80, /* all zeros */ };
 #endif	/* _BIG_ENDIAN */
 
 
-#if	!defined(__amd64) || !defined(_KERNEL)
+#if	defined(__amd64) && defined(_KERNEL)
+
+#elif defined(__aarch64__) /* && defined(_KERNEL) */
+
+#else /* generic */
+
 /* SHA256 Transform */
 
 static void
@@ -840,18 +852,8 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 			i = buf_len;
 		}
 
-#if !defined(__amd64) || !defined(_KERNEL)
-		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
-			for (; i + buf_limit - 1 < input_len; i += buf_limit) {
-				SHA256Transform(ctx, &input[i]);
-			}
-		} else {
-			for (; i + buf_limit - 1 < input_len; i += buf_limit) {
-				SHA512Transform(ctx, &input[i]);
-			}
-		}
+#if	defined(__amd64) && defined(_KERNEL)
 
-#else
 		uint32_t block_count;
 		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
 			block_count = (input_len - i) >> 6;
@@ -868,7 +870,38 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 				i += block_count << 7;
 			}
 		}
-#endif	/* !__amd64 || !_KERNEL */
+
+#elif defined(__aarch64__) /* && defined(_KERNEL) */
+		/* Why did we make #defines above, only to have this part ? */
+		uint32_t block_count;
+		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+			block_count = (input_len - i) >> 6;
+			if (block_count > 0) {
+				sha256_block_armv8((void *)&ctx->state,
+				    &input[i], block_count);
+				i += block_count << 6;
+			}
+		} else {
+			block_count = (input_len - i) >> 7;
+			if (block_count > 0) {
+				sha512_block_armv8((void *)&ctx->state,
+				    &input[i], block_count);
+				i += block_count << 7;
+			}
+		}
+
+#else
+
+		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
+			for (; i + buf_limit - 1 < input_len; i += buf_limit) {
+				SHA256Transform(ctx, &input[i]);
+			}
+		} else {
+			for (; i + buf_limit - 1 < input_len; i += buf_limit) {
+				SHA512Transform(ctx, &input[i]);
+			}
+		}
+#endif
 
 		/*
 		 * general optimization:
