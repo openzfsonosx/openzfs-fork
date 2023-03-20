@@ -29,7 +29,7 @@
 
 extern int cpu_number(void);
 
-#ifdef __x86_64__
+#if defined(__x86_64__)
 
 #include <i386/cpuid.h>
 
@@ -42,16 +42,23 @@ extern int cpu_number(void);
 	"        popq %%rbx         \n" : \
 	"=a" (a), "=S" (b), "=c" (c), "=d" (d) : "a" (func))
 
-#else /* Add ARM */
+static uint64_t _spl_cpuid_features = 0ULL;
+static uint64_t _spl_cpuid_features_leaf7 = 0ULL;
+static boolean_t _spl_cpuid_has_xgetbv = B_FALSE;
+
+#elif defined(__aarch64__)
+
+#include <sys/simd_aarch64.h>
+
+static uint64_t _spl_cpuid_id_aa64isar0_el1 = 0ULL;
+static uint64_t _spl_cpuid_id_aa64isar1_el1 = 0ULL;
+
+#else
 
 #define	_spl_cpuid(func, a, b, c, d)				\
 	a = b = c = d = 0
 
 #endif
-
-static uint64_t _spl_cpuid_features = 0ULL;
-static uint64_t _spl_cpuid_features_leaf7 = 0ULL;
-static boolean_t _spl_cpuid_has_xgetbv = B_FALSE;
 
 uint32_t
 getcpuid(void)
@@ -78,54 +85,12 @@ getcpuid(void)
 #endif
 }
 
+
+#if defined(__x86_64__)
 uint64_t
 spl_cpuid_features(void)
 {
 	static int first_time = 1;
-
-	_spl_cpuid_has_xgetbv = B_FALSE;
-
-#if defined(__aarch64__)
-
-	if (first_time == 1) {
-		first_time = 0;
-		uint64_t aa64isar0_el1;
-		uint64_t aa64isar1_el1;
-		uint32_t aes, sha1, sha2, sha3, bf16, i8mm;
-
-/* 4,5,6,7 -> GET_BITS(4, 8) */
-#define	GET_BITS(S, F, T) \
-		((S) >> (F)) & ((1 << ((T) - (F))) - 1)
-
-		asm volatile("mrs %0, ID_AA64ISAR0_EL1" :
-		    "=r"(aa64isar0_el1) ::);
-		printf("cpu_features: 0x%016llx \n", aa64isar0_el1);
-
-		aes = GET_BITS(aa64isar0_el1, 4, 8);
-		sha1 = GET_BITS(aa64isar0_el1, 8, 12);
-		sha2 = GET_BITS(aa64isar0_el1, 12, 16);
-		sha3 = GET_BITS(aa64isar0_el1, 32, 36);
-
-		asm volatile("mrs %0, ID_AA64ISAR1_EL1" :
-		    "=r"(aa64isar1_el1) ::);
-		printf("cpu_features: 0x%016llx \n", aa64isar1_el1);
-
-		bf16 = GET_BITS(aa64isar1_el1, 44, 48);
-		i8mm = GET_BITS(aa64isar1_el1, 52, 56);
-
-		printf("cpu_features: %s%s%s%s%s%s%s%s\n",
-		    aes & 3 ? "AES " : "",
-		    aes & 2 ? "PMULL " : "",
-		    sha1    ? "SHA1 " : "",
-		    sha2    ? "SHA256 " : "",
-		    sha2 & 2 ? "SHA512 " : "",
-		    sha3    ? "SHA3 " : "",
-		    bf16    ? "BF16 " : "",
-		    i8mm    ? "I8MM " : "");
-	}
-
-#else /* X64 */
-
 	uint64_t a, b, c, d;
 
 	if (first_time == 1) {
@@ -154,7 +119,6 @@ spl_cpuid_features(void)
 		    _spl_cpuid_features, _spl_cpuid_features_leaf7);
 
 	}
-#endif
 
 	return (_spl_cpuid_features);
 }
@@ -164,3 +128,86 @@ spl_cpuid_leaf7_features(void)
 {
 	return (_spl_cpuid_features_leaf7);
 }
+
+#endif /* x86_64 */
+
+
+#if defined(__aarch64__)
+
+/* 4,5,6,7 -> GET_BITS(4, 8) */
+#define	GET_BITS(S, F, T) \
+		((S) >> (F)) & ((1 << ((T) - (F))) - 1)
+
+uint64_t
+spl_cpuid_id_aa64isar0_el1(void)
+{
+	static int first_time = 1;
+
+	if (first_time == 1) {
+		first_time = 0;
+		uint64_t value;
+		uint32_t aes, sha1, sha2, sha3;
+
+		asm volatile("mrs %0, ID_AA64ISAR0_EL1" :
+		    "=r"(value) ::);
+
+		_spl_cpuid_id_aa64isar0_el1 = value;
+
+		printf("cpu_features0: 0x%016llx \n",
+		    _spl_cpuid_id_aa64isar0_el1);
+
+		aes = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 4, 8);
+		sha1 = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 8, 12);
+		sha2 = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 12, 16);
+		sha3 = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 32, 36);
+
+		printf("cpu_features0: %s%s%s%s%s%s\n",
+		    aes & 3 ? "AES " : "",
+		    aes & 2 ? "PMULL " : "",
+		    sha1    ? "SHA1 " : "",
+		    sha2    ? "SHA256 " : "",
+		    sha2 & 2 ? "SHA512 " : "",
+		    sha3    ? "SHA3 " : "");
+	}
+
+	return (_spl_cpuid_id_aa64isar0_el1);
+}
+
+uint64_t
+spl_cpuid_id_aa64isar1_el1(void)
+{
+	static int first_time = 1;
+
+	if (first_time == 1) {
+		first_time = 0;
+		uint64_t value;
+		uint32_t bf16, i8mm;
+
+		asm volatile("mrs %0, ID_AA64ISAR1_EL1" :
+		    "=r"(value) ::);
+
+		_spl_cpuid_id_aa64isar1_el1 = value;
+
+		printf("cpu_features: 0x%016llx \n",
+		    _spl_cpuid_id_aa64isar1_el1);
+
+		bf16 = GET_BITS(_spl_cpuid_id_aa64isar1_el1, 44, 48);
+		i8mm = GET_BITS(_spl_cpuid_id_aa64isar1_el1, 52, 56);
+
+		printf("cpu_features1: %s%s\n",
+		    bf16 ? "BF16 " : "",
+		    i8mm ? "I8MM " : "");
+	}
+
+	return (_spl_cpuid_id_aa64isar1_el1);
+}
+
+uint64_t
+spl_cpuid_features(void)
+{
+	spl_cpuid_id_aa64isar0_el1();
+	spl_cpuid_id_aa64isar1_el1();
+	return (0ULL);
+}
+
+#endif /* aarch64 */
