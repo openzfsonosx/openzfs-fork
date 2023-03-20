@@ -18,13 +18,14 @@
  * Portions Copyright (c) 2022 Tino Reichardt <milky-zfs@mcmilk.de>
  * - modified assembly to fit into OpenZFS
  */
+#include <sys/asm_linkage.h>
 
 #if defined(__aarch64__)
 
-.text
+SECTION_TEXT
 
-.align	6
-.type	.LK512,%object
+.balign	64
+SET_OBJ(.LK512)
 .LK512:
 	.quad	0x428a2f98d728ae22,0x7137449123ef65cd
 	.quad	0xb5c0fbcfec4d3b2f,0xe9b5dba58189dbbc
@@ -67,12 +68,9 @@
 	.quad	0x4cc5d4becb3e42b6,0x597f299cfc657e2a
 	.quad	0x5fcb6fab3ad6faec,0x6c44198c4a475817
 	.quad	0	// terminator
-.size	.LK512,.-.LK512
+SET_SIZE(.LK512)
 
-.globl	zfs_sha512_block_armv7
-.type	zfs_sha512_block_armv7,%function
-.align	6
-zfs_sha512_block_armv7:
+ENTRY_ALIGN(zfs_sha512_block_armv7, 64)
 	stp	x29,x30,[sp,#-128]!
 	add	x29,sp,#0
 
@@ -1033,13 +1031,10 @@ zfs_sha512_block_armv7:
 	ldp	x27,x28,[x29,#80]
 	ldp	x29,x30,[sp],#128
 	ret
-.size	zfs_sha512_block_armv7,.-zfs_sha512_block_armv7
+SET_SIZE(zfs_sha512_block_armv7)
 
 
-.globl	zfs_sha512_block_armv8
-.type	zfs_sha512_block_armv8,%function
-.align	6
-zfs_sha512_block_armv8:
+ENTRY_ALIGN(zfs_sha512_block_armv8, 64)
 .Lv8_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later
 	stp		x29,x30,[sp,#-16]!
@@ -1061,7 +1056,7 @@ zfs_sha512_block_armv8:
 	rev64		v23.16b,v23.16b
 	b		.Loop_hw
 
-.align	4
+.balign	16
 .Loop_hw:
 	ld1		{v24.2d},[x3],#16
 	subs		x2,x2,#1
@@ -1554,5 +1549,5 @@ zfs_sha512_block_armv8:
 
 	ldr		x29,[sp],#16
 	ret
-.size	zfs_sha512_block_armv8,.-zfs_sha512_block_armv8
+SET_SIZE(zfs_sha512_block_armv8)
 #endif
