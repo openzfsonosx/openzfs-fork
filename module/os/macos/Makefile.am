@@ -86,7 +86,9 @@ macos_zfs_CPPFLAGS+=-arch arm64e -arch x86_64
 macos_zfs_LDFLAGS+=-arch arm64e -arch x86_64
 zfs_ASM_SOURCES_C = \
 	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse2.S \
-	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse41.S
+	%D%/../../icp/asm-aarch64/blake3/b3_aarch64_sse41.S \
+	%D%/../../icp/asm-aarch64/sha2/sha256-armv8.S \
+	%D%/../../icp/asm-aarch64/sha2/sha512-armv8.S
 endif
 
 macos_zfs_LIBS =
@@ -118,8 +120,8 @@ zfs_ASM_SOURCES_AS = \
 	%D%/../../icp/asm-x86_64/modes/aesni-gcm-x86_64.S \
 	%D%/../../icp/asm-x86_64/modes/ghash-x86_64.S \
 	%D%/../../icp/asm-x86_64/modes/gcm_pclmulqdq.S \
-	%D%/../../icp/asm-x86_64/sha2/sha256_impl.S \
-	%D%/../../icp/asm-x86_64/sha2/sha512_impl.S \
+	%D%/../../icp/asm-x86_64/sha2/sha256-x86_64.S \
+	%D%/../../icp/asm-x86_64/sha2/sha512-x86_64.S \
 	%D%/../../icp/asm-x86_64/blake3/blake3_avx2.S \
 	%D%/../../icp/asm-x86_64/blake3/blake3_avx512.S \
 	%D%/../../icp/asm-x86_64/blake3/blake3_sse2.S \
@@ -188,7 +190,7 @@ zfs_common_SRCS = \
 	%D%/../../zfs/refcount.c \
 	%D%/../../zfs/rrwlock.c \
 	%D%/../../zfs/sa.c \
-	%D%/../../zfs/sha256.c \
+	%D%/../../zfs/sha2_zfs.c \
 	%D%/../../zfs/skein_zfs.c \
 	%D%/../../zfs/spa.c \
 	%D%/../../zfs/spa_checkpoint.c \
@@ -236,6 +238,7 @@ zfs_common_SRCS = \
 	%D%/../../zfs/zfs_byteswap.c \
 	%D%/../../zfs/zfs_fm.c \
 	%D%/../../zfs/zfs_fuid.c \
+	%D%/../../zfs/zfs_impl.c \
 	%D%/../../zfs/zfs_ioctl.c \
 	%D%/../../zfs/zfs_log.c \
 	%D%/../../zfs/zfs_onexit.c \
@@ -322,7 +325,6 @@ icp_SRCS = \
 	%D%/../../icp/algs/blake3/blake3.c \
 	%D%/../../icp/algs/blake3/blake3_generic.c \
 	%D%/../../icp/algs/blake3/blake3_impl.c \
-	%D%/../../icp/algs/blake3/blake3_x86-64.c \
 	%D%/../../icp/algs/edonr/edonr.c \
 	%D%/../../icp/algs/modes/cbc.c \
 	%D%/../../icp/algs/modes/ccm.c \
@@ -331,7 +333,9 @@ icp_SRCS = \
 	%D%/../../icp/algs/modes/gcm_generic.c \
 	%D%/../../icp/algs/modes/gcm.c \
 	%D%/../../icp/algs/modes/modes.c \
-	%D%/../../icp/algs/sha2/sha2.c \
+	%D%/../../icp/algs/sha2/sha2_generic.c \
+	%D%/../../icp/algs/sha2/sha256_impl.c \
+	%D%/../../icp/algs/sha2/sha512_impl.c \
 	%D%/../../icp/algs/skein/skein.c \
 	%D%/../../icp/algs/skein/skein_block.c \
 	%D%/../../icp/algs/skein/skein_iv.c \
