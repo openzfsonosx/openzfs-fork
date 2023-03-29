@@ -106,6 +106,7 @@ extern "C" {
 #include <sys/zfs_rlock.h>
 #include <sys/dataset_kstats.h>
 #include <sys/zvol_impl.h>
+#include <sys/nvpair.h>
 
 int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
 
@@ -228,7 +229,8 @@ zfs_boot_fix_paths(nvlist_t *nv, name_entry_t *names)
 	uint_t c, children;
 	uint64_t guid;
 	name_entry_t *ne, *best;
-	char *path, *devid;
+	const char *path;
+	char *devid;
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
@@ -518,7 +520,7 @@ zfs_boot_get_configs(pool_list_t *pl, boolean_t active_ok)
 	uint_t i, nspares, nl2cache;
 	boolean_t config_seen;
 	uint64_t best_txg;
-	char *name, *hostname = NULL;
+	const char *name, *hostname = NULL;
 	uint64_t guid;
 	uint_t children = 0;
 	nvlist_t **child = NULL;
@@ -615,7 +617,7 @@ zfs_boot_get_configs(pool_list_t *pl, boolean_t active_ok)
 				 *	hostname (if available)
 				 */
 				uint64_t state, version, pool_txg;
-				char *comment = NULL;
+				const char *comment = NULL;
 
 				version = fnvlist_lookup_uint64(tmp,
 				    ZPOOL_CONFIG_VERSION);
@@ -1213,7 +1215,8 @@ DSTATIC bool
 zfs_boot_probe_disk(pool_list_t *pools, IOMedia *media)
 {
 	OSString *ospath, *uuid;
-	char *path = 0, *pname;
+	char *path = 0;
+	const char *pname;
 	const char prefix[] = "/private/var/run/disk/by-id/media-";
 	uint64_t this_guid;
 	int num_labels, err, len = 0;
