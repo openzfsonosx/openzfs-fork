@@ -68,7 +68,7 @@ extern uint64_t physmem;
 
 void *zfs_kmem_alloc(size_t size, int kmflags);
 void *zfs_kmem_zalloc(size_t size, int kmflags);
-void zfs_kmem_free(void *buf, size_t size);
+void zfs_kmem_free(const void *buf, size_t size);
 
 void spl_kmem_init(uint64_t);
 void spl_kmem_thread_init(void);

@@ -324,6 +324,12 @@ icp_SRCS = \
 	%D%/../../icp/io/aes.c \
 	%D%/../../icp/io/sha2_mod.c \
 	%D%/../../icp/io/skein_mod.c \
+	%D%/../../icp/algs/aes/aes_impl_aesni.c \
+	%D%/../../icp/algs/aes/aes_impl_aesv8.c \
+	%D%/../../icp/algs/aes/aes_impl_generic.c \
+	%D%/../../icp/algs/aes/aes_impl_x86-64.c \
+	%D%/../../icp/algs/aes/aes_impl.c \
+	%D%/../../icp/algs/aes/aes_modes.c \
 	%D%/../../icp/algs/blake3/blake3.c \
 	%D%/../../icp/algs/blake3/blake3_generic.c \
 	%D%/../../icp/algs/blake3/blake3_impl.c \
@@ -341,15 +347,6 @@ icp_SRCS = \
 	%D%/../../icp/algs/skein/skein.c \
 	%D%/../../icp/algs/skein/skein_block.c \
 	%D%/../../icp/algs/skein/skein_iv.c \
-	%D%/../../icp/algs/sha2/sha2_generic.c \
-	%D%/../../icp/algs/sha2/sha256_impl.c \
-	%D%/../../icp/algs/sha2/sha512_impl.c \
-	%D%/../../icp/algs/aes/aes_impl_aesni.c \
-	%D%/../../icp/algs/aes/aes_impl_aesv8.c \
-	%D%/../../icp/algs/aes/aes_impl_generic.c \
-	%D%/../../icp/algs/aes/aes_impl_x86-64.c \
-	%D%/../../icp/algs/aes/aes_impl.c \
-	%D%/../../icp/algs/aes/aes_modes.c \
 	%D%/../../icp/illumos-crypto.c
 
 lua_SRCS = \

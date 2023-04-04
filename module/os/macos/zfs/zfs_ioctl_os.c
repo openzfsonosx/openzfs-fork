@@ -234,7 +234,7 @@ zfs_ioc_osx_proxy_dataset(const char *unused, nvlist_t *innvl,
     nvlist_t *outnvl)
 {
 	int error;
-	char *osname = NULL;
+	const char *osname = NULL;
 	char value[MAXPATHLEN * 2];
 
 	if (nvlist_lookup_string(innvl,

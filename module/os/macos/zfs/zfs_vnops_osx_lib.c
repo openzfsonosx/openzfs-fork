@@ -196,7 +196,8 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 	// But if we are to check acl, can fill in guids
 	if (VATTR_IS_ACTIVE(vap, va_acl)) {
 		// dprintf("Calling getacl\n");
-		if ((error = zfs_getacl(zp, &vap->va_acl, B_FALSE, NULL))) {
+		if ((error = zfs_getacl(zp, (vsecattr_t *)&vap->va_acl,
+		    B_FALSE, NULL))) {
 			// dprintf("zfs_getacl returned error %d\n", error);
 			error = 0;
 		} else {

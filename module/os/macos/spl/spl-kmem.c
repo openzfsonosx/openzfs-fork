@@ -2691,7 +2691,7 @@ zfs_kmem_alloc(size_t size, int kmflag)
 }
 
 void
-zfs_kmem_free(void *buf, size_t size)
+zfs_kmem_free(const void *buf, size_t size)
 {
 	size_t index;
 	kmem_cache_t *cp;

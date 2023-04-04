@@ -103,7 +103,7 @@ org_openzfsonosx_zfs_zvol_device::init(zvol_state_t *c_zv,
 }
 
 bool
-org_openzfsonosx_zfs_zvol_device::attach(IOService* provider)
+org_openzfsonosx_zfs_zvol_device::attach(IOService *provider)
 {
 	OSDictionary *protocolCharacteristics = 0;
 	OSDictionary *deviceCharacteristics = 0;
@@ -112,8 +112,7 @@ org_openzfsonosx_zfs_zvol_device::attach(IOService* provider)
 	const OSSymbol *propSymbol = 0;
 	OSString *dataString = 0;
 	OSNumber *dataNumber = 0;
-
-	char product_name[strlen(ZVOL_PRODUCT_NAME_PREFIX) + MAXPATHLEN + 1];
+	char product_name[MAXPATHLEN + 1];
 
 	if (!provider) {
 		dprintf("ZVOL attach missing provider\n");
