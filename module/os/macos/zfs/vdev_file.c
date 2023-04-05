@@ -233,7 +233,7 @@ vdev_file_io_start(zio_t *zio)
 	vdev_file_t *vf = vd->vdev_tsd;
 
 #ifdef CLOSE_ON_UNMOUNT
-	if (vf->vf_file == NULL) {
+	if (vf != NULL && vf->vf_file == NULL) {
 		zfs_file_t *fp = NULL;
 		int error;
 
@@ -392,14 +392,16 @@ vdev_file_close_all_impl(vdev_t *vd)
 		if (vd->vdev_ops == &vdev_file_ops) {
 			vdev_file_t *vf;
 			vf = vd->vdev_tsd;
-			zfs_file_t *fp = vf->vf_file;
-			if (fp != NULL) {
-				atomic_cas_ptr(&vf->vf_file, fp, NULL);
-				if (vf->vf_file == NULL) {
-					zfs_file_close(fp);
-					printf("closed '%s' "
-					    "(close_on_unmount)\n",
-					    vd->vdev_path);
+			if (vf != NULL) {
+				zfs_file_t *fp = vf->vf_file;
+				if (fp != NULL) {
+					atomic_cas_ptr(&vf->vf_file, fp, NULL);
+					if (vf->vf_file == NULL) {
+						zfs_file_close(fp);
+						printf("closed '%s' "
+						    "(close_on_unmount)\n",
+						    vd->vdev_path);
+					}
 				}
 			}
 		}
