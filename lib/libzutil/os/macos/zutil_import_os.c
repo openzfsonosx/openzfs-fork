@@ -313,8 +313,8 @@ zpool_open_func(void *arg)
 	 * Add additional entries for paths described by this label.
 	 */
 	if (rn->rn_labelpaths) {
-		char *path = NULL;
-		char *devid = NULL;
+		const char *path = NULL;
+		const char *devid = NULL;
 		char *env = NULL;
 		rdsk_node_t *slice;
 		avl_index_t where;
@@ -566,7 +566,8 @@ void
 update_vdev_config_dev_strs(nvlist_t *nv)
 {
 	vdev_dev_strs_t vds;
-	char *env, *type, *path;
+	char *env;
+	const char *type, *path;
 	uint64_t wholedisk = 0;
 
 	/*

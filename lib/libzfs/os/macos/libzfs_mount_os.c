@@ -418,7 +418,7 @@ do_mount(zfs_handle_t *zhp, const char *dir, const char *optptr, int mflag)
 	int devdisk = ZFS_DEVDISK_POOLONLY;
 	int ispool = 0;  // the pool dataset, that is
 	int optlen = 0;
-	char *value = NULL;
+	const char *value = NULL;
 	nvlist_t *args = NULL;
 
 	assert(spec != NULL);

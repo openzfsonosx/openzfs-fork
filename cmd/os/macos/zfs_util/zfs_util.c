@@ -478,7 +478,7 @@ retry:
 	(void) close(fd);
 
 	if (config != NULL) {
-		char *name;
+		const char *name;
 		ret = FSUR_RECOGNIZED;
 		args->pool_guid = (nvlist_lookup_uint64(config,
 		    ZPOOL_CONFIG_POOL_GUID, &guid) == 0) ? guid : 0;
