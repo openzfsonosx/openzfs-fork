@@ -29,12 +29,11 @@
  * C source files are here: https://github.com/mcmilk/BLAKE3-tests
  */
 
+#include <sys/asm_linkage.h>
+
 #if defined(__aarch64__)
-	.text
-	.globl	zfs_blake3_compress_in_place_sse2
-	.p2align	2
-	.type	zfs_blake3_compress_in_place_sse2,@function
-zfs_blake3_compress_in_place_sse2:
+
+ENTRY_ALIGN(zfs_blake3_compress_in_place_sse2, 4)
 	.cfi_startproc
 	sub	sp, sp, #80
 	stp	x30, x19, [sp, #64]
@@ -57,30 +56,29 @@ zfs_blake3_compress_in_place_sse2:
 	ldp	x30, x19, [sp, #64]
 	add	sp, sp, #80
 	ret
-.Lfunc_end0:
-	.size	zfs_blake3_compress_in_place_sse2, .Lfunc_end0-zfs_blake3_compress_in_place_sse2
+Lfunc_end0:
+SET_SIZE(zfs_blake3_compress_in_place_sse2)
 	.cfi_endproc
 
-	.section	.rodata.cst16,"aM",@progbits,16
-	.p2align	4
-.LCPI1_0:
+SECTION_STATIC1(.rodata.cst16,"aM",@progbits,16)
+	.balign	16
+LCPI1_0:
 	.xword	-4942790177982912921
 	.xword	-6534734903820487822
-.LCPI1_1:
+LCPI1_1:
 	.xword	0
 	.xword	-4294967296
-.LCPI1_2:
+LCPI1_2:
 	.xword	-1
 	.xword	4294967295
-	.text
-	.p2align	2
-	.type	compress_pre,@function
-compress_pre:
+SECTION_TEXT
+	.balign	16
+FUNCTION(compress_pre)
 	.cfi_startproc
 	ldr	q2, [x1]
-	adrp	x9, .LCPI1_0
+	adrp	x9, LCPI1_0 PAGE
 	fmov	s1, w3
-	ldr	q3, [x9, :lo12:.LCPI1_0]
+	ldr	q3, [x9, :lo12:LCPI1_0 PAGEOFF]
 	str	q2, [x0]
 	ldr	q6, [x1, #16]
 	lsr	x8, x4, #32
@@ -94,9 +92,9 @@ compress_pre:
 	str	q6, [x0, #16]
 	add	x9, x2, #32
 	ldp	q5, q7, [x2]
-	adrp	x8, .LCPI1_2
+	adrp	x8, LCPI1_2 PAGE
 	ld2	{ v17.4s, v18.4s }, [x9]
-	ldr	q1, [x8, :lo12:.LCPI1_2]
+	ldr	q1, [x8, :lo12:LCPI1_2 PAGEOFF]
 	uzp1	v16.4s, v5.4s, v7.4s
 	uzp2	v5.4s, v5.4s, v7.4s
 	ext	v20.16b, v18.16b, v18.16b, #12
@@ -192,10 +190,10 @@ compress_pre:
 	ext	v7.16b, v7.16b, v7.16b, #12
 	ushr	v21.4s, v20.4s, #7
 	shl	v20.4s, v20.4s, #25
-	adrp	x10, .LCPI1_1
+	adrp	x10, LCPI1_1 PAGE
 	add	v7.4s, v7.4s, v5.4s
 	orr	v20.16b, v20.16b, v21.16b
-	ldr	q23, [x10, :lo12:.LCPI1_1]
+	ldr	q23, [x10, :lo12:LCPI1_1 PAGEOFF]
 	ext	v18.16b, v18.16b, v18.16b, #8
 	add	v7.4s, v7.4s, v20.4s
 	eor	v18.16b, v18.16b, v7.16b
@@ -532,14 +530,11 @@ compress_pre:
 	stp	q0, q3, [x0]
 	stp	q2, q1, [x0, #32]
 	ret
-.Lfunc_end1:
-	.size	compress_pre, .Lfunc_end1-compress_pre
+Lfunc_end1:
+SET_SIZE(compress_pre)
 	.cfi_endproc
 
-	.globl	zfs_blake3_compress_xof_sse2
-	.p2align	2
-	.type	zfs_blake3_compress_xof_sse2,@function
-zfs_blake3_compress_xof_sse2:
+ENTRY_ALIGN(zfs_blake3_compress_xof_sse2, 4)
 	.cfi_startproc
 	sub	sp, sp, #96
 	str	x30, [sp, #64]
@@ -572,22 +567,18 @@ zfs_blake3_compress_xof_sse2:
 	ldp	x20, x19, [sp, #80]
 	add	sp, sp, #96
 	ret
-.Lfunc_end2:
-	.size	zfs_blake3_compress_xof_sse2, .Lfunc_end2-zfs_blake3_compress_xof_sse2
+Lfunc_end2:
+SET_SIZE(zfs_blake3_compress_xof_sse2)
 	.cfi_endproc
 
-	.section	.rodata.cst16,"aM",@progbits,16
-	.p2align	4
-.LCPI3_0:
+SECTION_STATIC1(.rodata.cst16,"aM",@progbits,16)
+	.balign	16
+LCPI3_0:
 	.word	0
 	.word	1
 	.word	2
 	.word	3
-	.text
-	.globl	zfs_blake3_hash_many_sse2
-	.p2align	2
-	.type	zfs_blake3_hash_many_sse2,@function
-zfs_blake3_hash_many_sse2:
+ENTRY_ALIGN(zfs_blake3_hash_many_sse2, 4)
 	.cfi_startproc
 	stp	d15, d14, [sp, #-160]!
 	stp	d13, d12, [sp, #16]
@@ -632,11 +623,11 @@ zfs_blake3_hash_many_sse2:
 	cmp	x1, #4
 	orr	w8, w7, w6
 	str	w8, [sp, #60]
-	b.lo	.LBB3_6
+	b.lo	LBB3_6
 	sbfx	w8, w5, #0, #1
 	dup	v0.4s, w8
-	adrp	x8, .LCPI3_0
-	ldr	q1, [x8, :lo12:.LCPI3_0]
+	adrp	x8, LCPI3_0 PAGE
+	ldr	q1, [x8, :lo12:LCPI3_0 PAGEOFF]
 	mov	w8, #58983
 	movk	w8, #27145, lsl #16
 	dup	v2.4s, w8
@@ -654,8 +645,8 @@ zfs_blake3_hash_many_sse2:
 	str	q0, [sp, #16]
 	stp	q2, q1, [sp, #80]
 	str	q3, [sp, #64]
-	b	.LBB3_3
-.LBB3_2:
+	b	LBB3_3
+LBB3_2:
 	zip1	v1.4s, v0.4s, v4.4s
 	zip2	v0.4s, v0.4s, v4.4s
 	zip1	v2.4s, v18.4s, v17.4s
@@ -683,8 +674,8 @@ zfs_blake3_hash_many_sse2:
 	stp	q2, q6, [x26, #64]
 	stp	q0, q5, [x26, #96]
 	add	x26, x26, #128
-	b.ls	.LBB3_6
-.LBB3_3:
+	b.ls	LBB3_6
+LBB3_3:
 	mov	x9, x21
 	ld1r	{ v0.4s }, [x9], #4
 	add	x10, x21, #8
@@ -700,7 +691,7 @@ zfs_blake3_hash_many_sse2:
 	ld1r	{ v15.4s }, [x14]
 	ld1r	{ v4.4s }, [x9]
 	ld1r	{ v7.4s }, [x15]
-	cbz	x22, .LBB3_2
+	cbz	x22, LBB3_2
 	ldr	q5, [sp, #32]
 	dup	v1.4s, w20
 	ldp	x10, x11, [x24]
@@ -718,7 +709,7 @@ zfs_blake3_hash_many_sse2:
 	sub	v1.4s, v2.4s, v1.4s
 	mov	x14, x22
 	str	q1, [sp, #112]
-.LBB3_5:
+LBB3_5:
 	subs	x14, x14, #1
 	csel	w0, w27, wzr, eq
 	orr	w0, w0, w17
@@ -1987,21 +1978,21 @@ zfs_blake3_hash_many_sse2:
 	add	x9, x9, #64
 	mov	w17, w19
 	prfm	pldl1keep, [x0, #256]
-	cbnz	x14, .LBB3_5
-	b	.LBB3_2
-.LBB3_6:
-	cbz	x23, .LBB3_14
+	cbnz	x14, LBB3_5
+	b	LBB3_2
+LBB3_6:
+	cbz	x23, LBB3_14
 	and	x29, x5, #0x1
-.LBB3_8:
+LBB3_8:
 	ldp	q0, q1, [x21]
 	ldr	x25, [x24]
 	ldr	w5, [sp, #60]
 	mov	x8, x22
 	stp	q0, q1, [sp, #432]
-	b	.LBB3_11
-.LBB3_9:
+	b	LBB3_11
+LBB3_9:
 	orr	w5, w5, w27
-.LBB3_10:
+LBB3_10:
 	add	x0, sp, #464
 	add	x1, sp, #432
 	mov	w3, #64
@@ -2016,17 +2007,17 @@ zfs_blake3_hash_many_sse2:
 	eor	v0.16b, v2.16b, v0.16b
 	eor	v1.16b, v3.16b, v1.16b
 	stp	q0, q1, [sp, #432]
-.LBB3_11:
+LBB3_11:
 	subs	x28, x8, #1
-	b.eq	.LBB3_9
-	cbnz	x8, .LBB3_10
+	b.eq	LBB3_9
+	cbnz	x8, LBB3_10
 	ldp	q0, q1, [sp, #432]
 	add	x20, x20, x29
 	add	x24, x24, #8
 	subs	x23, x23, #1
 	stp	q0, q1, [x26], #32
-	b.ne	.LBB3_8
-.LBB3_14:
+	b.ne	LBB3_8
+LBB3_14:
 	add	sp, sp, #528
 	ldp	x20, x19, [sp, #144]
 	ldp	x22, x21, [sp, #128]
@@ -2039,8 +2030,10 @@ zfs_blake3_hash_many_sse2:
 	ldp	d13, d12, [sp, #16]
 	ldp	d15, d14, [sp], #160
 	ret
-.Lfunc_end3:
-	.size	zfs_blake3_hash_many_sse2, .Lfunc_end3-zfs_blake3_hash_many_sse2
+Lfunc_end3:
+SET_SIZE(zfs_blake3_hash_many_sse2)
 	.cfi_endproc
+#ifdef __ELF__
 	.section	".note.GNU-stack","",@progbits
+#endif
 #endif
