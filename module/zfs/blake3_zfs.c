@@ -49,7 +49,7 @@ abd_checksum_blake3_native(abd_t *abd, uint64_t size, const void *ctx_template,
 {
 	ASSERT(ctx_template != NULL);
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) && !(defined(__APPLE__) && defined(__aarch64__))
 	BLAKE3_CTX *ctx = blake3_per_cpu_ctx[CPU_SEQID_UNSTABLE];
 #else
 	BLAKE3_CTX *ctx = kmem_alloc(sizeof (*ctx), KM_SLEEP);
@@ -59,7 +59,9 @@ abd_checksum_blake3_native(abd_t *abd, uint64_t size, const void *ctx_template,
 	(void) abd_iterate_func(abd, 0, size, blake3_incremental, ctx);
 	Blake3_Final(ctx, (uint8_t *)zcp);
 
-#if !defined(_KERNEL)
+#if defined(_KERNEL) && !(defined(__APPLE__) && defined(__aarch64__))
+	/* To keep conditionals the same */
+#else
 	memset(ctx, 0, sizeof (*ctx));
 	kmem_free(ctx, sizeof (*ctx));
 #endif
