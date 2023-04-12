@@ -985,7 +985,7 @@ zpool_disable_volumes(zfs_handle_t *nzhp, void *data)
 
 		}
 	}
-	(void) zfs_iter_children(nzhp, 0, zpool_disable_volumes, data);
+	(void) zfs_iter_children_v2(nzhp, 0, zpool_disable_volumes, data);
 	zfs_close(nzhp);
 	return (0);
 }

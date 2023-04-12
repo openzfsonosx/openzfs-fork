@@ -124,6 +124,6 @@ typedef	short			index_t;
 	{ ptr } - offsetof(type, member)))
 
 typedef struct timespec inode_timespec_t;
-typedef void zuserns_t;
+typedef void zidmap_t;
 
 #endif	/* _SPL_TYPES_H */

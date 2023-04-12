@@ -809,11 +809,6 @@ SYSCTL_UINT(_tunable, OID_AUTO, top_maxinflight, CTLFLAG_RWTUN,
     &zfs_vdev_max_active, 0,
     "The maximum number of I/Os of all types active for each device. (LEGACY)");
 
-extern uint_t zfs_vdev_def_queue_depth;
-SYSCTL_INT(_tunable_zfs_vdev, OID_AUTO, def_queue_depth, CTLFLAG_RWTUN,
-    &zfs_vdev_def_queue_depth, 0,
-    "Default queue depth for each allocator");
-
 /*extern uint64_t zfs_multihost_history;
 SYSCTL_UQUAD(_tunable, OID_AUTO, multihost_history, CTLFLAG_RWTUN,
     &zfs_multihost_history, 0,
