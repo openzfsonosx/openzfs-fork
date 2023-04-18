@@ -450,8 +450,11 @@ zfs_zrele_async(znode_t *zp)
 
 	ASSERT(os != NULL);
 
+	if (vp == NULL)
+		return;
+
 	/* If iocount > 1, AND, vp is set (not async_get) */
-	if (vp != NULL && vnode_iocount(vp) > 1) {
+	if (vnode_iocount(vp) > 1) {
 		VN_RELE(vp);
 		return;
 	}
