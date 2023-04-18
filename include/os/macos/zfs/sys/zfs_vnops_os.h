@@ -252,6 +252,9 @@ extern int zpl_xattr_set(struct vnode *ip, const char *name,
     zfs_uio_t *uio, int flags, cred_t *cr);
 extern const char *zpl_xattr_prefixname(const char *name);
 
+extern void zfs_findernotify_refresh(struct mount *mp);
+
+
 #ifdef	__cplusplus
 }
 #endif

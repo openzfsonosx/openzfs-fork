@@ -2733,6 +2733,10 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, dsl_dataset_t *ds)
 
 	cache_purgevfs(zfsvfs->z_parent->z_vfs);
 
+	/* Also issue an FSEvent so Finder updates */
+	zfs_findernotify_refresh(zfsvfs->z_parent->z_vfs);
+
+
 bail:
 	/* release the VFS ops */
 	rw_exit(&zfsvfs->z_teardown_inactive_lock);

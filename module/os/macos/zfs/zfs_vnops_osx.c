@@ -176,7 +176,7 @@ static boolean_t	zfs_findernotify_thread_exit;
 static int
 zfs_findernotify_callback(mount_t mp, __unused void *arg)
 {
-	vfs_context_t kernelctx = spl_vfs_context_kernel();
+	vfs_context_t kernelctx = NULL;
 	struct vnode *rootvp, *vp;
 	znode_t *zp = NULL;
 
@@ -194,7 +194,7 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	char tname[MFSNAMELEN] = { 0 };
 	vfs_name(mp, tname);
 	if (strncmp(tname, "zfs", MFSNAMELEN) != 0)
-		return (VFS_RETURNED);
+		return (SET_ERROR(VFS_RETURNED));
 
 	/*
 	 * The first entry in struct zfsvfs is the vfs ptr, so they
@@ -202,16 +202,11 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	 */
 	if (!zfsvfs ||
 	    (mp != zfsvfs->z_vfs))
-		return (VFS_RETURNED);
-
-	// Filesystem ZFS? Confirm the location of root_id in zfsvfs
-	if (zfsvfs->z_root != INO_ROOT)
-		return (VFS_RETURNED);
-
+		return (SET_ERROR(VFS_RETURNED));
 
 	/* Guard against unmount */
 	if (zfs_enter(zfsvfs, FTAG) != 0)
-		return (VFS_RETURNED);
+		return (SET_ERROR(VFS_RETURNED));
 
 	/* Check if space usage has changed enough to bother updating */
 	uint64_t refdbytes, availbytes, usedobjs, availobjs;
@@ -225,9 +220,15 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	}
 
 #define	ZFS_FINDERNOTIFY_THRESHOLD (1ULL<<20)
+#define	ZFS_FINDERNOTIFY_REFRESH 1ULL
 
-	/* Under the limit ? */
-	if (delta <= ZFS_FINDERNOTIFY_THRESHOLD) goto out;
+	boolean_t refresh = B_FALSE;
+
+	if (zfsvfs->z_findernotify_space == ZFS_FINDERNOTIFY_REFRESH)
+		refresh = B_TRUE;
+
+	/* Under the limit ? (and not a refresh) */
+	if (!refresh && delta <= ZFS_FINDERNOTIFY_THRESHOLD) goto out;
 
 	/* Over threashold, so we will notify finder, remember value */
 	zfsvfs->z_findernotify_space = availbytes;
@@ -236,7 +237,8 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	if (availbytes == delta)
 		goto out;
 
-	dprintf("ZFS: findernotify %p space delta %llu\n", mp, delta);
+	printf("ZFS: findernotify %p space delta %llu %s\n", mp, delta,
+	    refresh ? "(forced refresh)" : "");
 
 	// Grab the root zp
 	if (zfs_zget(zfsvfs, zfsvfs->z_root, &zp) == 0) {
@@ -244,7 +246,15 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 		rootvp = ZTOV(zp);
 
 		struct componentname cn;
-		char *tmpname = ".fseventsd";
+		char *tmpname;
+
+		/* To refresh finder space values, use fsevents, otherwise . */
+		if (refresh)
+			tmpname = ".";
+		else
+			tmpname = ".fseventsd";
+
+		kernelctx = vfs_context_create((vfs_context_t)0);
 
 		memset(&cn, 0, sizeof (cn));
 		cn.cn_nameiop = LOOKUP;
@@ -267,7 +277,6 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 			// Send event
 			spl_vnode_notify(vp, VNODE_EVENT_ATTRIB,
 			    &vattr);
-
 			// Cleanup vp
 			vnode_put(vp);
 
@@ -276,14 +285,15 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 		// Cleanup rootvp
 		vnode_put(rootvp);
 
+		(void) vfs_context_rele(kernelctx);
+
 	} // VFS_ROOT
 
 out:
 	zfs_exit(zfsvfs, FTAG);
 
-	return (VFS_RETURNED);
+	return (SET_ERROR(VFS_RETURNED));
 }
-
 
 static void
 zfs_findernotify_thread(void *notused)
@@ -312,6 +322,23 @@ zfs_findernotify_thread(void *notused)
 	CALLB_CPR_EXIT(&cpr);		/* drops arc_reclaim_lock */
 	dprintf("ZFS: findernotify thread exit\n");
 	thread_exit();
+}
+
+
+/* Uses the thread as not to block in vfs_iterate() */
+void
+zfs_findernotify_refresh(struct mount *mp)
+{
+	zfsvfs_t *zfsvfs = vfs_fsprivate(mp);
+
+	dprintf("%s\n", __func__);
+
+	/* Make sure it thinks delta needs updating */
+	zfsvfs->z_findernotify_space = ZFS_FINDERNOTIFY_REFRESH;
+
+	/* Wake up thread */
+	cv_broadcast(&zfs_findernotify_thread_cv);
+
 }
 
 void
