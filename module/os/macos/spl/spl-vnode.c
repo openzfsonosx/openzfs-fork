@@ -97,6 +97,7 @@ VOP_LOOKUP(struct vnode *dvp, struct vnode **vpp,
 {
 	char *path = IOMalloc(MAXPATHLEN);
 	char *lookup_name = cn->cn_nameptr;
+	int result = 0;
 
 	/*
 	 * Lookup a name, to get vnode.
@@ -107,9 +108,8 @@ VOP_LOOKUP(struct vnode *dvp, struct vnode **vpp,
 	 * We could re-write that code to use /absolute/path.
 	 */
 	if (dvp != NULL) {
-		int result, len;
+		int len = MAXPATHLEN;
 
-		len = MAXPATHLEN;
 		result = vn_getpath(dvp, path, &len);
 		if (result != 0) {
 			IOFree(path, MAXPATHLEN);
@@ -121,8 +121,11 @@ VOP_LOOKUP(struct vnode *dvp, struct vnode **vpp,
 
 		lookup_name = path;
 	}
+
+	result = vnode_lookup(lookup_name, 0, vpp, ct);
+
 	IOFree(path, MAXPATHLEN);
-	return (vnode_lookup(lookup_name, 0, vpp, ct));
+	return (result);
 }
 
 void
