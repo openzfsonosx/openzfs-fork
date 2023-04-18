@@ -2027,6 +2027,9 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 		}
 	}
 
+	/* best effort before lock held  - see below */
+	cache_purgevfs(zfsvfs->z_parent->z_vfs);
+
 	rrm_enter(&zfsvfs->z_teardown_lock, RW_WRITER, FTAG);
 
 	if (!unmounting) {
@@ -2036,7 +2039,12 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 		 * v_vfsp set to the parent's filesystem's vfsp.  Note,
 		 * 'z_parent' is self referential for non-snapshots.
 		 */
-		cache_purgevfs(zfsvfs->z_parent->z_vfs);
+		/*
+		 * This can deadlock, for example from rollback, as we
+		 * hold teardown lock above and vfs_iterate() will call
+		 * into ZFS when releasing nodes e.g. zfs_vnop_pageout()
+		 */
+		/* cache_purgevfs(zfsvfs->z_parent->z_vfs); */
 	}
 
 	/*
