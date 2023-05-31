@@ -280,7 +280,7 @@ function do_prune
 function copy_fix_libraries
 {
     echo "Fixing external libraries ... "
-    fixlib=$(otool -L ${codesign_files} | egrep '/usr/local/opt/|/opt/local/lib/' |awk '{print $1;}' | grep '\.dylib$' | sort | uniq)
+    fixlib=$(otool -L ${codesign_files} | egrep '/usr/local/opt/|/opt/local/lib/|/opt/local/libexec/' |awk '{print $1;}' | grep '\.dylib$' | sort | uniq)
 
     # Add the libs into codesign list - both to be codesigned, and updated
     # between themselves (libssl depends on libcrypt)
