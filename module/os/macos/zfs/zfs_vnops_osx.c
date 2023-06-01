@@ -237,7 +237,7 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	if (availbytes == delta)
 		goto out;
 
-	printf("ZFS: findernotify %p space delta %llu %s\n", mp, delta,
+	dprintf("ZFS: findernotify %p space delta %llu %s\n", mp, delta,
 	    refresh ? "(forced refresh)" : "");
 
 	// Grab the root zp
