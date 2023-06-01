@@ -1309,6 +1309,7 @@ zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
 	    portable_mac, local_mac, FALSE));
 }
 
+#ifdef _KERNEL
 int
 zio_crypt_do_objset_hmacs_errata1(zio_crypt_key_t *key, void *data,
     uint_t datalen, boolean_t should_bswap, uint8_t *portable_mac,
@@ -1318,6 +1319,7 @@ zio_crypt_do_objset_hmacs_errata1(zio_crypt_key_t *key, void *data,
 	return (zio_crypt_do_objset_hmacs_impl(key, data, datalen, should_bswap,
 	    portable_mac, local_mac, TRUE));
 }
+#endif
 
 static void
 zio_crypt_destroy_uio(zfs_uio_t *uio)
