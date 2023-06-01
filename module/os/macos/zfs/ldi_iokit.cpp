@@ -1758,26 +1758,27 @@ handle_get_media_info_ext_iokit(struct ldi_handle *lhp,
 
 	LH_MEDIA(lhp)->retain();
 
+	if ((blksize = LH_MEDIA(lhp)->getPreferredBlockSize()) == 0) {
+	    printf("zfs: %s invalid blocksize\n", __func__);
+	    LH_MEDIA(lhp)->release();
+	    return (ENXIO);
+	}
+
 	prop = LH_MEDIA(lhp)->getProperty(kIOPropertyPhysicalBlockSizeKey,
 	    gIOServicePlane, kIORegistryIterateRecursively |
 	    kIORegistryIterateParents);
 
 	number = OSDynamicCast(OSNumber, prop);
+
 	if (!prop || !number) {
-		printf("zfs: %s couldn't get physical blocksize\n", __func__);
-		LH_MEDIA(lhp)->release();
-		return (ENXIO);
+	    printf("zfs: %s couldn't get physical blocksize - using preferred\n", __func__);
+	    pblksize = blksize;
+	} else {
+	    pblksize = number->unsigned32BitValue();
 	}
 
-	pblksize = number->unsigned32BitValue();
 	number = 0;
 	prop = 0;
-
-	if ((blksize = LH_MEDIA(lhp)->getPreferredBlockSize()) == 0) {
-		printf("zfs: %s invalid blocksize\n", __func__);
-		LH_MEDIA(lhp)->release();
-		return (ENXIO);
-	}
 
 	if ((blkcount = LH_MEDIA(lhp)->getSize() / blksize) == 0) {
 		printf("ZFS: %s invalid block count\n", __func__);

@@ -299,7 +299,12 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 		    &vdev_disk_off_callb, (void *) vd, &lcb->lcb_id);
 	}
 
+	/* We openeded, reset offline */
+	/* macOS is unsure why we have to set this when disk comes back */
+	vd->vdev_remove_wanted = B_FALSE;
+
 skip_open:
+
 	/*
 	 * Determine the actual size of the device.
 	 */
