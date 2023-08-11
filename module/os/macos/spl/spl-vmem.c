@@ -2508,39 +2508,78 @@ int vmem_rescale_minshift = 3;
 
 /*
  * Resize vmp's hash table to keep the average lookup depth near 1.0.
+ *
+ * The decision to exit early, before allocating a new table, is done outside
+ * a mutex lock. The calculation of memory that should be allocated and the
+ * allocation itself is also done outside the lock. The allocation CANNOT be
+ * safely done under this mutex, and there is no reason to lock the subsequent
+ * memset.
+ *
+ * However, another thread (including ones possible awakened by the
+ * cv_broadcast() in our caller vmem_update()) can change the number of bytes
+ * allcated or freed in our vmem arena; enough of a downward change (e.g. from
+ * reaping after a reduction of ARC frees many scatter ABDs) will cause our
+ * previous outside-the-lock new_table allocation to be the wrong size,
+ * potentially leading to a loss of information about vmem_alloc_impl()
+ * allocations made before we acquire vmp->vm_lock.  In turn, this leads
+ * to a panic when doing a vmem_free_impl() on an improperly-recorded segment.
+ *
+ * Consequently once we hold vmp->vm_lock we must recalculate new_size and
+ * compare that with the previously-calculated nolock_new_size. If they do
+ * not match we must clean up and return rather than attempt to use new_table.
  */
 static void
 vmem_hash_rescale(vmem_t *vmp)
 {
-	vmem_seg_t **old_table, **new_table, *vsp;
-	size_t old_size, new_size, h, nseg;
+	vmem_seg_t **new_table, *vsp;
 
-	nseg = (size_t)(vmp->vm_kstat.vk_alloc.value.ui64 -
+	const size_t nolock_nseg =
+	    (size_t)(vmp->vm_kstat.vk_alloc.value.ui64 -
 	    vmp->vm_kstat.vk_free.value.ui64);
 
-	new_size = MAX(VMEM_HASH_INITIAL, 1 << (highbit(3 * nseg + 4) - 2));
-	old_size = vmp->vm_hash_mask + 1;
+	const size_t nolock_new_size = MAX(VMEM_HASH_INITIAL,
+	    1 << (highbit(3 * nolock_nseg + 4) - 2));
+	const size_t nolock_old_size = vmp->vm_hash_mask + 1;
 
-	if ((old_size >> vmem_rescale_minshift) <= new_size &&
-	    new_size <= (old_size << 1))
+	if ((nolock_old_size >> vmem_rescale_minshift) <= nolock_new_size &&
+	    nolock_new_size <= (nolock_old_size << 1))
 		return;
 
-	new_table = vmem_alloc_impl(vmem_hash_arena, new_size * sizeof (void *),
+	new_table = vmem_alloc_impl(vmem_hash_arena,
+	    nolock_new_size * sizeof (void *),
 	    VM_NOSLEEP);
 	if (new_table == NULL)
 		return;
-	memset(new_table, 0, new_size * sizeof (void *));
+	memset(new_table, 0, nolock_new_size * sizeof (void *));
 
 	mutex_enter(&vmp->vm_lock);
 
-	old_size = vmp->vm_hash_mask + 1;
-	old_table = vmp->vm_hash_table;
+	const size_t nseg = (size_t)(vmp->vm_kstat.vk_alloc.value.ui64 -
+	    vmp->vm_kstat.vk_free.value.ui64);
+
+	const size_t new_size =  MAX(VMEM_HASH_INITIAL,
+	    1 << (highbit(3 * nseg + 4) - 2));
+
+	if (new_size != nolock_new_size) {
+		printf("ZFS: SPL: %s:%d:%s:"
+		    " race condition found: %s, %ld, %ld\n",
+		    __FILE__, __LINE__, __func__,
+		    vmp->vm_name,
+		    nolock_new_size, new_size);
+		mutex_exit(&vmp->vm_lock);
+		vmem_free_impl(vmem_hash_arena, new_table,
+		    nolock_new_size * sizeof (void *));
+		return;
+	}
+
+	const size_t old_size = vmp->vm_hash_mask + 1;
+	vmem_seg_t **old_table = vmp->vm_hash_table;
 
 	vmp->vm_hash_mask = new_size - 1;
 	vmp->vm_hash_table = new_table;
 	vmp->vm_hash_shift = highbit(vmp->vm_hash_mask);
 
-	for (h = 0; h < old_size; h++) {
+	for (size_t h = 0; h < old_size; h++) {
 		vsp = old_table[h];
 		while (vsp != NULL) {
 			uintptr_t addr = vsp->vs_start;
@@ -2574,8 +2613,15 @@ vmem_update(void *dummy)
 		 * If threads are waiting for resources, wake them up
 		 * periodically so they can issue another kmem_reap()
 		 * to reclaim resources cached by the slab allocator.
+		 *
+		 * In general it is good practice to take the associated
+		 * lock before calling cv_broadcast().  Here it gives any
+		 * waiters a good shot at the lock that may be (re-)taken
+		 * by this thread in vmem_hash_rescale() function.
 		 */
+		mutex_enter(&vmp->vm_lock);
 		cv_broadcast(&vmp->vm_cv);
+		mutex_exit(&vmp->vm_lock);
 
 		/*
 		 * Rescale the hash table to keep the hash chains short.
@@ -2639,18 +2685,29 @@ spl_vmem_bucket_arena_by_size(size_t size)
 	return (vmem_bucket_arena_by_size(size));
 }
 
+/*
+ * We have just freed memory back to macOS so we let any waiters on the
+ * lowest-level bucket arenas know they have a chance to make progress in
+ * their hunt for memory from the operating system. We then tell the heap that
+ * there may be memory freshly imported into the buckets.
+ *
+ * This function broadcasts to waiters on the smallest-span buckets first, and
+ * because of mutex-ordering this biases towards small-allocation kmem caches.
+ */
 static inline void
 vmem_bucket_wake_all_waiters(void)
 {
 	for (int i = VMEM_BUCKET_LOWBIT; i < VMEM_BUCKET_HIBIT; i++) {
 		const int bucket = i - VMEM_BUCKET_LOWBIT;
 		vmem_t *bvmp = vmem_bucket_arena[bucket];
+		mutex_enter(&bvmp->vm_lock);
 		cv_broadcast(&bvmp->vm_cv);
+		mutex_exit(&bvmp->vm_lock);
 	}
+	mutex_enter(&spl_heap_arena->vm_lock);
 	cv_broadcast(&spl_heap_arena->vm_cv);
+	mutex_exit(&spl_heap_arena->vm_lock);
 }
-
-
 
 static void *
 xnu_alloc_throttled(vmem_t *bvmp, size_t size, int vmflag)

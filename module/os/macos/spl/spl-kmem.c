@@ -1791,12 +1791,24 @@ kmem_depot_ws_zero(kmem_cache_t *cp)
 }
 
 /*
- * The number of bytes to reap before we call kpreempt(). The default (1MB)
- * causes us to preempt reaping up to hundres of times per second.  Using a
- * larger value (1GB) causes this to have virtually no effect.
+ * The number of bytes to reap before we call kpreempt().
+ *
+ * There is a tradeoff between potentially many many preempts when giving
+ * freeing a large amount of ARC scatter ABDs (the preempts slightly slow down
+ * the return of memory to parent arenas during a larger reap, which in turn
+ * slightly delays the return of memory to the operating system) versus
+ * letting other threads on low-core-count machines make forward progress
+ * (which was upstream's goal when reap preemption was first introduced) or
+ * (in more modern times) gaining efficiencies in busy high-core-count
+ * machines that can have many threads allocating while an inevitably
+ * long-lived reap is in progress, narrowing the possibility of destroying
+ * kmem structures that might have to be rebuilt during the next preemption.
+ *
+ * Historically 1M was the value from upstream, which was increased for o3x
+ * for performance reasons. The reap mechanisms have evolved such that 1M
+ * is once again the better default.
  */
-size_t kmem_reap_preempt_bytes = 64 * 1024 * 1024;
-
+size_t kmem_reap_preempt_bytes = 1024 * 1024;
 
 /*
  * Reap all magazines that have fallen out of the depot's working set.
@@ -4500,7 +4512,9 @@ spl_free_set_pressure(int64_t new_p)
 		spl_free_fast_pressure = FALSE;
 		// wake up both spl_free_thread() to recalculate spl_free
 		// and any spl_free_set_and_wait_pressure() threads
-		cv_broadcast(&spl_free_thread_cv);
+		mutex_enter(&spl_free_thread_lock);
+		cv_signal(&spl_free_thread_cv);
+		mutex_exit(&spl_free_thread_lock);
 	}
 	spl_free_last_pressure = zfs_lbolt();
 }
