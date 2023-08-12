@@ -23,6 +23,6 @@ mount_zfs: macos_mount_zfs
 
 INSTALL_DATA_HOOKS += mount_zfs-install-exec-hook
 mount_zfs-install-exec-hook:
-	mkdir -p $(DESTDIR)/$(sbindir)/
+	mkdir -p $(FS_BUNDLEDIR)/Contents/Resources
 	cp -f $(DESTDIR)/$(sbindir)/macos_mount_zfs $(DESTDIR)/$(sbindir)/mount_zfs
 	cp -f $(DESTDIR)/$(sbindir)/mount_zfs $(FS_BUNDLEDIR)/Contents/Resources/mount_zfs
