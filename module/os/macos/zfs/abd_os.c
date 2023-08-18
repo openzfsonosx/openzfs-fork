@@ -410,7 +410,7 @@ abd_init(void)
 
 #ifdef _KERNEL
 /* This must all match spl-seg_kmem.c : segkmem_abd_init() */
-#define	SMALL_RAM_MACHINE (4096ULL * 1024ULL * 1024ULL * 1024ULL)
+#define	SMALL_RAM_MACHINE (4ULL * 1024ULL * 1024ULL * 1024ULL)
 
 	extern uint64_t total_memory;
 
