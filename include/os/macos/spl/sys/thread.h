@@ -77,25 +77,55 @@ typedef void (*thread_func_t)(void *);
 
 #ifdef SPL_DEBUG_THREAD
 
-#define	thread_create(A, B, C, D, E, F, G, H) \
+#define	thread_create(A, B, C, D, E, F, G, H)			\
     spl_thread_create_named(__FILE__, A, B, C, D, E, G, __FILE__, __LINE__, H)
 #define	thread_create_named(name, A, B, C, D, E, F, G, H)	\
     spl_thread_create_named(name, A, B, C, D, E, G, __FILE__, __LINE__, H)
+#define	thread_create_named_with_extpol_and_qos(name,		\
+    S, T, Q, A, B, C, D, E, F, G)				\
+	spl_thread_create_named_with_extpol_and_qos(S, T, Q,	\
+	    name, A, B, C, D, E, F,  __FILE__, __LINE__, G)
 
 extern kthread_t *spl_thread_create_named(const char *name,
     caddr_t stk, size_t stksize,
-    void (*proc)(void *), void *arg, size_t len, /* proc_t *pp, */ int state,
+    thread_func_t proc, void *arg, size_t len, /* proc_t *pp, */ int state,
+    const char *, int, pri_t pri);
+
+extern kthread_t *spl_thread_create_named_with_extpol_and_qos(
+    thread_extended_policy_t tmsharepol,
+    thread_throughput_qos_policy_t thoughpol,
+    thread_latency_qos_t latpol,
+    const char *name,
+    caddr_t stk, size_t stksize,
+    thread_func_t proc, void *arg, size_t len, /* proc_t *pp, */ int state,
     const char *, int, pri_t pri);
 
 #else
 
-#define	thread_create(A, B, C, D, E, F, G, H) \
-    spl_thread_create_named(__FILE__, A, B, C, D, E, G, H)
+#define	thread_create(A, B, C, D, E, F, G, H)			\
+	spl_thread_create_named(__FILE__, A, B, C, D, E, G, H)
 #define	thread_create_named(name, A, B, C, D, E, F, G, H)	\
-    spl_thread_create_named(name, A, B, C, D, E, G, H)
+	spl_thread_create_named(name, A, B, C, D, E, G, H)
+#define	thread_create_named_with_extpol_and_qos(name,		\
+    S, T, Q, A, B, C, D, E, F, G)				\
+	spl_thread_create_named_with_extpol_and_qos(		\
+	    S, T, Q, name, A, B, C, D, E, F, G)
+
 extern kthread_t *spl_thread_create_named(const char *name,
     caddr_t stk, size_t stksize,
-    void (*proc)(void *), void *arg, size_t len, /* proc_t *pp, */ int state,
+    thread_func_t proc, void *arg, size_t len,
+	/* proc_t *pp, */
+    int state,
+    pri_t pri);
+
+extern kthread_t *spl_thread_create_named_with_extpol_and_qos(
+    thread_extended_policy_t tmsharepol,
+    thread_throughput_qos_policy_t thoughpol,
+    thread_latency_qos_policy_t latpol,
+    const char *name,
+    caddr_t stk, size_t stksize,
+    thread_func_t proc,
+    void *arg, size_t len, /* proc_t *pp, */ int state,
     pri_t pri);
 
 #endif
@@ -128,24 +158,16 @@ extern void spl_thread_exit(void) __attribute__((noreturn));
 
 extern kthread_t *spl_current_thread(void);
 
-extern void set_thread_importance_named(thread_t, pri_t, const char *);
-extern void set_thread_importance(thread_t, pri_t);
+extern void spl_set_thread_importance(thread_t, pri_t, const char *);
 
-extern void set_thread_throughput_named(thread_t,
-    thread_throughput_qos_t, const char *);
-extern void set_thread_throughput(thread_t,
-    thread_throughput_qos_t);
+extern void spl_set_thread_timeshare(thread_t,
+    thread_extended_policy_data_t *, const char *);
 
-extern void set_thread_latency_named(thread_t,
-    thread_latency_qos_t, const char *);
-extern void set_thread_latency(thread_t,
-    thread_latency_qos_t);
+extern void spl_set_thread_throughput(thread_t,
+    thread_throughput_qos_policy_data_t *, const char *);
 
-extern void set_thread_timeshare_named(thread_t,
-    const char *);
-extern void set_thread_timeshare(thread_t);
-
-extern void spl_throttle_set_thread_io_policy(int);
+extern void spl_set_thread_latency(thread_t,
+    thread_latency_qos_policy_data_t *, const char *);
 
 #define	delay osx_delay
 extern void osx_delay(int);

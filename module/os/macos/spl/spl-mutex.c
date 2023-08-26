@@ -39,6 +39,13 @@
 // Not defined in headers
 extern boolean_t lck_mtx_try_lock(lck_mtx_t *lck);
 
+/*
+ * SPL mutexes: use the XNU interface, rather than the ones below,
+ * initialized in spl-osx.c and used in spl-thread.c
+ */
+lck_grp_attr_t	*spl_mtx_grp_attr;
+lck_attr_t	*spl_mtx_lck_attr;
+lck_grp_t	*spl_mtx_grp;
 
 static lck_attr_t	*zfs_lock_attr = NULL;
 static lck_grp_attr_t	*zfs_group_attr = NULL;
@@ -148,13 +155,14 @@ spl_mutex_subsystem_init(void)
 	mutex_list_mutex.m_initialised = MUTEX_INIT;
 	cv_init(&mutex_list_cv, NULL, CV_DEFAULT, NULL);
 
-	(void) thread_create(NULL, 0, spl_wdlist_check, 0, 0, 0, 0,
-	    maxclsyspri);
-#endif
+	/* create without timesharing or qos */
+	(void) thread_create_named_with_extpol_and_qos(
+	    "spl_wdlist_check (mutex)",
+	    NULL, NULL, NULL,
+	    NULL, 0, spl_wdlist_check, NULL, 0, 0, maxclsyspri);
+#endif /* SPL_DEBUG_MUTEX */
 	return (0);
 }
-
-
 
 void
 spl_mutex_subsystem_fini(void)

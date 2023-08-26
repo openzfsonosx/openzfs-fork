@@ -1868,178 +1868,159 @@ taskq_thread_wait(taskq_t *tq, kmutex_t *mx, kcondvar_t *cv,
 }
 
 #ifdef __APPLE__
-/*
- * Adjust thread policies for SYSDC and BATCH task threads
- */
 
 /*
- * from osfmk/kern/thread.[hc] and osfmk/kern/ledger.c
- *
- * limit [is] a percentage of CPU over an interval in nanoseconds
- *
- * in particular limittime = (interval_ns * percentage) / 100
- *
- * when a thread has enough cpu time accumulated to hit limittime,
- * ast_taken->thread_block is seen in a stackshot (e.g. spindump)
- *
- * thread.h 204:#define MINIMUM_CPULIMIT_INTERVAL_MS 1
- *
- * Illumos's sysdc updates its stats every 20 ms
- * (sysdc_update_interval_msec)
- * which is the tunable we can deal with here; xnu will
- * take care of the bookkeeping and the amount of "break",
- * which are the other Illumos tunables.
+ * Create a thread with appropriate importance and QOS
  */
-#define	CPULIMIT_INTERVAL (MSEC2NSEC(100ULL))
-#define	THREAD_CPULIMIT_BLOCK 0x1
 
-#if defined(MACOS_IMPURE)
-extern int thread_set_cpulimit(int action, uint8_t percentage,
-    uint64_t interval_ns);
-#endif
-
-static void
-taskq_thread_set_cpulimit(taskq_t *tq)
+static kthread_t *
+spl_taskq_thread_create_named(const char *name,
+    taskq_t *tq,
+    caddr_t stk,
+    size_t stksize,
+    thread_func_t proc,
+    void *arg,
+    size_t len,
+    int state,
+    pri_t pri)
 {
-	if (tq->tq_flags & TASKQ_DUTY_CYCLE) {
+
+	kthread_t *new_thread = NULL;
+	/*
+	 * We pass pri along, but use it to determine
+	 * what QOS to pass along as well
+	 */
+
+	if (pri < minclsyspri) {
+		/*
+		 * these are dsl_scan asynchronous reads,
+		 * and need neither QOS nor timesharing
+		 */
+		thread_extended_policy_data_t timeshare = {
+			.timeshare = 0,
+		};
+		new_thread =
+		    spl_thread_create_named_with_extpol_and_qos(
+		    &timeshare, NULL, NULL,
+		    name, stk, stksize, proc, arg, len, state, pri);
+	} else if (tq->tq_maxsize == 1 &&
+	    (tq->tq_flags & (TASKQ_DYNAMIC
+	    | TASKQ_THREADS_CPU_PCT
+	    | TASKQ_DUTY_CYCLE
+	    | TASKQ_DC_BATCH)) == 0) {
+		/*
+		 * This is a strict-FIFO taskq, which should be held at a
+		 * stable priority so that the immediately previous job on
+		 * this sole worker thread has not left the scheduler with the
+		 * wrong opinion of the job that is to come.  TIMESHARE could
+		 * let a well-behaved previous job might lead to an
+		 * over-prioritization of the subsequent job.
+		 */
+		thread_extended_policy_data_t timeshare = {
+			.timeshare = 0,
+		};
+		new_thread =
+		    spl_thread_create_named_with_extpol_and_qos(
+		    &timeshare, NULL, NULL,
+		    name, stk, stksize, proc, arg, len, state, pri);
+	} else if (tq->tq_flags & TASKQ_DC_BATCH) {
+		/*
+		 * Batch SDC scheduling class,
+		 * CPU intensive but not latency sensitive
+		 */
 		ASSERT3U(tq->tq_DC, <=, 100);
 		ASSERT3U(tq->tq_DC, >, 0);
-#if defined(MACOS_IMPURE)
-		const uint8_t inpercent = MIN(100, MAX(tq->tq_DC, 1));
-		const uint64_t interval_ns = CPULIMIT_INTERVAL;
+
+		int pri_pct = (maxclsyspri * tq->tq_DC) / 100 - 1;
+		if (pri_pct < minclsyspri)
+			pri_pct = minclsyspri;
+		if (pri_pct >= maxclsyspri)
+			pri_pct = maxclsyspri - 1;
+
+		thread_throughput_qos_policy_data_t throughpol = {
+			.thread_throughput_qos_tier =
+			THROUGHPUT_QOS_TIER_2,
+		};
+
+		thread_latency_qos_policy_data_t latpol = {
+			.thread_latency_qos_tier =
+			LATENCY_QOS_TIER_3,
+		};
+
+		thread_extended_policy_data_t timeshare = {
+			.timeshare = 0,
+		};
+
+		new_thread =
+		    spl_thread_create_named_with_extpol_and_qos(
+		    &timeshare, &throughpol, &latpol,
+		    name, stk, stksize, proc, arg, len, state, pri_pct);
+	} else if (tq->tq_flags & TASKQ_DUTY_CYCLE) {
 		/*
-		 * deflate tq->tq_DC (a percentage of cpu) by the
-		 * ratio of max_ncpus (logical cpus) to physical_ncpu.
-		 *
-		 * we don't want hyperthread resources to get starved
-		 * out by a large DUTY CYCLE, and we aren't doing
-		 * processor set pinning of threads to CPUs of either
-		 * type (neither does Illumos, but sysdc does take
-		 * account of psets when calculating the duty cycle,
-		 * and I don't know how to do that yet).
-		 *
-		 * do some scaled integer division to get
-		 * decpct = percent/(maxcpus/physcpus)
+		 * SDC scheduling class, the sysdc threads.
+		 * This is cpu-intensive workload.
+		 * We need the "duty cycle" (DC)
+		 * from tq->tq_DC, which is a percentage
+		 * of CPU
 		 */
-		const uint64_t numcpus = max_ncpus - num_ecores;
-		const uint64_t m100 = (uint64_t)numcpus * 100ULL;
-		const uint64_t r100 = m100 / (MAX(numcpus/2, 1));
-		const uint64_t pct100 = inpercent * 100ULL;
-		const uint64_t decpct = pct100 / r100;
-		uint8_t percent = MIN(decpct, inpercent);
-		ASSERT3U(percent, <=, 100);
-		ASSERT3U(percent, >, 0);
+		ASSERT3U(tq->tq_DC, <=, 100);
+		ASSERT3U(tq->tq_DC, >, 0);
 
-		int ret = thread_set_cpulimit(THREAD_CPULIMIT_BLOCK,
-		    percent, interval_ns);
-#else
-		int ret = 45; // ENOTSUP -- XXX todo: drop priority?
-#endif
+		thread_throughput_qos_t tqos;
 
-		if (ret != KERN_SUCCESS) {
-			printf("SPL: %s:%d: WARNING"
-			    " thread_set_cpulimit returned %d\n",
-			    __func__, __LINE__, ret);
+		int pri_pct = (maxclsyspri * tq->tq_DC) / 100 - 1;
+		if (pri_pct < minclsyspri)
+			pri_pct = minclsyspri;
+		if (pri_pct >= maxclsyspri)
+			pri_pct = maxclsyspri - 1;
+
+		if (pri < defclsyspri) {
+			tqos = THROUGHPUT_QOS_TIER_4;
+		} else if (pri < maxclsyspri) {
+			tqos = THROUGHPUT_QOS_TIER_3;
+		} else {
+			tqos = THROUGHPUT_QOS_TIER_2;
 		}
+
+		thread_throughput_qos_policy_data_t throughpol = {
+			.thread_throughput_qos_tier = tqos,
+		};
+
+		/* no latency, default timeshare */
+		new_thread =
+		    spl_thread_create_named_with_extpol_and_qos(
+		    NULL, &throughpol, NULL,
+		    name, stk, stksize, proc, arg, len, state, pri_pct);
+	} else if (pri < maxclsyspri) {
+		/* just a default thread */
+		new_thread =
+		    spl_thread_create_named_with_extpol_and_qos(
+		    NULL, NULL, NULL,
+		    name, stk, stksize, proc, arg, len, state, pri);
+	} else {
+		/*
+		 * maxclsyspri, low latency ("LEGACY" aka "USER_INITIATED")
+		 */
+
+		thread_latency_qos_policy_data_t latpol = {
+			.thread_latency_qos_tier =
+			LATENCY_QOS_TIER_1,
+		};
+
+		new_thread =
+		    spl_thread_create_named_with_extpol_and_qos(
+		    NULL, NULL, &latpol,
+		    name, stk, stksize, proc, arg, len, state, pri);
 	}
-}
-
-/*
- * Set up xnu thread importance,
- * throughput and latency QOS.
- *
- * Approximate Illumos's SYSDC
- * (/usr/src/uts/common/disp/sysdc.c)
- *
- * SYSDC tracks cpu runtime itself, and yields to
- * other threads if
- * onproc time / (onproc time + runnable time)
- * exceeds the Duty Cycle threshold.
- *
- * Approximate this by
- * [a] setting a thread_cpu_limit percentage,
- * [b] setting the thread precedence
- * slightly higher than normal,
- * [c] setting the thread throughput and latency policies
- * just less than USER_INTERACTIVE, and
- * [d] turning on the
- * TIMESHARE policy, which adjusts the thread
- * priority based on cpu usage.
- */
-
-static void
-set_taskq_thread_attributes(thread_t thread, taskq_t *tq)
-{
-	pri_t pri = tq->tq_pri;
-
-	if (tq->tq_flags & TASKQ_DUTY_CYCLE) {
-		taskq_thread_set_cpulimit(tq);
+	if (!new_thread) {
+		printf("SPL: %s:%s:%d: unable to create thread"
+		    " '%s', pri %d, DC %d, flags %x\n",
+		    __FILE__, __func__, __LINE__,
+		    (name == NULL) ? "unammed tq thread" : name,
+		    pri, tq->tq_DC, tq->tq_flags);
 	}
 
-	if (tq->tq_flags & TASKQ_DC_BATCH)
-		pri--;
-
-	set_thread_importance_named(thread,
-	    pri, tq->tq_name);
-
-	/*
-	 * TIERs: 0 is USER_INTERACTIVE, 1 is USER_INITIATED, 1 is LEGACY,
-	 *        2 is UTILITY, 5 is BACKGROUND, 5 is MAINTENANCE
-	 */
-	const thread_throughput_qos_t std_throughput = THROUGHPUT_QOS_TIER_1;
-	const thread_throughput_qos_t sysdc_throughput = THROUGHPUT_QOS_TIER_1;
-	const thread_throughput_qos_t batch_throughput = THROUGHPUT_QOS_TIER_2;
-	const thread_throughput_qos_t minpri_throughput = batch_throughput;
-	const thread_throughput_qos_t dsl_scan_iss_throughput =
-	    THROUGHPUT_QOS_TIER_5;
-
-	if (tq->tq_flags & TASKQ_DC_BATCH)
-		set_thread_throughput_named(thread,
-		    batch_throughput, tq->tq_name);
-	else if (tq->tq_flags & TASKQ_DUTY_CYCLE)
-		set_thread_throughput_named(thread,
-		    sysdc_throughput, tq->tq_name);
-	else if (pri == minclsyspri)
-		set_thread_throughput_named(thread,
-		    minpri_throughput, tq->tq_name);
-	else if (pri < minclsyspri)
-		set_thread_throughput_named(thread,
-		    dsl_scan_iss_throughput, tq->tq_name);
-	else
-		set_thread_throughput_named(thread,
-		    std_throughput, tq->tq_name);
-
-	/*
-	 * TIERs: 0 is USER_INTERACTIVE, 1 is USER_INITIATED,
-	 *        1 is LEGACY, 3 is UTILITY, 3 is BACKGROUND,
-	 *        5 is MAINTENANCE
-	 */
-	const thread_latency_qos_t batch_latency = LATENCY_QOS_TIER_3;
-	const thread_latency_qos_t std_latency = LATENCY_QOS_TIER_1;
-	const thread_latency_qos_t minpri_latency = batch_latency;
-	const thread_latency_qos_t dsl_scan_iss_latency = LATENCY_QOS_TIER_5;
-
-	if (tq->tq_flags & TASKQ_DC_BATCH)
-		set_thread_latency_named(thread,
-		    batch_latency, tq->tq_name);
-	else if (pri == minclsyspri)
-		set_thread_latency_named(thread,
-		    minpri_latency, tq->tq_name);
-	else if (pri < minclsyspri)
-		set_thread_latency_named(thread,
-		    dsl_scan_iss_latency, tq->tq_name);
-	else
-		set_thread_latency_named(thread,
-		    std_latency, tq->tq_name);
-
-	/*
-	 * Passivate I/Os for this thread
-	 * (Default is IOPOOL_IMPORTANT)
-	 */
-	spl_throttle_set_thread_io_policy(IOPOL_PASSIVE);
-
-	set_thread_timeshare_named(thread,
-	    tq->tq_name);
+	return (new_thread);
 }
 
 #endif // __APPLE__
@@ -2057,10 +2038,6 @@ taskq_thread(void *arg)
 	callb_cpr_t cprinfo;
 	hrtime_t start, end;
 	boolean_t freeit;
-
-#ifdef __APPLE__
-	set_taskq_thread_attributes(current_thread(), tq);
-#endif
 
 	CALLB_CPR_INIT(&cprinfo, &tq->tq_lock, callb_generic_cpr,
 	    tq->tq_name);
@@ -2796,11 +2773,10 @@ taskq_bucket_extend(void *arg)
 	 * for it to be initialized (below).
 	 */
 	tqe->tqent_thread = (kthread_t *)0xCEDEC0DE;
-	thread = thread_create_named(tq->tq_name,
-	    NULL, 0, (void (*)(void *))taskq_d_thread,
-	    tqe, 0, pp0, TS_RUN, tq->tq_pri);
 
-	set_taskq_thread_attributes(thread, tq);
+	thread = spl_taskq_thread_create_named(tq->tq_name,
+	    tq, NULL, 0, (thread_func_t)taskq_d_thread, tqe,
+	    0, TS_RUN, tq->tq_pri);
 #else
 
 	/*

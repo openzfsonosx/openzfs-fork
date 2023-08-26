@@ -36,15 +36,141 @@
 #include <sys/systm.h>
 #include <TargetConditionals.h>
 #include <AvailabilityMacros.h>
+#include <sys/mutex.h>
 
 uint64_t zfs_threads = 0;
+
+typedef struct initialize_thread_args {
+	lck_mtx_t *lck;
+	const char *child_name;
+	thread_func_t proc;
+	void *arg;
+	pri_t pri;
+	int state;
+	thread_extended_policy_t tmsharepol;
+	thread_throughput_qos_policy_t throughpol;
+	thread_latency_qos_policy_t latpol;
+	int child_done;
+	void *wait_channel;
+#ifdef SPL_DEBUG_THREAD
+	const char *caller_filename;
+	int caller_line;
+#endif
+} initialize_thread_args_t;
+
+/*
+ * do setup work inside the child thread, then launch
+ * the work, proc(arg)
+ */
+void
+spl_thread_setup(void *v, wait_result_t wr)
+{
+
+	/* we have been created!  sanity check and take lock */
+	spl_data_barrier();
+	VERIFY3P(v, !=, NULL);
+
+	initialize_thread_args_t *a = v;
+
+	lck_mtx_lock(a->lck);
+	spl_data_barrier();
+
+	/* set things up */
+
+	if (a->child_name == NULL)
+		a->child_name = "anonymous zfs thread";
+
+#if	defined(MAC_OS_X_VERSION_10_15) &&				\
+	(MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_15)
+	thread_set_thread_name(current_thread(), a->child_name);
+#endif
+
+	spl_set_thread_importance(current_thread(), a->pri, a->child_name);
+
+	if (a->tmsharepol) {
+		spl_set_thread_timeshare(current_thread(),
+		    a->tmsharepol, a->child_name);
+	}
+
+	if (a->throughpol) {
+		if (a->tmsharepol) {
+			ASSERT(a->tmsharepol->timeshare);
+		}
+		spl_set_thread_throughput(current_thread(),
+		    a->throughpol, a->child_name);
+	}
+
+	if (a->latpol) {
+		if (a->tmsharepol) {
+			ASSERT(a->tmsharepol->timeshare);
+		}
+		spl_set_thread_latency(current_thread(),
+		    a->latpol, a->child_name);
+	}
+
+	/* save proc and args */
+
+	thread_func_t proc = a->proc;
+	void *arg = a->arg;
+
+	/* set done with setup flag, wake parent, release lck */
+
+	a->child_done = 1;
+	spl_data_barrier();
+	wakeup_one(a->wait_channel);
+	spl_data_barrier();
+	lck_mtx_unlock(a->lck);
+
+	/* jump to proc, which doesn't come back here */
+
+	proc(arg);
+	__builtin_unreachable();
+	panic("SPL: proc called from spl_thread_setup() returned");
+}
 
 kthread_t *
 spl_thread_create_named(
     const char *name,
     caddr_t stk,
     size_t stksize,
-    void (*proc)(void *),
+    thread_func_t proc,
+    void *arg,
+    size_t len,
+    int state,
+#ifdef SPL_DEBUG_THREAD
+    const char *filename,
+    int line,
+#endif
+    pri_t pri)
+{
+	thread_extended_policy_data_t tmsharepol = {
+		.timeshare = TRUE
+	};
+
+	return (spl_thread_create_named_with_extpol_and_qos(
+	    &tmsharepol, NULL, NULL,
+	    name, stk, stksize, proc, arg,
+	    len, state,
+#ifdef SPL_DEBUG_THREAD
+	    filename, line,
+#endif
+	    pri));
+}
+
+/*
+ * For each of the first three args, if NULL then kernel default
+ *
+ * no timesharing, no throughput qos, no latency qos
+ */
+kthread_t *
+spl_thread_create_named_with_extpol_and_qos(
+    thread_extended_policy_t tmsharepol,
+    thread_throughput_qos_policy_t throughpol,
+    thread_latency_qos_policy_t latpol,
+    const char *name,
+    caddr_t stk,
+    size_t stksize,
+    thread_func_t proc,
     void *arg,
     size_t len,
     int state,
@@ -62,24 +188,60 @@ spl_thread_create_named(
 	    filename, line);
 #endif
 
-	result = kernel_thread_start((thread_continue_t)proc, arg, &thread);
+	uint64_t wait_location;
 
-	if (result != KERN_SUCCESS)
-		return (NULL);
+	wrapper_mutex_t lck;
 
-	set_thread_importance_named(thread, pri, "anonymous new zfs thread");
+	lck_mtx_init((lck_mtx_t *)&lck, spl_mtx_grp, spl_mtx_lck_attr);
 
-	if (name == NULL)
-		name = "unnamed zfs thread";
-
-#if	defined(MAC_OS_X_VERSION_10_15) && \
-	(MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_15)
-	thread_set_thread_name(thread, name);
+	initialize_thread_args_t childargs = {
+		.lck = (lck_mtx_t *)&lck,
+		.child_name = name,
+		.proc = proc,
+		.arg = arg,
+		.pri = pri,
+		.state = state,
+		.tmsharepol = tmsharepol,
+		.throughpol = throughpol,
+		.latpol = latpol,
+		.child_done = 0,
+		.wait_channel = &wait_location,
+#ifdef SPL_DEBUG_THREAD
+		.caller_filename = filename,
+		.caller_line = line,
 #endif
+	};
+
+	spl_data_barrier();
+	lck_mtx_lock((lck_mtx_t *)&lck);
+	spl_data_barrier();
+
+	result = kernel_thread_start(spl_thread_setup,
+	    (void *)&childargs, &thread);
+
+	if (result != KERN_SUCCESS) {
+		lck_mtx_unlock((lck_mtx_t *)&lck);
+		lck_mtx_destroy((lck_mtx_t *)&lck, spl_mtx_grp);
+		printf("SPL: %s:%d kernel_thread_start error return %d\n",
+		    __func__, __LINE__, result);
+		return (NULL);
+	}
+
+	for (; ; ) {
+		spl_data_barrier();
+		(void) msleep(&wait_location, (lck_mtx_t *)&lck, PRIBIO,
+		    "spl thread initialization", 0);
+		spl_data_barrier();
+		if (childargs.child_done != 0)
+			break;
+	}
 
 	thread_deallocate(thread);
 
 	atomic_inc_64(&zfs_threads);
+
+	lck_mtx_unlock((lck_mtx_t *)&lck);
+	lck_mtx_destroy((lck_mtx_t *)&lck, spl_mtx_grp);
 
 	return ((kthread_t *)thread);
 }
@@ -120,24 +282,14 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	return ((callout_id_t)arg);
 }
 
-#if defined(MACOS_IMPURE)
-extern void throttle_set_thread_io_policy(int priority);
-#endif
-
-void
-spl_throttle_set_thread_io_policy(int priority)
-{
-#if defined(MACOS_IMPURE)
-	throttle_set_thread_io_policy(priority);
-#endif
-}
-
-
 /*
  * Set xnu kernel thread importance based on openzfs pri_t.
  *
- * Thread importance adjusts upwards and downards from
- * BASEPRI_KERNEL (defined as 81).
+ * Thread importance adjusts upwards and downwards from BASEPRI_KERNEL (defined
+ * as 81).  Higher value is higher priority (e.g. BASEPRI_REALTIME is 96),
+ * BASEPRI_GRAPHICS is 76, and MAXPRI_USER is 63.
+ *
+ * (See osfmk/kern/sched.h)
  *
  * Many important kernel tasks run at BASEPRI_KERNEL,
  * with networking and kernel graphics (Metal etc) running
@@ -153,22 +305,34 @@ spl_throttle_set_thread_io_policy(int priority)
  */
 
 void
-set_thread_importance_named(thread_t thread, pri_t pri, const char *name)
+spl_set_thread_importance(thread_t thread, pri_t pri, const char *name)
 {
 	thread_precedence_policy_data_t policy = { 0 };
 
 	/*
 	 * start by finding an offset from BASEPRI_KERNEL,
 	 * which is found in osfmk/kern/sched.h
+	 *
+	 * (it's 81, importance is a signed-offset from that)
 	 */
 
 	policy.importance = pri - 81;
 
-	/* dont let ANY of our threads run as high as networking & GPU */
+	/*
+	 * dont let ANY of our threads run as high as networking & GPU
+	 *
+	 * hard cap on our maximum priority at 81 (BASEPRI_KERNEL),
+	 * which is then our maxclsyspri.
+	 */
 	if (policy.importance > 0)
 		policy.importance = 0;
-	else if (policy.importance < (-11))
-		policy.importance = -11;
+	/*
+	 * set a floor on importance at priority 60, which is about the same
+	 * as bluetoothd and userland audio, which are of relatively high
+	 * importance.
+	 */
+	else if (policy.importance < (-21))
+		policy.importance = -21;
 
 	int i = policy.importance;
 	kern_return_t pol_prec_kret = thread_policy_set(thread,
@@ -182,84 +346,81 @@ set_thread_importance_named(thread_t thread, pri_t pri, const char *name)
 	}
 }
 
-void
-set_thread_importance(thread_t thread, pri_t pri)
-{
-	set_thread_importance_named(thread, pri, "anonymous zfs thread");
-}
-
 /*
  * Set a kernel throughput qos for this thread,
  */
 
 void
-set_thread_throughput_named(thread_t thread,
-    thread_throughput_qos_t throughput, const char *name)
+spl_set_thread_throughput(thread_t thread,
+    thread_throughput_qos_policy_t throughput, const char *name)
 {
-	/*
-	 * TIERs: 0 is USER_INTERACTIVE, 1 is USER_INITIATED, 1 is LEGACY,
-	 *        2 is UTILITY, 5 is BACKGROUND, 5 is MAINTENANCE
-	 *
-	 *  (from xnu/osfmk/kern/thread_policy.c)
-	 */
 
-	thread_throughput_qos_policy_data_t qosp = { 0 };
-	qosp.thread_throughput_qos_tier = throughput;
+
+	ASSERT(throughput);
+
+	if (!throughput)
+		return;
+
+	if (!name)
+		name = "anonymous zfs thread (throughput)";
+
+	/*
+	 * TIERs:
+	 *
+	 * 0 is USER_INTERACTIVE, 1 is USER_INITIATED, 1 is LEGACY,
+	 * 2 is UTILITY, 5 is BACKGROUND, 5 is MAINTENANCE
+	 *
+	 * (from xnu/osfmk/kern/thread_policy.c)
+	 */
 
 	kern_return_t qoskret = thread_policy_set(thread,
 	    THREAD_THROUGHPUT_QOS_POLICY,
-	    (thread_policy_t)&qosp,
+	    (thread_policy_t)throughput,
 	    THREAD_THROUGHPUT_QOS_POLICY_COUNT);
 	if (qoskret != KERN_SUCCESS) {
 		printf("SPL: %s:%d: WARNING failed to set"
 		    " thread throughput policy retval: %d "
 		    " (THREAD_THROUGHPUT_QOS_POLICY %x), %s\n",
 		    __func__, __LINE__, qoskret,
-		    qosp.thread_throughput_qos_tier, name);
+		    throughput->thread_throughput_qos_tier, name);
 	}
 }
 
 void
-set_thread_throughput(thread_t thread,
-    thread_throughput_qos_t throughput)
+spl_set_thread_latency(thread_t thread,
+    thread_latency_qos_policy_t latency, const char *name)
 {
-	set_thread_throughput_named(thread, throughput,
-	    "anonymous zfs function");
-}
 
-void
-set_thread_latency_named(thread_t thread,
-    thread_latency_qos_t latency, const char *name)
-{
+	ASSERT(latency);
+
+	if (!latency)
+		return;
+
+	if (!name)
+		name = "anonymous zfs thread (latency)";
+
 	/*
-	 * TIERs: 0 is USER_INTERACTIVE, 1 is USER_INITIATED, 1 is LEGACY,
-	 *        3 is UTILITY, 3 is BACKGROUND, 5 is MAINTENANCE
+	 * TIERs:
+	 * 0 is USER_INTERACTIVE, 1 is USER_INITIATED, 1 is LEGACY,
+	 * 3 is UTILITY, 3 is BACKGROUND, 5 is MAINTENANCE
 	 *
-	 *  (from xnu/osfmk/kern/thread_policy.c)
+	 * (from xnu/osfmk/kern/thread_policy.c)
+	 *
 	 * NB: these differ from throughput tier mapping
 	 */
 
-	thread_latency_qos_policy_data_t qosp = { 0 };
-	qosp.thread_latency_qos_tier = latency;
 	kern_return_t qoskret = thread_policy_set(thread,
 	    THREAD_LATENCY_QOS_POLICY,
-	    (thread_policy_t)&qosp,
+	    (thread_policy_t)latency,
 	    THREAD_LATENCY_QOS_POLICY_COUNT);
 	if (qoskret != KERN_SUCCESS) {
 		printf("SPL: %s:%d: WARNING failed to set"
-		    " thread latency policy retval: %d "
-		    " (THREAD_LATENCY_QOS_POLICY %x), %s",
+		    " thread latency policy to %x, retval: %d, '%s'\n",
 		    __func__, __LINE__,
-		    qoskret, qosp.thread_latency_qos_tier,
+		    latency->thread_latency_qos_tier,
+		    qoskret,
 		    name);
 	}
-}
-
-void
-set_thread_latency(thread_t thread,
-    thread_latency_qos_t latency)
-{
-	set_thread_latency_named(thread, latency, "anonymous zfs function");
 }
 
 /*
@@ -272,22 +433,31 @@ set_thread_latency(thread_t thread,
  */
 
 void
-set_thread_timeshare_named(thread_t thread, const char *name)
+spl_set_thread_timeshare(thread_t thread,
+    thread_extended_policy_t policy,
+    const char *name)
 {
-	thread_extended_policy_data_t policy = { .timeshare = TRUE };
+
+	ASSERT(policy);
+
+	if (!policy)
+		return;
+
+	if (!name) {
+		if (policy->timeshare)
+			name = "anonymous zfs thread (timeshare->off)";
+		else
+			name = "anonymous zfs thread (timeshare->on)";
+	}
+
 	kern_return_t kret = thread_policy_set(thread,
 	    THREAD_EXTENDED_POLICY,
-	    (thread_policy_t)&policy,
+	    (thread_policy_t)policy,
 	    THREAD_EXTENDED_POLICY_COUNT);
 	if (kret != KERN_SUCCESS) {
 		printf("SPL: %s:%d: WARNING failed to set"
-		    " timeshare policy retval: %d, %s\n",
-		    __func__, __LINE__, kret, name);
+		    " timeshare policy to %d, retval: %d, %s\n",
+		    __func__, __LINE__, kret,
+		    policy->timeshare, name);
 	}
-}
-
-void
-set_thread_timeshare(thread_t thread)
-{
-	set_thread_timeshare_named(thread, "anonymous zfs function");
 }

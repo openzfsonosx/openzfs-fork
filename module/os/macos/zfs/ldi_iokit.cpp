@@ -1365,7 +1365,7 @@ buf_strategy_iokit(ldi_buf_t *lbp, struct ldi_handle *lhp)
 	}
 
 	if (lbp->b_flags & B_THROTTLED_IO) {
-		ioattr.priority = kIOStoragePriorityLow;
+		ioattr.priority = kIOStoragePriorityBackground - 1;
 	}
 
 	if (lbp->b_flags & B_FUA) {

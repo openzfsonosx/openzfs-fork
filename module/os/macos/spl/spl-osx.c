@@ -435,6 +435,15 @@ spl_start(kmod_info_t *ki, void *d)
 		delay(hz>>1);
 	}
 
+	/*
+	 * special purpose xnu-style locks, separate from the spl-mutex.c
+	 * system, where those are available either late or may require
+	 * memory or thread allocation
+	 */
+	spl_mtx_lck_attr  = lck_attr_alloc_init();
+	spl_mtx_grp_attr = lck_grp_attr_alloc_init();
+	spl_mtx_grp = lck_grp_alloc_init("spl-mutex", spl_mtx_grp_attr);
+
 	while (1) {
 		len = sizeof (total_memory);
 		sysctlbyname("hw.memsize", &total_memory, &len, NULL, 0);
@@ -541,6 +550,13 @@ spl_stop(kmod_info_t *ki, void *d)
 	spl_kmem_fini();
 	spl_kstat_fini();
 	spl_mutex_subsystem_fini();
+
+	lck_attr_free(spl_mtx_lck_attr);
+	spl_mtx_lck_attr = NULL;
+	lck_grp_attr_free(spl_mtx_grp_attr);
+	spl_mtx_grp_attr = NULL;
+	lck_grp_free(spl_mtx_grp);
+	spl_mtx_grp = NULL;
 
 	return (KERN_SUCCESS);
 }

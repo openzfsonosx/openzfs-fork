@@ -149,6 +149,10 @@ struct thread *spl_mutex_owner(kmutex_t *mp);
 int  spl_mutex_subsystem_init(void);
 void spl_mutex_subsystem_fini(void);
 
+extern lck_grp_attr_t	*spl_mtx_grp_attr;
+extern lck_attr_t	*spl_mtx_lck_attr;
+extern lck_grp_t	*spl_mtx_grp;
+
 #ifdef __cplusplus
 }
 #endif
