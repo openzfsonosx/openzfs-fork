@@ -71,12 +71,7 @@ utsname(void)
 void
 osx_delay(int ticks)
 {
-	if (ticks < 2) {
-		// IODelay spins and takes microseconds as an argument
-		// don't spend more than 10msec spinning.
-		IODelay(ticks * 10000);
-		return;
-	}
+	ASSERT3S(ticks, >, 0);
 
 	// ticks are 10 msec units
 	int64_t ticks_to_go = (int64_t)ticks;
@@ -85,11 +80,52 @@ osx_delay(int ticks)
 	int64_t end_tick = start_tick + (int64_t)ticks_to_go;
 
 	do {
-		IOSleep(ticks_to_go);
+		/*
+		 * IOSleepWithLeeway takes() (milliseconds, lw_ms) where the
+		 * leeway in milliseconds lw_ms ultimately results in an
+		 * interval and deadline being given to
+		 * _clock_delay_until_deadline_with_leeway() to schedule a lax
+		 * (TIMEOUT_URGENCY_LEEWAY) wakeup and then does a
+		 * thread_block().
+		 *
+		 * Without the leeway, a strict deadline is scheduled before
+		 * the thread_block().
+		 *
+		 * Both of these options are gentle compared to a spin wait,
+		 * which will happen if the interval given to
+		 * _clock..._leeway(int, dead, lee) is less than the threshold
+		 * from ml_delay_should_spin.
+		 *
+		 * The threshold is short on ARM and is related to CPU idle
+		 * latency.  On i386 it appears to be 10 microseconds by
+		 * default, so also short compared to one tick, which is at
+		 * least ten milliseconds.
+		 *
+		 * We will always IOSleepWithLeeway a minimum amount, even if
+		 * we are invoked with delay(zero-or-negative-value);
+		 */
+
+		bool forced_sleep = false;
+
+		ASSERT3S(ticks_to_go, >, 0);
+		unsigned milliseconds_remaining = ticks_to_go * 10;
+
+		if (milliseconds_remaining < 2) {
+			milliseconds_remaining = 2;
+			forced_sleep = true;
+		}
+
+		ASSERT3U(milliseconds_remaining, <=, 1000 * 60);
+
+		IOSleepWithLeeway(milliseconds_remaining, 1);
+
+		if (forced_sleep)
+			break;
+
 		int64_t cur_tick = (int64_t)zfs_lbolt();
 		ticks_to_go = (end_tick - cur_tick);
-	} while (ticks_to_go > 0);
 
+	} while (ticks_to_go > 0);
 }
 
 

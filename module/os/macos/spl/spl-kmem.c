@@ -29,6 +29,7 @@
  *
  */
 
+#include <IOKit/IOLib.h>
 #include <sys/debug.h>
 #include <sys/cdefs.h>
 #include <sys/cmn_err.h>
@@ -1005,8 +1006,8 @@ kmem_error(int error, kmem_cache_t *cparg, const void *bufarg)
 	}
 
 	if (kmem_panic > 0) {
-		extern  void IODelay(unsigned microseconds); // <IOKit/IOLib.h?
-		IODelay(1000000);
+		/* give time for the logging to register */
+		IODelay(1 * 1000 * 1000);
 		panic("kernel heap corruption detected");
 	}
 
@@ -1829,8 +1830,7 @@ kmem_depot_ws_reap(kmem_cache_t *cp)
 		mtx_contended = true;
 		printf("ZFS: SPL: %s:%s:%d: could not get lock\n",
 		    __FILE__, __func__, __LINE__);
-		extern void IOSleep(unsigned milliseconds);
-		IOSleep(1);
+		IOSleepWithLeeway(1, 1);
 		mutex_enter(&cp->cache_reap_lock);
 	}
 

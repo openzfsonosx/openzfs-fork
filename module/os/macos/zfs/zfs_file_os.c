@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 
+#include <IOKit/IOLib.h>
 #include <sys/zfs_context.h>
 #include <sys/zfs_file.h>
 #include <sys/stat.h>
@@ -26,8 +27,6 @@
 #include <sys/zfs_ioctl.h>
 
 #define	FILE_FD_NOTUSED -1
-
-extern void IOSleep(unsigned milliseconds);
 
 /*
  * Open file
@@ -117,7 +116,7 @@ again:
 		 * but to static sleep until APPLE exports something for us
 		 */
 		if (local_resid == count)
-			IOSleep(1);
+			IOSleepWithLeeway(2, 1);
 
 		buf += count - local_resid;
 		*off += count - local_resid;
@@ -206,7 +205,7 @@ again:
 	if (error == EAGAIN) {
 		/* No progress at all, sleep a bit so we don't busycpu */
 		if (local_resid == count)
-			IOSleep(1);
+			IOSleepWithLeeway(2, 1);
 		buf += count - local_resid;
 		*off += count - local_resid;
 		count -= count - local_resid;

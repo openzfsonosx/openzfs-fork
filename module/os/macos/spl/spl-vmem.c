@@ -212,6 +212,7 @@
  * that even non-DEBUG systems get quite a bit of sanity checking already.
  */
 
+#include <IOKit/IOLib.h>
 #include <sys/vmem_impl.h>
 #include <sys/kmem.h>
 #include <sys/kstat.h>
@@ -454,8 +455,6 @@ extern hrtime_t spl_dynamic_memory_cap_last_downward_adjust;
 extern kmutex_t spl_dynamic_memory_cap_lock;
 extern uint64_t spl_dynamic_memory_cap_reductions;
 extern uint64_t spl_dynamic_memory_cap_hit_floor;
-
-extern void IOSleep(unsigned milliseconds);
 
 #define	INITIAL_BLOCK_SIZE	16ULL*1024ULL*1024ULL
 static char *initial_default_block = NULL;
@@ -1901,9 +1900,8 @@ vmem_alloc_in_worker_thread(vmem_t *vmp, size_t size, int vmflag)
 		    &vmp->vm_cb_busy, &f, true,
 		    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 			/* delay and loop */
-			extern void IODelay(unsigned microseconds);
-			if ((i % 1000) == 0)
-				IOSleep(1); // ms
+			if ((i % 5) == 0)
+				IOSleepWithLeeway(1, 1);
 			else
 				IODelay(1); // us
 			continue;
@@ -2881,7 +2879,7 @@ xnu_alloc_throttled(vmem_t *bvmp, size_t size, int vmflag)
 
 	for (uint64_t loop_for_mem = 1; ; loop_for_mem++) {
 		// ASSERT3U((loop_for_mem % 10), ==, 0); // 1 second bleat beat
-		IOSleep(100); /* sleep 100 milliseconds, hope to free memory */
+		IOSleepWithLeeway(100, 1); /* hope someone frees memory */
 		/* only try to allocate if there is memory */
 		if (fail_at > segkmem_total_mem_allocated) {
 			p = spl_vmem_malloc_unconditionally_unlocked(size);
@@ -3001,7 +2999,7 @@ vmem_bucket_alloc(vmem_t *null_vmp, size_t size, const int vmflags)
 		    16ULL*1024ULL*1024ULL))) {
 			spl_free_set_emergency_pressure(
 			    total_memory >> 7LL);
-			IOSleep(1);
+			IOSleepWithLeeway(2, 1);
 			if (!vmem_canalloc_atomic(bvmp, size) &&
 			    (spl_vmem_xnu_useful_bytes_free() < (MAX(size,
 			    16ULL*1024ULL*1024ULL)))) {
