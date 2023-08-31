@@ -24,7 +24,7 @@
  * Copyright (C) 2008 MacZFS
  * Copyright (C) 2013, 2020 Jorgen Lundman <lundman@lundman.net>
  * Copyright (C) 2014 Brendon Humphrey <brendon.humphrey@mac.com>
- * Copyright (C) 2017, 2021 Sean Doran <smd@use.net>
+ * Copyright (C) 2017, 2021, 2023 Sean Doran <smd@use.net>
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  *
  */
@@ -4253,9 +4253,7 @@ kmem_cache_build_slablist(kmem_cache_t *cp)
 
 	for (sp = list_head(&cp->cache_complete_slabs); sp != NULL;
 	    sp = list_next(&cp->cache_complete_slabs, sp)) {
-
-		MALLOC(fs, struct free_slab *, sizeof (struct free_slab),
-		    M_TEMP, M_WAITOK);
+		fs = IOMallocType(struct free_slab);
 		fs->vmp = vmp;
 		fs->slabsize = cp->cache_slabsize;
 		fs->slab = (void *)P2ALIGN((uintptr_t)sp->slab_base,
@@ -4267,8 +4265,7 @@ kmem_cache_build_slablist(kmem_cache_t *cp)
 	for (sp = avl_first(&cp->cache_partial_slabs); sp != NULL;
 	    sp = AVL_NEXT(&cp->cache_partial_slabs, sp)) {
 
-		MALLOC(fs, struct free_slab *, sizeof (struct free_slab),
-		    M_TEMP, M_WAITOK);
+		fs = IOMallocType(struct free_slab);
 		fs->vmp = vmp;
 		fs->slabsize = cp->cache_slabsize;
 		fs->slab = (void *)P2ALIGN((uintptr_t)sp->slab_base,
@@ -4319,7 +4316,7 @@ kmem_cache_fini()
 		i++;
 		list_remove(&freelist, fs);
 		vmem_free_impl(fs->vmp, fs->slab, fs->slabsize);
-		FREE(fs, M_TEMP);
+		IOFreeType(fs, struct free_slab);
 
 	}
 	printf("SPL: Released %u slabs\n", i);

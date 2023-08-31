@@ -29,6 +29,7 @@
 
 /*
  * Copyright (C) 2015, 2020 Jorgen Lundman <lundman@lundman.net>
+ * Copyright (C) 2023 Sean Doran <smd@use.net>
  */
 
 /*

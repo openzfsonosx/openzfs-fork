@@ -23,9 +23,11 @@
  *
  * Copyright (C) 2008 MacZFS
  * Copyright (C) 2013, 2020 Jorgen Lundman <lundman@lundman.net>
+ * Copyright (C) 2023 Sean Doran <smd@use.net>
  *
  */
 
+#include <IOKit/IOLib.h>
 #include <sys/rwlock.h>
 #include <kern/debug.h>
 #include <sys/atomic.h>
@@ -111,8 +113,7 @@ rw_init(krwlock_t *rwlp, char *name, krw_type_t type, __unused void *arg)
 #ifdef SPL_DEBUG_RWLOCK
 	struct leak *leak;
 
-	MALLOC(leak, struct leak *,
-	    sizeof (struct leak),  M_TEMP, M_WAITOK);
+	leak = IOMallocType(struct leak);
 
 	if (leak) {
 		memset(leak, 0, sizeof (struct leak));
@@ -155,7 +156,7 @@ rw_destroy(krwlock_t *rwlp)
 		list_remove(&rwlock_list, leak);
 		rwlp->leak = NULL;
 		mutex_exit(&rwlock_list_mutex);
-		FREE(leak, M_TEMP);
+		IOFreeType(leak, struct leak);
 	}
 #endif
 }
@@ -364,7 +365,7 @@ spl_rwlock_fini(void)
 				// Same place
 				found++;
 				list_remove(&rwlock_list, runner);
-				FREE(runner, M_TEMP);
+				IOFreeType(runner, struct leak);
 				runner = NULL;
 			} // if same
 
@@ -377,7 +378,7 @@ spl_rwlock_fini(void)
 		    leak->location_line,
 		    found);
 
-		FREE(leak, M_TEMP);
+		IOFreeType(leak, struct leak);
 		total += found;
 
 	}

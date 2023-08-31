@@ -23,6 +23,7 @@
  *
  * Copyright (C) 2013 Jorgen Lundman <lundman@lundman.net>
  * Copyright (C) 2014 Brendon Humphrey <brendon.humphrey@mac.com>
+ * Copyright (C) 2023 Sean Doran <smd@use.net>
  *
  */
 
@@ -30,6 +31,7 @@
  * Provides an implementation of kstat that is backed by OSX sysctls.
  */
 
+#include <IOKit/IOLib.h>
 #include <sys/kstat.h>
 #include <sys/debug.h>
 #include <sys/thread.h>
@@ -37,16 +39,6 @@
 #include <sys/time.h>
 #include <sys/sysctl.h>
 #include <sys/sbuf.h>
-
-/*
- * We need to get dynamically allocated memory from the kernel allocator
- * (Our needs are small, we wont blow the zone_map).
- */
-void *IOMalloc(vm_size_t size);
-void IOFree(void *address, vm_size_t size);
-
-void *IOMallocAligned(vm_size_t size, vm_offset_t alignment);
-void IOFreeAligned(void *address, vm_size_t size);
 
 /*
  * Statically declared toplevel OID that all kstats
@@ -114,11 +106,6 @@ typedef struct ekstat {
 struct sysctl_tree_node		*tree_nodes = 0;
 struct sysctl_oid 		*e_sysctl = 0;
 
-/* sbuf_new() and family does exist in XNU, but Apple wont let us call them */
-#define	M_SBUF		105 /* string buffers */
-#define	SBMALLOC(size)	_MALLOC(size, M_SBUF, M_WAITOK)
-#define	SBFREE(buf)	FREE(buf, M_SBUF)
-
 #define	SBUF_SETFLAG(s, f)	do { (s)->s_flags |= (f); } while (0)
 #define	SBUF_CLEARFLAG(s, f)	do { (s)->s_flags &= ~(f); } while (0)
 #define	SBUF_ISDYNAMIC(s)	((s)->s_flags & SBUF_DYNAMIC)
@@ -170,12 +157,12 @@ sbuf_delete(struct sbuf *s)
 {
 	int isdyn;
 	if (SBUF_ISDYNAMIC(s)) {
-		SBFREE(s->s_buf);
+		IOFreeAligned(s->s_buf, s->s_size);
 	}
 	isdyn = SBUF_ISDYNSTRUCT(s);
 	memset(s, 0, sizeof (*s));
 	if (isdyn) {
-		SBFREE(s);
+		IOFreeType(s, struct sbuf);
 	}
 }
 
@@ -207,13 +194,13 @@ sbuf_extend(struct sbuf *s, int addlen)
 	}
 
 	newsize = sbuf_extendsize(s->s_size + addlen);
-	newbuf = (char *)SBMALLOC(newsize);
+	newbuf = (char *)IOMallocAligned(newsize, _Alignof(char));
 	if (newbuf == NULL) {
 		return (-1);
 	}
 	memcpy(newbuf, s->s_buf, s->s_size);
 	if (SBUF_ISDYNAMIC(s)) {
-		SBFREE(s->s_buf);
+		IOFreeAligned(s->s_buf, s->s_size);
 	} else {
 		SBUF_SETFLAG(s, SBUF_DYNAMIC);
 	}
@@ -227,7 +214,7 @@ sbuf_new(struct sbuf *s, char *buf, int length, int flags)
 {
 	flags &= SBUF_USRFLAGMSK;
 	if (s == NULL) {
-		s = (struct sbuf *)SBMALLOC(sizeof (*s));
+		s = IOMallocType(struct sbuf);
 		if (s == NULL) {
 			return (NULL);
 		}
@@ -246,10 +233,10 @@ sbuf_new(struct sbuf *s, char *buf, int length, int flags)
 	if (flags & SBUF_AUTOEXTEND) {
 		s->s_size = sbuf_extendsize(s->s_size);
 	}
-	s->s_buf = (char *)SBMALLOC(s->s_size);
+	s->s_buf = (char *)IOMallocAligned(s->s_size, _Alignof(char));
 	if (s->s_buf == NULL) {
 		if (SBUF_ISDYNSTRUCT(s)) {
-			SBFREE(s);
+			IOFreeType(s, struct sbuf);
 		}
 		return (NULL);
 	}
