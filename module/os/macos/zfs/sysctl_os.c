@@ -589,14 +589,6 @@ SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, df_free_pct, CTLFLAG_RWTUN,
     "The minimum free space, in percent, which must be available in a "
     "space map to continue allocations in a first-fit fashion");
 
-/*
- * Percentage of all cpus that can be used by the metaslab taskq.
- */
-extern int metaslab_load_pct;
-SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, load_pct, CTLFLAG_RWTUN,
-    &metaslab_load_pct, 0,
-    "Percentage of cpus that can be used by the metaslab taskq");
-
 /* spa.c */
 extern int zfs_ccw_retry_interval;
 SYSCTL_INT(_tunable, OID_AUTO, ccw_retry_interval, CTLFLAG_RWTUN,
