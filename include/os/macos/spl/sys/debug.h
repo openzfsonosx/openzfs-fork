@@ -182,6 +182,7 @@ void print_symbol(uintptr_t symbol);
 #define	ASSERT3P(x, y, z)						\
 	((void) sizeof ((uintptr_t)(x)), (void) sizeof ((uintptr_t)(z)))
 #define	ASSERT0(x)		((void) sizeof ((uintptr_t)(x)))
+#define	ASSERT0P(x)		((void) sizeof ((uintptr_t)(x)))
 #define	IMPLY(A, B)							\
 	((void) sizeof ((uintptr_t)(A)), (void) sizeof ((uintptr_t)(B)))
 #define	EQUIV(A, B)		\

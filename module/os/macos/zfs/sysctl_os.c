@@ -497,6 +497,24 @@ SYSCTL_INT(_tunable, OID_AUTO, default_ibs, CTLFLAG_RWTUN,
 
 /* metaslab.c */
 
+int
+param_set_active_allocator(ZFS_MODULE_PARAM_ARGS)
+{
+	char buf[16];
+	int rc;
+
+	if (req->newptr == (user_addr_t)NULL)
+		strlcpy(buf, zfs_active_allocator, sizeof (buf));
+
+	rc = sysctl_handle_string(oidp, buf, sizeof (buf), req);
+	if (rc || req->newptr == (user_addr_t)NULL)
+		return (rc);
+	if (strcmp(buf, zfs_active_allocator) == 0)
+		return (0);
+
+	return (param_set_active_allocator_common(buf));
+}
+
 /*
  * In pools where the log space map feature is not enabled we touch
  * multiple metaslabs (and their respective space maps) with each
@@ -578,14 +596,6 @@ extern int metaslab_load_pct;
 SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, load_pct, CTLFLAG_RWTUN,
     &metaslab_load_pct, 0,
     "Percentage of cpus that can be used by the metaslab taskq");
-
-/*
- * Max number of metaslabs per group to preload.
- */
-extern int metaslab_preload_limit;
-SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, preload_limit, CTLFLAG_RWTUN,
-    &metaslab_preload_limit, 0,
-    "Max number of metaslabs per group to preload");
 
 /* spa.c */
 extern int zfs_ccw_retry_interval;
