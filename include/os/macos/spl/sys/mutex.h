@@ -114,7 +114,7 @@ typedef struct kmutex {
 #define	mutex_init(A, B, C, D) \
     spl_mutex_init(A, B, C, D, __FILE__, __FUNCTION__, __LINE__)
 void spl_mutex_init(kmutex_t *mp, char *name, kmutex_type_t type,
-    void *ibc, const char *f, const char *fn, int l);
+    void *ibc, const char *f, const char *fn, const int l);
 
 #else
 
@@ -124,24 +124,33 @@ void spl_mutex_init(kmutex_t *mp, char *name, kmutex_type_t type, void *ibc);
 #endif
 
 #ifdef SPL_DEBUG_MUTEX
-#define	mutex_enter(X) spl_mutex_enter((X), __FILE__, __LINE__)
-void spl_mutex_enter(kmutex_t *mp, const char *file, int line);
+#define	mutex_enter(X) spl_mutex_enter((X), __FILE__, __func__, __LINE__)
+void spl_mutex_enter(kmutex_t *mp, const char *file,
+    const char *func, const int line);
+void spl_dbg_mutex_destroy(kmutex_t *, const char *,
+    const char *, const int);
+#define	mutex_destroy(X) spl_dbg_mutex_destroy(X, __FILE__, __func__, __LINE__)
 #else
-#define	mutex_enter spl_mutex_enter
+#define	mutex_enter	spl_mutex_enter
 void spl_mutex_enter(kmutex_t *mp);
+#define	mutex_destroy	spl_mutex_destroy
 #endif
-
 #define	mutex_enter_nested(A, B)	mutex_enter(A)
 
-#define	mutex_destroy spl_mutex_destroy
 #define	mutex_exit spl_mutex_exit
-#define	mutex_tryenter spl_mutex_tryenter
 #define	mutex_owned spl_mutex_owned
 #define	mutex_owner spl_mutex_owner
 
 void spl_mutex_destroy(kmutex_t *mp);
 void spl_mutex_exit(kmutex_t *mp);
+#ifdef SPL_DEBUG_MUTEX
+int spl_mutex_tryenter(kmutex_t *mp,
+	const char *file, const char *func, const int line);
+#define	mutex_tryenter(M) spl_mutex_tryenter(M, __FILE__, __func__, __LINE__)
+#else
 int  spl_mutex_tryenter(kmutex_t *mp);
+#define	mutex_tryenter spl_mutex_tryenter
+#endif
 int  spl_mutex_owned(kmutex_t *mp);
 
 struct thread *spl_mutex_owner(kmutex_t *mp);

@@ -118,9 +118,9 @@ extern unsigned int num_ecores;
  * taskqs for scrubs can be lower-priority, and are better that way for wide
  * pools (where the number of vdevs is 50% or more the number of cores).
  *
- * This value is around the level of bluetoothd or userland audio
+ * This value is just below the level of bluetoothd or userland audio
  */
-#define	dsl_scan_iss_syspri	60
+#define	DSL_SCAN_ISS_SYSPRI	59
 
 /*
  * Missing macros

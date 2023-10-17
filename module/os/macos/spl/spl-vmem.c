@@ -3968,8 +3968,15 @@ vmem_fini(vmem_t *heap)
 		// segkmem_free(fs->vmp, fs->slab, fs->slabsize);
 		IOFreeType(fs, struct free_slab);
 	}
-	printf("SPL: WOULD HAVE released %llu bytes (%llu spans) from arenas\n",
-	    total, total_count);
+	if (total != 0 && total_count != 0) {
+		printf("SPL: %s:%d: WOULD HAVE released %llu bytes"
+		    " (%llu spans) from arenas\n",
+		    __func__, __LINE__, total, total_count);
+	} else {
+		printf("SPL: %s:%d  good,"
+		    " did not have to force release any vmem spans",
+		    __func__, __LINE__);
+	}
 	list_destroy(&freelist);
 	printf("SPL: %s: Brief delay for readability...\n", __func__);
 	delay(hz);

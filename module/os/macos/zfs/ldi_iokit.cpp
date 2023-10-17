@@ -1357,15 +1357,15 @@ buf_strategy_iokit(ldi_buf_t *lbp, struct ldi_handle *lhp)
 	/* higher priority is lower numerical value */
 
 	if (lbp->b_flags & B_ASYNC) {
-		ioattr.priority++;
+		ioattr.priority += 16;
 	}
 
 	if (lbp->b_flags & B_WRITE) {
-		ioattr.priority--;
+		ioattr.priority += 16;
 	}
 
 	if (lbp->b_flags & B_THROTTLED_IO) {
-		ioattr.priority = kIOStoragePriorityBackground - 1;
+		ioattr.priority = kIOStoragePriorityBackground;
 	}
 
 	if (lbp->b_flags & B_FUA) {

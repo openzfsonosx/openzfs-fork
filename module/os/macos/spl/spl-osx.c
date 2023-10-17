@@ -30,6 +30,7 @@
 #include <sys/systm.h>
 #include <mach/mach_types.h>
 #include <libkern/libkern.h>
+#include <sys/thread.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
 #include <sys/utsname.h>

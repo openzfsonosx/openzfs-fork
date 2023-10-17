@@ -317,7 +317,11 @@ spl_set_thread_importance(thread_t thread, pri_t pri, const char *name)
 	 * (it's 81, importance is a signed-offset from that)
 	 */
 
-	policy.importance = pri - 81;
+	const pri_t basepri = 81;
+	const pri_t importance = pri - basepri;
+	const pri_t importance_floor = DSL_SCAN_ISS_SYSPRI - basepri;
+
+	policy.importance = importance;
 
 	/*
 	 * dont let ANY of our threads run as high as networking & GPU
@@ -328,12 +332,12 @@ spl_set_thread_importance(thread_t thread, pri_t pri, const char *name)
 	if (policy.importance > 0)
 		policy.importance = 0;
 	/*
-	 * set a floor on importance at priority 60, which is about the same
-	 * as bluetoothd and userland audio, which are of relatively high
-	 * importance.
+	 * set a floor on importance at priority 59, which is just below
+	 * bluetoothd and userland audio, which are of relatively high
+	 * userland importance.
 	 */
-	else if (policy.importance < (-21))
-		policy.importance = -21;
+	else if (policy.importance < importance_floor)
+		policy.importance = importance_floor;
 
 	int i = policy.importance;
 	kern_return_t pol_prec_kret = thread_policy_set(thread,
