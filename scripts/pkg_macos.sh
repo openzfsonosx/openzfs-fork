@@ -267,6 +267,9 @@ function do_prune
 "./${prefix}/share/zfs-macos/runfiles" \
 "./${prefix}/share/zfs-macos/test-runner" \
 "./${prefix}/share/zfs-macos/zfs-tests" \
+"./${prefix}/share/zfs/runfiles" \
+"./${prefix}/share/zfs/test-runner" \
+"./${prefix}/share/zfs/zfs-tests" \
 "./${prefix}/src"
 
     popd || fail "failed to popd"
@@ -328,25 +331,8 @@ function do_notarize
 
     TFILE="out-altool.xml"
     RFILE="req-altool.xml"
-    xcrun altool --notarize-app -f my_package_new.pkg --primary-bundle-id org.openzfsonosx.zfs -u lundman@lundman.net -p "$PKG_NOTARIZE_KEY" --output-format xml > ${TFILE}
-
-    GUID=$(/usr/libexec/PlistBuddy -c "Print :notarization-upload:RequestUUID" ${TFILE})
-    echo "Uploaded. GUID ${GUID}"
-    echo "Waiting for Apple to notarize..."
-    while true
-    do
-	sleep 10
-	echo "Querying Apple."
-
-	xcrun altool --notarization-info "${GUID}" -u lundman@lundman.net -p "$PKG_NOTARIZE_KEY" --output-format xml > ${RFILE}
-	status=$(/usr/libexec/PlistBuddy -c "Print :notarization-info:Status" ${RFILE})
-	if [ "$status" != "in progress" ]; then
-	    echo "Status: $status ."
-	    break
-	fi
-	echo "Status: $status - sleeping ..."
-	sleep 30
-    done
+    # xcrun altool --notarize-app -f my_package_new.pkg --primary-bundle-id org.openzfsonosx.zfs -u lundman@lundman.net -p "$PKG_NOTARIZE_KEY" --output-format xml > ${TFILE}
+    xcrun notarytool submit --wait --apple-id lundman@lundman.net --team-id "735AM5QEU3" --password "$PKG_NOTARIZE_KEY" my_package_new.pkg
 
     echo "Stapling PKG ..."
     xcrun stapler staple my_package_new.pkg
