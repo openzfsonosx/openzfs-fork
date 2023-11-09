@@ -52,6 +52,16 @@ OS=$(sw_vers | awk '{if ($1 == "ProductVersion:") print $2;}')
 OS=$(echo "$OS" | awk -F . '{if ($1 == 10) print $1"."$2; else print $1}')
 RC=$(grep Release: META | awk '$2 ~ /rc/ { print $2}')
 
+friendly=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | tr -d '\\')
+if [ -z "$friendly" ]; then
+    friendly=$(awk '/SOFTWARE LICENSE AGREEMENT FOR OS X/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'OS X ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
+fi
+if [ -z "$friendly" ]; then
+    friendly=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
+fi
+
+friendly=$(echo "$friendly" | tr ' ' '.')
+
 function usage
 {
     echo "$0: Create installable pkg for macOS"
@@ -111,6 +121,7 @@ fi
 echo "Version is $version"
 echo "Prefix set to $prefix"
 echo "RC, if set: $RC"
+echo "OS name: $friendly"
 echo ""
 
 sleep 3
@@ -382,13 +393,6 @@ echo "pkgbuild result $ret"
 if [ $ret != 0 ]; then
     fail "pkgbuild failed"
 fi
-
-friendly=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | tr -d '\\')
-if [ -z "$friendly" ]; then
-    friendly=$(awk '/SOFTWARE LICENSE AGREEMENT FOR OS X/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'OS X ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
-fi
-
-friendly=$(echo "$friendly" | tr ' ' '.')
 
 # Now fiddle with pkg to make it nicer
 productbuild --synthesize --package ./my_package.pkg distribution.xml
