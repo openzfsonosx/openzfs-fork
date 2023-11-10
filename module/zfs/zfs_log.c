@@ -47,6 +47,10 @@
 #include <sys/zfs_fuid.h>
 #include <sys/dsl_dataset.h>
 
+#ifdef __APPLE__
+#include <sys/spa_impl.h> // spa_min_alloc
+#endif
+
 /*
  * These zfs_log_* functions must be called within a dmu tx, in one
  * of 2 contexts depending on zilog->z_replay:
@@ -637,6 +641,11 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	uintptr_t fsync_cnt;
 	uint64_t gen = 0;
 	ssize_t size = resid;
+
+#ifdef __APPLE__
+	if (zp->z_zfsvfs->z_os->os_spa->spa_min_alloc > blocksize)
+		blocksize = zp->z_zfsvfs->z_os->os_spa->spa_min_alloc;
+#endif
 
 	if (zil_replaying(zilog, tx) || zp->z_unlinked ||
 	    zfs_xattr_owner_unlinked(zp)) {
