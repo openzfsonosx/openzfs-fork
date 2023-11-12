@@ -405,18 +405,7 @@ abd_init(void)
 
 	int cflags = KMC_ARENA_SLAB;
 #else
-	int cflags = KMC_ARENA_SLAB;
-#endif
-
-#ifdef _KERNEL
-/* This must all match spl-seg_kmem.c : segkmem_abd_init() */
-#define	SMALL_RAM_MACHINE (4ULL * 1024ULL * 1024ULL * 1024ULL)
-
-	extern uint64_t total_memory;
-
-	if (total_memory < SMALL_RAM_MACHINE) {
-		cflags = KMC_NOTOUCH;
-	}
+	int cflags = KMC_NOTOUCH;
 #endif
 
 	abd_chunk_cache = kmem_cache_create("abd_chunk", zfs_abd_chunk_size,
@@ -463,18 +452,9 @@ abd_init(void)
 		VERIFY3S(index, >=, 0);
 		VERIFY3S(index, <, SUBPAGE_CACHE_INDICES);
 
-#ifdef DEBUG
-		int csubflags = KMF_LITE;
-#else
-		int csubflags = 0;
-#endif
-#ifdef _KERNEL
-		if (total_memory < SMALL_RAM_MACHINE)
-			csubflags = cflags;
-#endif
 		abd_subpage_cache[index] =
 		    kmem_cache_create(name, bytes, sizeof (void *),
-		    NULL, NULL, NULL, NULL, abd_subpage_arena, csubflags);
+		    NULL, NULL, NULL, NULL, abd_subpage_arena, cflags);
 
 		VERIFY3P(abd_subpage_cache[index], !=, NULL);
 	}
