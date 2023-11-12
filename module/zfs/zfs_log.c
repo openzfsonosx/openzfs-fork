@@ -642,10 +642,8 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	uint64_t gen = 0;
 	ssize_t size = resid;
 
-#ifdef __APPLE__
-	if (zp->z_zfsvfs->z_os->os_spa->spa_min_alloc > blocksize)
-		blocksize = zp->z_zfsvfs->z_os->os_spa->spa_min_alloc;
-#endif
+	if (unlikely(blocksize == 0))
+		blocksize = SPA_MINBLOCKSIZE;
 
 	if (zil_replaying(zilog, tx) || zp->z_unlinked ||
 	    zfs_xattr_owner_unlinked(zp)) {
