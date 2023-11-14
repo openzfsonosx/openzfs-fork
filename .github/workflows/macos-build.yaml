@@ -31,7 +31,7 @@ jobs:
           ./configure CPPFLAGS="-I/usr/local/opt/gettext/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/opt/gettext/lib/ -L/usr/local/opt/openssl/lib"
       - name: build
         run: |
-          make -j 2
+          make -j $(($(sysctl -n hw.ncpu)+1))
       #- name: install
       #  run: |
       #    sudo make install DESTDIR=///
