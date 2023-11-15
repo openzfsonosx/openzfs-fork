@@ -648,8 +648,10 @@ zfs_getbsdflags(znode_t *zp)
 	if (zflags & ZFS_TRACKED)
 		bsdflags |= UF_TRACKED;
 
+#ifdef	SF_NOUNLINK
 	if (zflags & ZFS_NOUNLINK)
 		bsdflags |= SF_NOUNLINK;
+#endif
 	if (zflags & ZFS_SIMMUTABLE)
 		bsdflags |= SF_IMMUTABLE;
 	if (zflags & ZFS_SAPPENDONLY)
@@ -704,8 +706,10 @@ zfs_setbsdflags(znode_t *zp, uint32_t ioctl_flags, xvattr_t *xva)
 	    XAT_SIMMUTABLE, xoap->xoa_simmutable);
 	FLAG_CHANGE(ZFS_ARCHIVE, SF_ARCHIVED,
 	    XAT_ARCHIVE, xoap->xoa_archive);
+#ifdef	SF_NOUNLINK
 	FLAG_CHANGE(ZFS_NOUNLINK, SF_NOUNLINK,
 	    XAT_NOUNLINK, xoap->xoa_nounlink);
+#endif
 	// FLAG_CHANGE(ZFS_READONLY, XAT_READONLY, xoap->xoa_readonly);
 	// FLAG_CHANGE(ZFS_SYSTEM, XAT_SYSTEM, xoap->xoa_system);
 	// FLAG_CHANGE(ZFS_REPARSE, XAT_REPARSE, xoap->xoa_reparse);
