@@ -850,7 +850,7 @@ vdev_disk_init(void)
 	 * Apple Silicon we deflate further.
 	 */
 
-	const int cpus = MAX(1, max_ncpus - num_ecores - 2);
+	const int cpus = MAX(1, (int)(max_ncpus - num_ecores - 2));
 
 	/*
 	 * Keep vdev_disk_taskq_stack as in-order as we can, and use
