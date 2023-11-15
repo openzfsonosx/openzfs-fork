@@ -290,7 +290,9 @@ spl_implyout(const char *buf, const char *file, const char *func, int line)
 #endif /* MACOS_ASSERT_SHOULD_PANIC */
 #endif /* NDEBUG */
 
+#if !defined(zfs_fallthrough)
 #define	zfs_fallthrough		__attribute__((__fallthrough__))
+#endif
 
 #ifdef  __cplusplus
 }
