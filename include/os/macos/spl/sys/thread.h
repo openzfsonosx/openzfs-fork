@@ -75,6 +75,33 @@ typedef void (*thread_func_t)(void *);
 
 // Drop the p0 argument, not used.
 
+#if defined(MAC_OS_X_VERSION_10_9) && \
+	(MAC_OS_X_VERSION_MIN_REQUIRED <= MAC_OS_X_VERSION_10_9)
+/* Missing in 10.9 - none of this will be run, but handles us compile */
+#define	THREAD_LATENCY_QOS_POLICY 7
+#define	THREAD_LATENCY_QOS_POLICY_COUNT ((mach_msg_type_number_t) \
+	(sizeof (thread_latency_qos_policy_data_t) / sizeof (integer_t)))
+#define	THREAD_THROUGHPUT_QOS_POLICY 8
+#define	THREAD_THROUGHPUT_QOS_POLICY_COUNT ((mach_msg_type_number_t) \
+	(sizeof (thread_throughput_qos_policy_data_t) / sizeof (integer_t)))
+typedef integer_t thread_latency_qos_t;
+typedef integer_t thread_throughput_qos_t;
+struct thread_throughput_qos_policy {
+	thread_throughput_qos_t thread_throughput_qos_tier;
+};
+struct thread_latency_qos_policy {
+	thread_latency_qos_t thread_latency_qos_tier;
+};
+typedef struct thread_throughput_qos_policy
+thread_throughput_qos_policy_data_t;
+typedef struct thread_latency_qos_policy
+thread_latency_qos_policy_data_t;
+typedef struct thread_throughput_qos_policy
+*thread_throughput_qos_policy_t;
+typedef struct thread_latency_qos_policy
+*thread_latency_qos_policy_t;
+#endif
+
 #ifdef SPL_DEBUG_THREAD
 
 #define	thread_create(A, B, C, D, E, F, G, H)			\
@@ -128,29 +155,6 @@ extern kthread_t *spl_thread_create_named_with_extpol_and_qos(
     void *arg, size_t len, /* proc_t *pp, */ int state,
     pri_t pri);
 
-#endif
-
-#if defined(MAC_OS_X_VERSION_10_9) && \
-	(MAC_OS_X_VERSION_MIN_REQUIRED <= MAC_OS_X_VERSION_10_9)
-/* Missing in 10.9 - none of this will be run, but handles us compile */
-#define	THREAD_LATENCY_QOS_POLICY 7
-#define	THREAD_LATENCY_QOS_POLICY_COUNT ((mach_msg_type_number_t) \
-	(sizeof (thread_latency_qos_policy_data_t) / sizeof (integer_t)))
-#define	THREAD_THROUGHPUT_QOS_POLICY 8
-#define	THREAD_THROUGHPUT_QOS_POLICY_COUNT ((mach_msg_type_number_t) \
-	(sizeof (thread_throughput_qos_policy_data_t) / sizeof (integer_t)))
-typedef integer_t thread_latency_qos_t;
-typedef integer_t thread_throughput_qos_t;
-struct thread_throughput_qos_policy {
-	thread_throughput_qos_t thread_throughput_qos_tier;
-};
-struct thread_latency_qos_policy {
-	thread_latency_qos_t thread_latency_qos_tier;
-};
-typedef struct thread_throughput_qos_policy
-thread_throughput_qos_policy_data_t;
-typedef struct thread_latency_qos_policy
-thread_latency_qos_policy_data_t;
 #endif
 
 #define	thread_exit spl_thread_exit
