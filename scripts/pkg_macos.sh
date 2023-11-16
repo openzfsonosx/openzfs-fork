@@ -69,6 +69,7 @@ function usage
     echo " Options:"
     echo "   -l  skip make install step, using a folder of a previous run"
     echo "   -L  copy and fix external libraries"
+    echo "   -A  use obsolete altool to notarize"
     exit
 }
 
@@ -76,6 +77,7 @@ while getopts "hlL" opt; do
     case $opt in
 	l ) skip_install=1 ;;
 	L ) fix_libraries=1 ;;
+	A ) use_altool=1 ;;
 	h ) usage
 	    exit 2
 	    ;;
@@ -118,10 +120,20 @@ if [ -f "${BASE_DIR}/../config.status" ]; then
     prefix=$(grep 'S\["prefix"\]' "${BASE_DIR}/../config.status" | tr '=' ' ' | awk '{print $2;}' | tr -d '"')
 fi
 
+xcrun notarytool > /dev/null 2>&1
+if [ $? != 0 ]; then
+    use_altool=1
+fi
+
 echo "Version is $version"
 echo "Prefix set to $prefix"
 echo "RC, if set: $RC"
 echo "OS name: $friendly"
+if [ -n "$use_altool" ]; then
+    echo "notarize: altool"
+else
+    echo "notarize: notarytool"
+fi
 echo ""
 
 sleep 3
@@ -216,7 +228,7 @@ function do_codesign
        [ x"$OS" == x"10.11" ] ||
        [ x"$OS" == x"10.10" ] ||
        [ x"$OS" == x"10.9" ]; then
-	extra=""
+	extra="--signature-size=12000"
     else
 	extra="--options runtime"
     fi
@@ -294,7 +306,7 @@ function do_prune
 function copy_fix_libraries
 {
     echo "Fixing external libraries ... "
-    fixlib=$(otool -L ${codesign_files} | egrep '/usr/local/opt/|/opt/local/lib/' |awk '{print $1;}' | grep '\.dylib$' | sort | uniq)
+    fixlib=$(otool -L ${codesign_files} | egrep '/usr/local/opt/|/opt/local/lib/|/opt/local/libexec/' |awk '{print $1;}' | grep '\.dylib$' | sort | uniq)
 
     # Add the libs into codesign list - both to be codesigned, and updated
     # between themselves (libssl depends on libcrypt)
@@ -328,7 +340,7 @@ function copy_fix_libraries
 	for file in $codesign_files
 	do
 	    chmod u+w "${file}"
-	    src=$(otool -L "$file" | awk '{print $1;}' | grep "${name}.dylib")
+	    src=$(otool -L "$file" | grep -v ":$" | awk '{print $1;}' | grep "${name}.dylib")
 	    install_name_tool -change "${src}" "${prefix}/lib/${name}.dylib" "${file}"
 	done
     done
@@ -336,7 +348,48 @@ function copy_fix_libraries
 
 # Upload .pkg file
 # Staple .pkg file
-function do_notarize
+function do_notarize_altool
+{
+    echo "Uploading PKG to Apple ..."
+
+    TFILE="out-altool.xml"
+    RFILE="req-altool.xml"
+    xcrun altool --notarize-app -f my_package_new.pkg --primary-bundle-id org.openzfsonosx.zfs -u lundman@lundman.net -p "$PKG_NOTARIZE_KEY" --output-format xml > ${TFILE}
+
+    GUID=$(/usr/libexec/PlistBuddy -c "Print :notarization-upload:RequestUUID" ${TFILE})
+    echo "Uploaded. GUID ${GUID}"
+    echo "Waiting for Apple to notarize..."
+    while true
+    do
+	sleep 10
+	echo "Querying Apple."
+
+	xcrun altool --notarization-info "${GUID}" -u lundman@lundman.net -p "$PKG_NOTARIZE_KEY" --output-format xml > ${RFILE}
+	status=$(/usr/libexec/PlistBuddy -c "Print :notarization-info:Status" ${RFILE})
+	if [ "$status" != "in progress" ]; then
+	    echo "Status: $status ."
+	    break
+	fi
+	echo "Status: $status - sleeping ..."
+	sleep 30
+    done
+
+    echo "Stapling PKG ..."
+    xcrun stapler staple my_package_new.pkg
+    ret=$?
+    xcrun stapler validate -v my_package_new.pkg
+
+    if [ $ret != 0 ]; then
+	echo "Failed to notarize: $ret"
+	grep "https://" ${RFILE}
+	exit 1
+    fi
+
+}
+
+# Upload .pkg file
+# Staple .pkg file
+function do_notarize_notarytool
 {
     echo "Uploading PKG to Apple ..."
 
@@ -356,6 +409,15 @@ function do_notarize
 	exit 1
     fi
 
+}
+
+function do_notarize
+{
+    if [ -n "$use_altool" ]; then
+	do_notarize_altool
+    else
+	do_notarize_notarytool
+    fi
 }
 
 echo "Pruning install area ..."
