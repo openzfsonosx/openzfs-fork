@@ -8,13 +8,6 @@ launchddaemon_DATA = \
 	$(top_srcdir)/etc/launchd/daemons/org.openzfsonosx.zpool-import-all.plist \
 	$(top_srcdir)/etc/launchd/daemons/org.openzfsonosx.InvariantDisks.plist
 
-dist_launchddaemon_DATA = \
-	%D%/org.openzfsonosx.zconfigd.plist.in \
-	%D%/org.openzfsonosx.zed.plist.in \
-	%D%/org.openzfsonosx.zpool-import.plist.in \
-	%D%/org.openzfsonosx.zpool-import-all.plist.in \
-	%D%/org.openzfsonosx.InvariantDisks.plist.in
-
 %D%/org.openzfsonosx.zconfigd.plist: %D%/org.openzfsonosx.zconfigd.plist.in
 %D%/org.openzfsonosx.zed.plist: %D%/org.openzfsonosx.zed.plist.in
 %D%/org.openzfsonosx.zpool-import.plist: %D%/org.openzfsonosx.zpool-import.plist.in
@@ -29,5 +22,3 @@ $(launchddaemon_DATA):
 		-e 's,@launchddaemondir\@,$(launchddaemondir),g' \
 		-e 's,@launchdscriptdir\@,$(launchdscriptdir),g' \
 		'$@.in' >'$@'
-
-

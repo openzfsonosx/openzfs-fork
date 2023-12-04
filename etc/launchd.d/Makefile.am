@@ -1,6 +1,4 @@
 
-noinst_launch_d_DATA = \
-	%D%/zpool-import-all.sh.in
 noinst_launch_ddir = \
 	$(launchdscriptdir)/
 
