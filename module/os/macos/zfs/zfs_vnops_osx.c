@@ -74,8 +74,8 @@
 #include <sys/callb.h>
 #include <sys/unistd.h>
 
-
-
+#include <TargetConditionals.h>
+#include <AvailabilityMacros.h>
 
 #ifdef _KERNEL
 #include <sys/sysctl.h>
@@ -4653,6 +4653,18 @@ zfs_vnop_clonefile(struct vnop_clonefile_args *ap)
 	 */
 	error = zfs_clone_range(inzp, &inoff, outzp, &outoff,
 		&len, cr);
+
+#if	defined(MAC_OS_X_VERSION_14) &&	\
+	(MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_14)
+	/*
+	 * From file_cmds-428 (Sonoma) if we return ENOTSUP, it will
+	 * fallback to regular copy. Earlier macOS will just print
+	 * error. We could consider an internal copy_file_range()
+	 * here if we want to.
+	 */
+	if (error == EAGAIN)
+		error = ENOTSUP;
+#endif
 
 	if (error == 0) {
 		*ap->a_vpp = ZTOV(outzp);
