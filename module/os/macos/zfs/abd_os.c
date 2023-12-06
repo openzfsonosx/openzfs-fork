@@ -401,15 +401,17 @@ abd_init(void)
 	 * const int cflags = KMF_BUFTAG | KMF_LITE;
 	 * or
 	 * const int cflags = KMC_ARENA_SLAB;
+	 * (the latter tests larger exchanges of memory with the kernel)
 	 */
 
-	int cflags = KMC_ARENA_SLAB;
+	int cflags = KMF_BUFTAG | KMF_LITE;
+	// int cflags = KMC_ARENA_SLAB;
 #else
 	int cflags = KMC_NOTOUCH;
 #endif
 
 	abd_chunk_cache = kmem_cache_create("abd_chunk", zfs_abd_chunk_size,
-	    ABD_PGSIZE,
+	    sizeof (void *),
 	    NULL, NULL, NULL, NULL, abd_arena, cflags);
 
 	wmsum_init(&abd_sums.abdstat_struct_size, 0);

@@ -49,6 +49,7 @@
 static utsname_t utsname_static = { { 0 } };
 
 unsigned int max_ncpus = 0;
+unsigned int boot_ncpus = 0;
 unsigned int num_ecores = 0;
 uint64_t  total_memory = 0;
 uint64_t  real_total_memory = 0;
@@ -495,6 +496,9 @@ spl_start(kmod_info_t *ki, void *d)
 
 #if defined(__arm64__)
 	num_ecores = (max_ncpus > 4) ? 4 : 0;
+	boot_ncpus = MAX(1, (int)max_ncpus - (int)num_ecores);
+#else
+	boot_ncpus = max_ncpus;
 #endif
 
 	/*

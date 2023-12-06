@@ -61,6 +61,7 @@ struct taskq_ent;
 #ifdef __APPLE__
 #define	TASKQ_TIMESHARE		0x0020  /* macOS dynamic thread priority */
 #define	TASKQ_REALLY_DYNAMIC	0x0040  /* don't filter out TASKQ_DYNAMIC */
+#define	TASKQ_CREATE_SYNCED	0x0080	/* don't deflate ncpus */
 #endif
 
 /*
