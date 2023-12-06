@@ -55,8 +55,11 @@ test_script:
     export SHELL=/bin/ksh
 
 
-    sudo scripts/cmd-macos.sh zed -fF &
+    sudo /usr/local/zfs/bin/zed -fF &
 
+    sudo mkdir -p /etc/synthetic.d/
+
+    sudo touch /etc/synthetic.d/zfs-tests
 
     scripts/zfs-tests.sh -r macOS-CI || echo "Tests not quite right"
 
