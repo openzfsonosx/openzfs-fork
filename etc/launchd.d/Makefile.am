@@ -10,8 +10,14 @@ do_subst = -$(SED) -e 's,@bindir\@,$(bindir),g' \
 
 CLEANFILES += %D%/zpool-import-all.sh
 
-INSTALL_DATA_HOOKS += install-zpool-import
+INSTALL_DATA_HOOKS += zpool-import-all.sh
 
-install-zpool-import: %D%/zpool-import-all.sh.in
-	$(do_subst) < %D%/zpool-import-all.sh.in > $(DESTDIR)/$(launchdscriptdir)/zpool-import-all.sh
-	chmod +x $(DESTDIR)/$(launchdscriptdir)/zpool-import-all.sh
+zpool-import-all.sh: %D%/zpool-import-all.sh.in
+	-$(AM_V_at)$(MKDIR_P) $(DESTDIR)/$(launchdscriptdir)/
+	-$(AM_V_GEN)$(SED) -e 's,@bindir\@,$(bindir),g' \
+		-e 's,@runstatedir\@,$(runstatedir),g' \
+		-e 's,@sbindir\@,$(sbindir),g' \
+		-e 's,@sysconfdir\@,$(sysconfdir),g' \
+		-e 's,@launchdscriptdir\@,$(launchdscriptdir),g' \
+		'$<' > $(DESTDIR)/$(launchdscriptdir)/'$@'
+	chmod +x $(DESTDIR)/$(launchdscriptdir)/'$@'
