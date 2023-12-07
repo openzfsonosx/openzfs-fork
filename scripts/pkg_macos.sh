@@ -120,9 +120,13 @@ if [ -f "${BASE_DIR}/../config.status" ]; then
     prefix=$(grep 'S\["prefix"\]' "${BASE_DIR}/../config.status" | tr '=' ' ' | awk '{print $2;}' | tr -d '"')
 fi
 
-xcrun notarytool > /dev/null 2>&1
-if [ $? != 0 ]; then
-    use_altool=1
+if [ -z "$NOTARYTOOL" ]; then
+    xcrun notarytool > /dev/null 2>&1
+    if [ $? != 0 ]; then
+	use_altool=1
+    else
+	NOTARYTOOL="$(xcrun -f notarytool)"
+    fi
 fi
 
 echo "Version is $version"
@@ -132,7 +136,7 @@ echo "OS name: $friendly"
 if [ -n "$use_altool" ]; then
     echo "notarize: altool"
 else
-    echo "notarize: notarytool"
+    echo "notarize: notarytool ($NOTARYTOOL)"
 fi
 echo ""
 
@@ -396,7 +400,7 @@ function do_notarize_notarytool
     TFILE="out-altool.xml"
     RFILE="req-altool.xml"
     # xcrun altool --notarize-app -f my_package_new.pkg --primary-bundle-id org.openzfsonosx.zfs -u lundman@lundman.net -p "$PKG_NOTARIZE_KEY" --output-format xml > ${TFILE}
-    xcrun notarytool submit --wait --apple-id lundman@lundman.net --team-id "735AM5QEU3" --password "$PKG_NOTARIZE_KEY" my_package_new.pkg
+    $NOTARYTOOL submit --wait --apple-id lundman@lundman.net --team-id "735AM5QEU3" --password "$PKG_NOTARIZE_KEY" my_package_new.pkg
 
     echo "Stapling PKG ..."
     xcrun stapler staple my_package_new.pkg
