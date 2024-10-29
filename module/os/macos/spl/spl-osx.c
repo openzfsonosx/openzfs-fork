@@ -71,9 +71,9 @@ utsname(void)
  * 1 HZ is 10 milliseconds
  */
 void
-osx_delay(int ticks)
+osx_delay(clock_t ticks)
 {
-	ASSERT3S(ticks, >, 0);
+	ASSERT3U(ticks, <, SEC_TO_TICK(60));
 
 	// ticks are 10 msec units
 	int64_t ticks_to_go = (int64_t)ticks;
@@ -109,7 +109,7 @@ osx_delay(int ticks)
 
 		bool forced_sleep = false;
 
-		ASSERT3S(ticks_to_go, >, 0);
+		ASSERT3U(ticks_to_go, <, SEC_TO_TICK(60));
 		unsigned milliseconds_remaining = ticks_to_go * 10;
 
 		if (milliseconds_remaining < 2) {

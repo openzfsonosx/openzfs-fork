@@ -31,12 +31,12 @@
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
-#include <sys/tsd.h>
 #include <sys/condvar.h>
 #include <kern/sched_prim.h>
 #include <mach/thread_policy.h>
 #include <TargetConditionals.h>
 #include <AvailabilityMacros.h>
+#include <mach/mach_types.h> // thread_t
 
 #ifdef	__cplusplus
 extern "C" {
@@ -50,6 +50,8 @@ extern "C" {
  */
 #define	kthread thread
 #define	kthread_t struct kthread
+
+#include <sys/tsd.h>
 
 /*
  * Thread interfaces
@@ -174,7 +176,7 @@ extern void spl_set_thread_latency(thread_t,
     thread_latency_qos_policy_data_t *, const char *);
 
 #define	delay osx_delay
-extern void osx_delay(int);
+extern void osx_delay(clock_t);
 
 #define	KPREEMPT_SYNC 0
 static inline void kpreempt(int flags)

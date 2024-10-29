@@ -26,6 +26,7 @@
  */
 
 #include <sys/processor.h>
+#include <sys/sysmacros.h>
 
 extern int cpu_number(void);
 

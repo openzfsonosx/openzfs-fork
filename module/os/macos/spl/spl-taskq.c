@@ -1758,9 +1758,9 @@ taskq_resume(taskq_t *tq)
 }
 
 int
-taskq_member(taskq_t *tq, kthread_t *thread)
+taskq_member(taskq_t *tq, kthread_t *xthread)
 {
-	return (tq == (taskq_t *)tsd_get_by_thread(taskq_tsd, thread));
+	return (tq == (taskq_t *)tsd_get_by_thread(taskq_tsd, xthread));
 }
 
 taskq_t *
