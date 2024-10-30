@@ -486,6 +486,30 @@ vdev_disk_io_intr(ldi_buf_t *bp)
 		    zio->io_size);
 	}
 
+	/*
+	 * thread_block / yield if this is an automated / low-priority read or
+	 * write, in order to avoid CPU starvation of user-initiated threads.
+	 *
+	 * kpreempt(KPREEMPT_SYNC) is cheap and fast on a mac with idle cores,
+	 *
+	 * However, on a busy system it effectively asks xnu to impose a
+	 * system-load-dependent delay on the forthcoming insertion of this
+	 * I/O into a z_{rd,wr}_int taskq (which even on a busy many-cored
+	 * system might send the zio without delay to checksuming and other
+	 * expensive pipeline operations).
+	 *
+	 * During a scrub this also tends to increase the difference in queue
+	 * depth and latency (zpool iostat -{q,w}) between scrubq_read and
+	 * [a]syncq I/Os to the same pool.
+	 */
+	if (zio->io_priority == ZIO_PRIORITY_SCRUB ||
+	    zio->io_priority == ZIO_PRIORITY_REMOVAL ||
+	    zio->io_priority == ZIO_PRIORITY_INITIALIZING ||
+	    zio->io_priority == ZIO_PRIORITY_TRIM ||
+	    zio->io_priority == ZIO_PRIORITY_REBUILD) {
+		kpreempt(KPREEMPT_SYNC);
+	}
+
 	zio_delay_interrupt(zio);
 }
 
@@ -543,7 +567,11 @@ vdev_disk_io_strategy(void *arg)
 	case ZIO_TYPE_READ:
 		if (zio->io_priority == ZIO_PRIORITY_SYNC_READ) {
 			flags = B_READ;
-		} else if (zio->io_priority == ZIO_PRIORITY_SCRUB) {
+		} else if (zio->io_priority == ZIO_PRIORITY_SCRUB ||
+		    zio->io_priority == ZIO_PRIORITY_REMOVAL ||
+		    zio->io_priority == ZIO_PRIORITY_INITIALIZING ||
+		    zio->io_priority == ZIO_PRIORITY_TRIM ||
+		    zio->io_priority == ZIO_PRIORITY_REBUILD) {
 			/*
 			 *  Signal using  B_THROTTLED_IO.
 			 *  This is safe because our path through
@@ -692,9 +720,10 @@ vdev_disk_io_start(zio_t *zio)
 	}
 
 	/*
-	 * dispatch async or scrub reads on appropriate taskq,
-	 * dispatch async writes on appropriate taskq,
-	 * do everything else on this thread
+	 * Dispatch scrub and other low-priority reads on a
+	 * lower-thread-priority and lower-thread-number taskq,
+	 * with other async I/Os dispatched to an appropriate
+	 * taskq, and other I/Os into a default taskq for observability.
 	 */
 	if (zio->io_type == ZIO_TYPE_READ) {
 		if (zio->io_priority == ZIO_PRIORITY_ASYNC_READ) {
@@ -702,7 +731,15 @@ vdev_disk_io_start(zio_t *zio)
 			    vdev_disk_io_strategy,
 			    zio, TQ_SLEEP), !=, 0);
 			return;
-		} else if (zio->io_priority == ZIO_PRIORITY_SCRUB) {
+		} else if (zio->io_priority == ZIO_PRIORITY_SCRUB ||
+		    zio->io_priority == ZIO_PRIORITY_REMOVAL ||
+		    zio->io_priority == ZIO_PRIORITY_INITIALIZING ||
+		    zio->io_priority == ZIO_PRIORITY_TRIM ||
+		    zio->io_priority == ZIO_PRIORITY_REBUILD) {
+			/*
+			 * dispatch automated / low-priority reads onto a
+			 * lowered-priority taskq
+			 */
 			VERIFY3U(taskq_dispatch(vdev_disk_taskq_scrub,
 			    vdev_disk_io_strategy,
 			    zio, TQ_SLEEP), !=, 0);
