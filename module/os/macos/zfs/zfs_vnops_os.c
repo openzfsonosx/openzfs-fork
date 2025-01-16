@@ -206,15 +206,6 @@ zfs_open(struct vnode *vp, int mode, int flag, cred_t *cr)
 		return (SET_ERROR(EPERM));
 	}
 
-	/* Virus scan eligible files on open */
-	if (!zfs_has_ctldir(zp) && zfsvfs->z_vscan && S_ISREG(zp->z_mode) &&
-	    !(zp->z_pflags & ZFS_AV_QUARANTINED) && zp->z_size > 0) {
-		if (zfs_vscan(vp, cr, 0) != 0) {
-			zfs_exit(zfsvfs, FTAG);
-			return (SET_ERROR(EACCES));
-		}
-	}
-
 	/* Keep a count of the synchronous opens in the znode */
 	if (flag & (FSYNC | FDSYNC))
 		atomic_inc_32(&zp->z_sync_cnt);
@@ -236,10 +227,6 @@ zfs_close(struct vnode *vp, int flag, cred_t *cr)
 	/* Decrement the synchronous opens in the znode */
 	if (flag & (FSYNC | FDSYNC))
 		atomic_dec_32(&zp->z_sync_cnt);
-
-	if (!zfs_has_ctldir(zp) && zfsvfs->z_vscan && S_ISREG(zp->z_mode) &&
-	    !(zp->z_pflags & ZFS_AV_QUARANTINED) && zp->z_size > 0)
-		VERIFY(zfs_vscan(vp, cr, 1) == 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (0);
@@ -1425,7 +1412,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 	caddr_t		outbuf;
 	size_t		bufsize;
 	zap_cursor_t	zc;
-	zap_attribute_t	zap;
+	zap_attribute_t	*zap;
 	uint_t		bytes_wanted;
 	uint64_t	offset; /* must be unsigned; checks for < 1 */
 	uint64_t	parent;
@@ -1470,6 +1457,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 	os = zfsvfs->z_os;
 	offset = zfs_uio_offset(uio);
 	prefetch = zp->z_zn_prefetch;
+	zap = zap_attribute_long_alloc();
 
 	/*
 	 * Initialize the iterator cursor.
@@ -1511,20 +1499,20 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 		 * Special case `.', `..', and `.zfs'.
 		 */
 		if (offset == 0) {
-			(void) strlcpy(zap.za_name, ".", MAXNAMELEN);
-			zap.za_normalization_conflict = 0;
+			(void) strlcpy(zap->za_name, ".", MAXNAMELEN);
+			zap->za_normalization_conflict = 0;
 			objnum = (zp->z_id == zfsvfs->z_root) ? 2 : zp->z_id;
 			type = DT_DIR;
 		} else if (offset == 1) {
-			(void) strlcpy(zap.za_name, "..", MAXNAMELEN);
-			zap.za_normalization_conflict = 0;
+			(void) strlcpy(zap->za_name, "..", MAXNAMELEN);
+			zap->za_normalization_conflict = 0;
 			objnum = (parent == zfsvfs->z_root) ? 2 : parent;
 			objnum = (zp->z_id == zfsvfs->z_root) ? 1 : objnum;
 			type = DT_DIR;
 		} else if (offset == 2 && zfs_show_ctldir(zp)) {
-			(void) strlcpy(zap.za_name, ZFS_CTLDIR_NAME,
+			(void) strlcpy(zap->za_name, ZFS_CTLDIR_NAME,
 			    MAXNAMELEN);
-			zap.za_normalization_conflict = 0;
+			zap->za_normalization_conflict = 0;
 			objnum = ZFSCTL_INO_ROOT;
 			type = DT_DIR;
 		} else {
@@ -1532,7 +1520,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 			/*
 			 * Grab next entry.
 			 */
-			if ((error = zap_cursor_retrieve(&zc, &zap))) {
+			if ((error = zap_cursor_retrieve(&zc, zap))) {
 				if ((*eofp = (error == ENOENT)) != 0)
 					break;
 				else
@@ -1546,8 +1534,8 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 			 *
 			 * XXX: This should be a feature flag for compatibility
 			 */
-			if (zap.za_integer_length != 8 ||
-			    zap.za_num_integers != 1) {
+			if (zap->za_integer_length != 8 ||
+			    zap->za_num_integers != 1) {
 				cmn_err(CE_WARN, "zap_readdir: bad directory "
 				    "entry, obj = %lld, offset = %lld\n",
 				    (u_longlong_t)zp->z_id,
@@ -1556,12 +1544,12 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 				goto update;
 			}
 
-			objnum = ZFS_DIRENT_OBJ(zap.za_first_integer);
+			objnum = ZFS_DIRENT_OBJ(zap->za_first_integer);
 			/*
 			 * MacOS X can extract the object type here such as:
 			 * uint8_t type = ZFS_DIRENT_TYPE(zap.za_first_integer);
 			 */
-			type = ZFS_DIRENT_TYPE(zap.za_first_integer);
+			type = ZFS_DIRENT_TYPE(zap->za_first_integer);
 
 		}
 
@@ -1578,11 +1566,11 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 		 *
 		 * Note: non-ascii names may expand (3x) when converted to NFD
 		 */
-		namelen = strlen(zap.za_name);
+		namelen = strlen(zap->za_name);
 
 		/* sysctl to force formD normalization of vnop output */
 		if (zfs_vnop_force_formd_normalized_output &&
-		    !is_ascii_str(zap.za_name))
+		    !is_ascii_str(zap->za_name))
 			force_formd_normalized_output = 1;
 		else
 			force_formd_normalized_output = 0;
@@ -1621,15 +1609,15 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 			 * Mac OS X: non-ascii names are UTF-8 NFC on disk
 			 * so convert to NFD before exporting them.
 			 */
-			namelen = strlen(zap.za_name);
+			namelen = strlen(zap->za_name);
 			if (!force_formd_normalized_output ||
-			    utf8_normalizestr((const u_int8_t *)zap.za_name,
+			    utf8_normalizestr((const u_int8_t *)zap->za_name,
 			    namelen, (u_int8_t *)eodp->d_name, &nfdlen,
 			    MAXPATHLEN-1, UTF_DECOMPOSED) != 0) {
 				/* ASCII or normalization failed, copy zap */
-				if ((namelen > 0))
-					(void) memcpy(eodp->d_name, zap.za_name,
-					    namelen + 1);
+				if (namelen > 0)
+					(void) memcpy(eodp->d_name,
+					    zap->za_name, namelen + 1);
 			} else {
 				/* Normalization succeeded (in buffer) */
 				namelen = nfdlen;
@@ -1651,14 +1639,14 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 			 * Mac OS X: non-ascii names are UTF-8 NFC on disk
 			 * so convert to NFD before exporting them.
 			 */
-			namelen = strlen(zap.za_name);
+			namelen = strlen(zap->za_name);
 			if (!force_formd_normalized_output ||
-			    utf8_normalizestr((const u_int8_t *)zap.za_name,
+			    utf8_normalizestr((const u_int8_t *)zap->za_name,
 			    namelen, (u_int8_t *)odp->d_name, &nfdlen,
 			    MAXNAMLEN, UTF_DECOMPOSED) != 0) {
 				/* ASCII or normalization failed, copy zap */
 				if ((namelen > 0))
-					(void) memcpy(odp->d_name, zap.za_name,
+					(void) memcpy(odp->d_name, zap->za_name,
 					    namelen + 1);
 			} else {
 				/* Normalization succeeded (in buffer). */
@@ -1708,6 +1696,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 
 update:
 	zap_cursor_fini(&zc);
+	zap_attribute_free(zap);
 	if (outbuf) {
 		kmem_free(outbuf, bufsize);
 	}

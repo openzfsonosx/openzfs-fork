@@ -480,7 +480,7 @@ zfs_unlinked_drain_task(void *arg)
 {
 	zfsvfs_t *zfsvfs = arg;
 	zap_cursor_t	zc;
-	zap_attribute_t zap;
+	zap_attribute_t *zap;
 	dmu_object_info_t doi;
 	znode_t		*zp;
 	int		error;
@@ -488,8 +488,9 @@ zfs_unlinked_drain_task(void *arg)
 	/*
 	 * Iterate over the contents of the unlinked set.
 	 */
+	zap = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, zfsvfs->z_os, zfsvfs->z_unlinkedobj);
-	    zap_cursor_retrieve(&zc, &zap) == 0 &&
+	    zap_cursor_retrieve(&zc, zap) == 0 &&
 	    zfsvfs->z_drain_state == ZFS_DRAIN_RUNNING;
 	    zap_cursor_advance(&zc)) {
 
@@ -498,7 +499,7 @@ zfs_unlinked_drain_task(void *arg)
 		 */
 
 		error = dmu_object_info(zfsvfs->z_os,
-		    zap.za_first_integer, &doi);
+		    zap->za_first_integer, &doi);
 		if (error != 0)
 			continue;
 
@@ -508,7 +509,7 @@ zfs_unlinked_drain_task(void *arg)
 		 * We need to re-mark these list entries for deletion,
 		 * so we pull them back into core and set zp->z_unlinked.
 		 */
-		error = zfs_zget(zfsvfs, zap.za_first_integer, &zp);
+		error = zfs_zget(zfsvfs, zap->za_first_integer, &zp);
 
 		/*
 		 * We may pick up znodes that are already marked for deletion.
@@ -532,6 +533,7 @@ zfs_unlinked_drain_task(void *arg)
 		ASSERT3B(zfsvfs->z_unmounted, ==, B_FALSE);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(zap);
 
 	mutex_enter(&zfsvfs->z_drain_lock);
 	zfsvfs->z_drain_state = ZFS_DRAIN_SHUTDOWN;
@@ -593,7 +595,7 @@ static int
 zfs_purgedir(znode_t *dzp)
 {
 	zap_cursor_t	zc;
-	zap_attribute_t	zap;
+	zap_attribute_t	*zap;
 	znode_t		*xzp;
 	dmu_tx_t	*tx;
 	zfsvfs_t	*zfsvfs = ZTOZSB(dzp);
@@ -601,11 +603,12 @@ zfs_purgedir(znode_t *dzp)
 	int skipped = 0;
 	int error;
 
+	zap = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, zfsvfs->z_os, dzp->z_id);
 	    (error = zap_cursor_retrieve(&zc, &zap)) == 0;
 	    zap_cursor_advance(&zc)) {
 		error = zfs_zget_ext(zfsvfs,
-		    ZFS_DIRENT_OBJ(zap.za_first_integer), &xzp,
+		    ZFS_DIRENT_OBJ(zap->za_first_integer), &xzp,
 		    ZGET_FLAG_ASYNC);
 		if (error) {
 			skipped += 1;
@@ -614,7 +617,7 @@ zfs_purgedir(znode_t *dzp)
 
 		tx = dmu_tx_create(zfsvfs->z_os);
 		dmu_tx_hold_sa(tx, dzp->z_sa_hdl, B_FALSE);
-		dmu_tx_hold_zap(tx, dzp->z_id, FALSE, zap.za_name);
+		dmu_tx_hold_zap(tx, dzp->z_id, FALSE, zap->za_name);
 		dmu_tx_hold_sa(tx, xzp->z_sa_hdl, B_FALSE);
 		dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 		/* Is this really needed ? */
@@ -630,7 +633,7 @@ zfs_purgedir(znode_t *dzp)
 		}
 		memset(&dl, 0, sizeof (dl));
 		dl.dl_dzp = dzp;
-		dl.dl_name = zap.za_name;
+		dl.dl_name = zap->za_name;
 
 		error = zfs_link_destroy(&dl, xzp, tx, 0, NULL);
 		if (error)
@@ -641,6 +644,7 @@ zfs_purgedir(znode_t *dzp)
 		zfs_znode_asyncput(xzp);
 	}
 	zap_cursor_fini(&zc);
+	zap_attribute_free(zap);
 	if (error != ENOENT)
 		skipped += 1;
 	return (skipped);
