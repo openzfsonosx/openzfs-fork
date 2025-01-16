@@ -1086,6 +1086,9 @@ remove_child_sysctls(ekstat_t *e)
 	kstat_named_t *named_base = (kstat_named_t *)(ksp->ks_data);
 	sysctl_leaf_t *vals_base = e->e_vals;
 
+	if (named_base == NULL) /* fex. VIRTUAL */
+		return;
+
 	for (int i = 0; i < ksp->ks_ndata; i++) {
 		if (vals_base[i].l_oid_registered) {
 			sysctl_unregister_oid(&vals_base[i].l_oid);
