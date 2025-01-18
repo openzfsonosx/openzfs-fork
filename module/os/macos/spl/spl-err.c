@@ -85,3 +85,20 @@ spl_panic(const char *file, const char *func, int line, const char *fmt, ...)
 	/* Unreachable */
 	return (1);
 }
+
+int
+spl_assertf(const char *file, const char *func, int line,
+	const char *fmt, ...)
+{
+	char msg[MAXMSGLEN];
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vsnprintf(msg, sizeof (msg), fmt, ap);
+	va_end(ap);
+
+	printf("%s", msg);
+
+	return (ret);
+}

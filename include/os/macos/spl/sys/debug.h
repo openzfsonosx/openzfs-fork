@@ -77,6 +77,8 @@ extern int zfs_flags;
  */
 int spl_panic(const char *file, const char *func, int line,
     const char *fmt, ...);
+int spl_assertf(const char *file, const char *func, int line,
+    const char *fmt, ...);
 void spl_dumpstack(void);
 
 void spl_backtrace(char *thesignal);
@@ -108,6 +110,12 @@ spl_assert(const char *buf, const char *file, const char *func, int line)
 	(void) (unlikely(!(cond)) &&					\
 	    spl_assert("VERIFY(" #cond ") failed\n",			\
 	    __FILE__, __FUNCTION__, __LINE__))
+
+#define	VERIFYF(cond, str, ...)	do {	\
+		if (unlikely(!(cond)))			\
+			spl_panic(__FILE__, __FUNCTION__, __LINE__,		\
+			    "VERIFY(" #cond ") failed " str "\n", __VA_ARGS__);	\
+		} while (0)
 
 #define	VERIFY3B(LEFT, OP, RIGHT)	do {				\
 		const boolean_t _verify3_left = (boolean_t)(LEFT);	\
@@ -322,12 +330,17 @@ spl_assert(const char *buf, const char *file, const char *func, int line)
 #define	ASSERT0F	VERIFY0F
 #define	ASSERTF		VERIFYF
 #define	ASSERT		VERIFY
-#define	ASSERTV(X)	X __maybe_unused
+#define	ASSERTV(X)	__maybe_unused X
 #define	IMPLY		VERIFY_IMPLY
 #define	EQUIV		VERIFY_EQUIV
 
 /* END CSTYLED */
 #else /* MACOS_ASSERT_SHOULD_PANIC */
+
+/*
+ * We differ to upstream here, with MACOS_ASSERT_SHOULD_PANIC, so
+ * we can run with asserts on, but not have it panic.
+ */
 
 #define	PRINT printf
 
@@ -339,7 +352,13 @@ __attribute__((noinline)) int assfail(const char *str, const char *file,
 	    PRINT("ZFS: %s %s %d : %s\n", __FILE__, __FUNCTION__, __LINE__, \
 		"ASSERTION(" #cond ") failed\n"))
 
-#define	ASSERT3_IMPL(LEFT, OP, RIGHT, TYPE, FMT, CAST)			\
+#define	ASSERTF(cond, str, ...)	do {	\
+		if (unlikely(!(cond)))			\
+			spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "VERIFY(" #cond ") failed " str "\n", __VA_ARGS__); \
+		} while (0)
+
+#define	ASSERT3_IMPL(LEFT, OP, RIGHT, TYPE, FMT, CAST)	\
 	do {								\
 		if (!((TYPE)(LEFT) OP(TYPE)(RIGHT)) &&	\
 		    assfail(#LEFT #OP #RIGHT, __FILE__, __LINE__))	\
@@ -349,14 +368,6 @@ __attribute__((noinline)) int assfail(const char *str, const char *file,
 				__LINE__, #LEFT, #RIGHT,	\
 			    CAST(LEFT), CAST(RIGHT));			\
 	} while (0)
-
-
-#define	ASSERTF(cond, fmt, a...)					\
-	do {								\
-		if (unlikely(!(cond)))					\
-			panic("ZFS: ASSERTION(" #cond ") failed: " fmt, ## a); \
-	} while (0)
-
 
 #define	ASSERT3B(x, y, z) ASSERT3_IMPL(x, y, z, int64_t, "%u", \
 		(boolean_t))
@@ -368,15 +379,78 @@ __attribute__((noinline)) int assfail(const char *str, const char *file,
 #define	ASSERT3P(x, y, z) ASSERT3_IMPL(x, y, z, uintptr_t, "%p", (void *))
 #define	ASSERT0(x)	ASSERT3_IMPL(0, ==, x, int64_t, "%lld", (long long))
 #define	ASSERT0P(x)	ASSERT3_IMPL(0, ==, x, uintptr_t, "%p", (void *))
-#define	ASSERT3BF(x)	ASSERT3_IMPL(0, ==, x, boolean_t, "%p", (void *))
-#define	ASSERT3SF(x)	ASSERT3_IMPL(0, ==, x, int64_t, "%p", (void *))
-#define	ASSERT3UF(x)	ASSERT3_IMPL(0, ==, x, uint64_t, "%p", (void *))
-#define	ASSERT3PF(x)	ASSERT3_IMPL(0, ==, x, uintptr_t, "%p", (void *))
-#define	ASSERT0PF(x)	ASSERT3_IMPL(0, ==, x, uintptr_t, "%p", (void *))
-#define	ASSERT0F(x)	ASSERT3_IMPL(0, ==, x, int64_t, "%p", (void *))
-#define	ASSERTF(x)	ASSERT3_IMPL(0, ==, x, uintptr_t, "%p", (void *))
-#define	ASSERTV(x)	x
 
+#define	ASSERT3BF(LEFT, OP, RIGHT, STR, ...)	do {			\
+		const boolean_t _verify3_left = (boolean_t)(LEFT);	\
+		const boolean_t _verify3_right = (boolean_t)(RIGHT);	\
+		if (unlikely(!(_verify3_left OP _verify3_right)))	\
+		    spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "ASSERT3(" #LEFT " "  #OP " "  #RIGHT ") "		\
+		    "failed (%d " #OP " %d) " STR "\n",			\
+		    (boolean_t)(_verify3_left),				\
+		    (boolean_t)(_verify3_right),			\
+		    __VA_ARGS__);					\
+	} while (0)
+
+#define	ASSERT3SF(LEFT, OP, RIGHT, STR, ...)	do {			\
+		const int64_t _verify3_left = (int64_t)(LEFT);		\
+		const int64_t _verify3_right = (int64_t)(RIGHT);	\
+		if (unlikely(!(_verify3_left OP _verify3_right)))	\
+		    spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "ASSERT3(" #LEFT " "  #OP " "  #RIGHT ") "		\
+		    "failed (%lld " #OP " %lld) " STR "\n",		\
+		    (long long)(_verify3_left),				\
+		    (long long)(_verify3_right),			\
+		    __VA_ARGS__);					\
+	} while (0)
+
+#define	ASSERT3UF(LEFT, OP, RIGHT, STR, ...)	do {			\
+		const uint64_t _verify3_left = (uint64_t)(LEFT);	\
+		const uint64_t _verify3_right = (uint64_t)(RIGHT);	\
+		if (unlikely(!(_verify3_left OP _verify3_right)))	\
+		    spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "ASSERT3(" #LEFT " "  #OP " "  #RIGHT ") "		\
+		    "failed (%llu " #OP " %llu) " STR "\n",		\
+		    (unsigned long long)(_verify3_left),		\
+		    (unsigned long long)(_verify3_right),		\
+		    __VA_ARGS__);					\
+	} while (0)
+
+#define	ASSERT3PF(LEFT, OP, RIGHT, STR, ...)	do {			\
+		const uintptr_t _verify3_left = (uintptr_t)(LEFT);	\
+		const uintptr_t _verify3_right = (uintptr_t)(RIGHT);	\
+		if (unlikely(!(_verify3_left OP _verify3_right)))	\
+		    spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "ASSERT3(" #LEFT " "  #OP " "  #RIGHT ") "		\
+		    "failed (%px " #OP " %px) " STR "\n",		\
+		    (void *) (_verify3_left),				\
+		    (void *) (_verify3_right),				\
+		    __VA_ARGS__);					\
+	} while (0)
+
+#define	ASSERT0PF(RIGHT, STR, ...)	do {				\
+		const uintptr_t _verify3_left = (uintptr_t)(0);		\
+		const uintptr_t _verify3_right = (uintptr_t)(RIGHT);	\
+		if (unlikely(!(_verify3_left == _verify3_right)))	\
+		    spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "ASSERT0(0 == " #RIGHT ") "				\
+		    "failed (0 == %px) " STR "\n",			\
+		    (long long) (_verify3_right),			\
+		    __VA_ARGS__);					\
+	} while (0)
+
+#define	ASSERT0F(RIGHT, STR, ...)	do {				\
+		const int64_t _verify3_left = (int64_t)(0);		\
+		const int64_t _verify3_right = (int64_t)(RIGHT);	\
+		if (unlikely(!(_verify3_left == _verify3_right)))	\
+		    spl_assertf(__FILE__, __FUNCTION__, __LINE__,	\
+		    "ASSERT0(0 == " #RIGHT ") "				\
+		    "failed (0 == %lld) " STR "\n",			\
+		    (long long) (_verify3_right),			\
+		    __VA_ARGS__);					\
+	} while (0)
+
+#define	ASSERTV(x)	x
 
 /*
  * IMPLY and EQUIV are assertions of the form:
