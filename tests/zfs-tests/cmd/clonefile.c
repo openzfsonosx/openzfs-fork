@@ -63,6 +63,12 @@
 #define	loff_t	off_t
 #endif
 
+#ifdef __APPLE__
+/* error: attribute declaration must precede definition */
+ssize_t
+copy_file_range(int, loff_t *, int, loff_t *, size_t, unsigned int);
+#define	cf_copy_file_range copy_file_range
+#else
 ssize_t
 copy_file_range(int, loff_t *, int, loff_t *, size_t, unsigned int)
     __attribute__((weak));
@@ -76,6 +82,7 @@ cf_copy_file_range(int sfd, loff_t *soff, int dfd, loff_t *doff,
 	return (
 	    syscall(__NR_copy_file_range, sfd, soff, dfd, doff, len, flags));
 }
+#endif /* APPLE */
 
 /* Define missing FICLONE */
 #ifdef FICLONE
@@ -267,9 +274,13 @@ main(int argc, char **argv)
 		off_t slen = lseek(sfd, 0, SEEK_END);
 		off_t dpos = lseek(dfd, 0, SEEK_CUR);
 		off_t dlen = lseek(dfd, 0, SEEK_END);
-
+#ifdef __APPLE__
+		fprintf(stderr, "file offsets: src=%llu/%llu; dst=%llu/%llu\n",
+		    spos, slen, dpos, dlen);
+#else
 		fprintf(stderr, "file offsets: src=%lu/%lu; dst=%lu/%lu\n",
 		    spos, slen, dpos, dlen);
+#endif
 	}
 
 	close(dfd);

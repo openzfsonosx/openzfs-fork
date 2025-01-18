@@ -39,9 +39,14 @@
 #define	loff_t	off_t
 #endif
 
+#ifdef __APPLE__
+ssize_t
+copy_file_range(int, loff_t *, int, loff_t *, size_t, unsigned int);
+#else
 ssize_t
 copy_file_range(int, loff_t *, int, loff_t *, size_t, unsigned int)
     __attribute__((weak));
+#endif
 
 static void *
 mmap_file(int fd, size_t size)

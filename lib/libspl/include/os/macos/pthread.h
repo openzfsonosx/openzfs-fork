@@ -31,6 +31,6 @@
  * the thread-names (let us know if you find one) we will skip setting
  * names for (userland) threads.
  */
-#define	pthread_setname_np(tid, name)
+#define	pthread_setname_np(tid, name) (void) name
 
 #endif

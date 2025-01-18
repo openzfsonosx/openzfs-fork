@@ -23,6 +23,7 @@
 #ifndef ZFS_CONTEXT_OS_H_
 #define	ZFS_CONTEXT_OS_H_
 
+#include <sys/stat.h>
 #include <sys/ioctl.h>
 
 #define	ZFS_EXPORTS_PATH	"/etc/exports"
