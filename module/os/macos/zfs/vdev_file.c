@@ -231,7 +231,6 @@ vdev_file_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
 	vdev_file_t *vf = vd->vdev_tsd;
-	zfs_file_t *fp = vf->vf_file;
 	int error = 0;
 
 #ifdef CLOSE_ON_UNMOUNT
@@ -272,7 +271,8 @@ vdev_file_io_start(zio_t *zio)
 			 * Issue the flush. If successful, the response will
 			 * be handled in the completion callback, so we're done.
 			 */
-			zio->io_error = zfs_file_fsync(fp, 0);
+			if (vf)
+				zio->io_error = zfs_file_fsync(vf->vf_file, 0);
 		}
 
 		zio->io_error = error;

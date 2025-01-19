@@ -1197,7 +1197,7 @@ zvol_os_is_zvol_impl(const char *path)
 	dprintf("%s: processing '%s'\n", __func__, path);
 
 	/* Validate path */
-	if (path == 0 || strlen(path) <= 1) {
+	if (path == NULL || strlen(path) <= 1) {
 		dprintf("%s no path provided\n", __func__);
 		return (SET_ERROR(ret));
 	}
