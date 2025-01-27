@@ -595,6 +595,7 @@ typedef struct dnode_stats {
 	kstat_named_t dnode_move_handle;
 	kstat_named_t dnode_move_rwlock;
 	kstat_named_t dnode_move_active;
+	kstat_named_t dnode_move_race;
 } dnode_stats_t;
 
 typedef struct dnode_sums {
@@ -626,6 +627,7 @@ typedef struct dnode_sums {
 	wmsum_t dnode_move_handle;
 	wmsum_t dnode_move_rwlock;
 	wmsum_t dnode_move_active;
+	wmsum_t dnode_move_race;
 } dnode_sums_t;
 
 extern dnode_stats_t dnode_stats;
