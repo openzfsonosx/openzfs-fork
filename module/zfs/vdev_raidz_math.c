@@ -81,7 +81,7 @@ static boolean_t raidz_math_initialized = B_FALSE;
 
 #define	RAIDZ_IMPL_READ(i)	(*(volatile uint32_t *) &(i))
 
-static uint32_t zfs_vdev_raidz_impl = IMPL_SCALAR;
+uint32_t zfs_vdev_raidz_impl = IMPL_SCALAR;
 static uint32_t user_sel_impl = IMPL_FASTEST;
 
 /* Hold all supported implementations */
@@ -635,17 +635,8 @@ vdev_raidz_impl_set(const char *val)
 
 #if defined(_KERNEL)
 
-#if defined(__linux__)
-static int
-zfs_vdev_raidz_impl_set(const char *val, zfs_kernel_param_t *kp)
-{
-	return (vdev_raidz_impl_set(val));
-}
-#endif
-
-#if defined(__linux__) || defined(__APPLE__)
-static int
-zfs_vdev_raidz_impl_get(char *buffer, zfs_kernel_param_t *kp)
+int
+vdev_raidz_impl_get(char *buffer, size_t size)
 {
 	int i, cnt = 0;
 	char *fmt;
@@ -656,44 +647,18 @@ zfs_vdev_raidz_impl_get(char *buffer, zfs_kernel_param_t *kp)
 	/* list mandatory options */
 	for (i = 0; i < ARRAY_SIZE(math_impl_opts) - 2; i++) {
 		fmt = (impl == math_impl_opts[i].sel) ? "[%s] " : "%s ";
-		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
+		cnt += kmem_scnprintf(buffer + cnt, size - cnt, fmt,
 		    math_impl_opts[i].name);
 	}
 
 	/* list all supported implementations */
 	for (i = 0; i < raidz_supp_impl_cnt; i++) {
 		fmt = (i == impl) ? "[%s] " : "%s ";
-		cnt += kmem_scnprintf(buffer + cnt, PAGE_SIZE - cnt, fmt,
+		cnt += kmem_scnprintf(buffer + cnt, size - cnt, fmt,
 		    raidz_supp_impl[i]->name);
 	}
 
 	return (cnt);
 }
 
-#endif /* defined(Linux) || defined(APPLE) */
-
-#if defined(__APPLE__)
-/* get / set function */
-int
-param_zfs_vdev_raidz_impl_set(ZFS_MODULE_PARAM_ARGS)
-{
-	char buf[1024]; /* Linux module string limit */
-	int rc = 0;
-
-	/* Always fill in value before calling sysctl_handle_*() */
-	if (req->newptr == (user_addr_t)NULL)
-		(void) zfs_vdev_raidz_impl_get(buf, NULL);
-
-	rc = sysctl_handle_string(oidp, buf, sizeof (buf), req);
-	if (rc || req->newptr == (user_addr_t)NULL)
-		return (rc);
-
-	rc = vdev_raidz_impl_set(buf);
-	return (rc);
-}
-#endif /* defined(APPLE) */
-
-module_param_call(zfs_vdev_raidz_impl, zfs_vdev_raidz_impl_set,
-    zfs_vdev_raidz_impl_get, NULL, 0644);
-MODULE_PARM_DESC(zfs_vdev_raidz_impl, "Select raidz implementation.");
 #endif
