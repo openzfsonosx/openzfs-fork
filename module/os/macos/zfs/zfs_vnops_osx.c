@@ -3885,6 +3885,7 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 
 	cn.cn_namelen = strlen(prefixed_name) + 1;
 	cn.cn_nameptr = (char *)kmem_zalloc(cn.cn_namelen, KM_SLEEP);
+	const size_t free_buflen = cn.cn_namelen;
 
 	/* Lookup the attribute name. */
 	if ((error = zfs_dirlook(xdzp, (char *)prefixed_name, &xzp, 0, NULL,
@@ -3905,8 +3906,8 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 			0, VNODE_UPDATE_NAME);
 	}
 
-	kmem_free(prefixed_name, strlen(prefixed_name));
-	kmem_free(cn.cn_nameptr, cn.cn_namelen);
+	spa_strfree(prefixed_name);
+	kmem_free(cn.cn_nameptr, free_buflen);
 
 out:
 	if (xdzp)
