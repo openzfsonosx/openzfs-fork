@@ -58,7 +58,7 @@
 #define	gcm_avx_can_use_movbe _gcm_avx_can_use_movbe
 
 // There is a bug in Xcode 16.0
-#if defined(__APPLE__) && (__clang_major__ == 16) && (__clang_minor__ == 0)
+#if defined(__APPLE__) && (__clang_major__ >= 16)
 #define cfi_restore set ignore,
 #define cfi_def_cfa_register set ignore,
 #endif

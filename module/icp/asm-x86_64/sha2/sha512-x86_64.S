@@ -21,7 +21,7 @@
 
 #if defined(__x86_64)
 
-#if defined(__APPLE__) && (__clang_major__ == 16) && (__clang_minor__ == 0)
+#if defined(__APPLE__) && (__clang_major__ >= 16)
 // There is a bug in Xcode 16.0
 // let sadd #if version == here?
 #define cfi_restore set ignore,
