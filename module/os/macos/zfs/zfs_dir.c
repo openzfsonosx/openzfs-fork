@@ -605,7 +605,7 @@ zfs_purgedir(znode_t *dzp)
 
 	zap = zap_attribute_alloc();
 	for (zap_cursor_init(&zc, zfsvfs->z_os, dzp->z_id);
-	    (error = zap_cursor_retrieve(&zc, &zap)) == 0;
+	    (error = zap_cursor_retrieve(&zc, zap)) == 0;
 	    zap_cursor_advance(&zc)) {
 		error = zfs_zget_ext(zfsvfs,
 		    ZFS_DIRENT_OBJ(zap->za_first_integer), &xzp,
