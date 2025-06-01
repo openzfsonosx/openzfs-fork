@@ -213,6 +213,7 @@ zfs_common_SRCS = \
 	%D%/../../zfs/vdev.c \
 	%D%/../../zfs/vdev_draid.c \
 	%D%/../../zfs/vdev_draid_rand.c \
+	%D%/../../zfs/vdev_file.c \
 	%D%/../../zfs/vdev_indirect.c \
 	%D%/../../zfs/vdev_indirect_births.c \
 	%D%/../../zfs/vdev_indirect_mapping.c \
@@ -272,7 +273,7 @@ zfs_os_SRCS = \
 	%D%/zfs/spa_misc_os.c \
 	%D%/zfs/sysctl_os.c \
 	%D%/zfs/vdev_disk.c \
-	%D%/zfs/vdev_file.c \
+	%D%/zfs/vdev_file_os.c \
 	%D%/zfs/vdev_label_os.c \
 	%D%/zfs/zfs_acl.c \
 	%D%/zfs/zfs_boot.cpp \
