@@ -217,6 +217,9 @@ extern "C" {
 #define	param_set_max_auto_ashift_args(var) \
     CTLTYPE_U64, &var, sizeof (var), param_set_max_auto_ashift, "QU"
 
+#define	param_set_raidz_impl_args(var) \
+    CTLTYPE_STRING, NULL, 0, param_set_raidz_impl, "A"
+
 #define	spa_taskq_read_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, spa_taskq_read_param, "A"
 

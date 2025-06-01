@@ -691,6 +691,24 @@ param_set_deadman_failmode(ZFS_MODULE_PARAM_ARGS)
 	return (-param_set_deadman_failmode_common(buf));
 }
 
+int
+param_set_raidz_impl(ZFS_MODULE_PARAM_ARGS)
+{
+	char buf[128]; /* Linux module string limit */
+	const size_t bufsize = sizeof (buf);
+	int rc = 0;
+
+	/* Always fill in value before calling sysctl_handle_*() */
+	if (req->newptr == (user_addr_t)NULL)
+		vdev_raidz_impl_get(buf, bufsize);
+
+	rc = sysctl_handle_string(oidp, buf, sizeof (buf), req);
+	if (rc || req->newptr == (user_addr_t)NULL)
+		return (rc);
+
+	rc = vdev_raidz_impl_set(buf);
+	return (rc);
+}
 
 /* spacemap.c */
 extern int space_map_ibs;
