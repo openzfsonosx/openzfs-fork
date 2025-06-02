@@ -538,6 +538,7 @@ zfs_sha256_available(void)
 
 #define	HWCAP_FP		0x00000001
 #define	HWCAP_AES		0x00000008
+#define	HWCAP_PMULL		0x00000010
 #define	HWCAP_SHA2		0x00000040
 #define	HWCAP_SHA512		0x00200000
 
@@ -579,6 +580,13 @@ zfs_aesv8_available(void)
 {
 	unsigned long hwcap = getauxval(AT_HWCAP);
 	return (hwcap & HWCAP_AES);
+}
+
+static inline boolean_t
+zfs_pmull_available(void)
+{
+	unsigned long hwcap = getauxval(AT_HWCAP);
+	return (hwcap & HWCAP_PMULL);
 }
 
 #elif defined(__powerpc__)

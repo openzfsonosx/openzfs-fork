@@ -93,4 +93,12 @@ zfs_aesv8_available(void)
 	return ((ftr >> 4) & 0xf);
 }
 
+static inline boolean_t
+zfs_pmull_available(void)
+{
+	uint64_t ftr;
+	get_ftr(ID_AA64ISAR0_EL1, ftr);
+	return ((ftr >> 8) & 0xf);
+}
+
 #endif /* _MACOS_SIMD_AARCH64_H */

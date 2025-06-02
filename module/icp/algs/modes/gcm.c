@@ -35,6 +35,11 @@
 #include <aes/aes_impl.h>
 #endif
 
+// CAN_USE_GCM_ASM appears to be an Intel thing
+#ifdef __aarch64__
+#include <aes/aes_impl.h>
+#endif
+
 #define	GHASH(c, d, t, o) \
 	xor_block((uint8_t *)(d), (uint8_t *)(c)->gcm_ghash); \
 	(o)->mul((uint64_t *)(void *)(c)->gcm_ghash, (c)->gcm_H, \
@@ -75,6 +80,87 @@ static int gcm_decrypt_final_avx(gcm_ctx_t *, crypto_data_t *, size_t);
 static int gcm_init_avx(gcm_ctx_t *, const uint8_t *, size_t, const uint8_t *,
     size_t, size_t);
 #endif /* ifdef CAN_USE_GCM_ASM */
+
+#if defined(__aarch64__) && defined(HAVE_AESV8)
+
+extern void ASMABI gcm_init_v8(uint64_t *Htable, const uint64_t Xi[2]);
+extern void ASMABI gcm_gmult_v8(uint64_t Xi[2], const uint64_t Htable[16*2]);
+extern void ASMABI gcm_ghash_v8(uint64_t Xi[2], const uint64_t Htable[16*2],
+	const uint8_t *input, size_t len);
+
+static boolean_t
+gcm_ghashv8_will_work(void)
+{
+	/*
+	 * so msr is a system register that returns 0 below
+	 * EL1. But all APPLE M1 onwards support PMULL. We could
+	 * fetch it from sysctl here for userland.
+	 */
+#ifndef _KERNEL
+	return (B_TRUE);
+#endif
+	return (kfpu_allowed() &&
+	    zfs_aesv8_available() &&
+	    zfs_pmull_available());
+}
+
+const gcm_impl_ops_t gcm_ghashv8_impl = {
+	.name = "ghashv8",
+	.needs_htable = B_TRUE,
+	.ghash = &gcm_ghash_v8,
+	.ghash_init = &gcm_init_v8, // or gcm_init_htab(), not NULL!
+	.is_supported = &gcm_ghashv8_will_work
+};
+
+// Turbo up the GHASH
+#undef GHASH
+#define	GHASH(c, d, t, o) do { \
+		xor_block((uint8_t *)(d), (uint8_t *)(c)->gcm_ghash); \
+		if ((o)->ghash != NULL) { \
+			(o)->ghash((uint64_t *)(c)->gcm_ghash, \
+				(const uint64_t *)(c)->gcm_Htable, \
+				(const uint8_t *)(t), 16); \
+		} else { \
+			(o)->mul((uint64_t *)(c)->gcm_ghash, (c)->gcm_H, \
+				(uint64_t *)(t)); \
+		} \
+	} while (0)
+
+// ChatGPT also suggests we can copy gcm_mode_encrypt_contiguous_blocks()
+// and move the GHASH call outside the loop to call gcm_ghash_v8_x4()
+// for larger sections, mopping up the tail with regular GHASH.
+// Perhaps by adding gcm_impl_ops_t->ghash_x4 variant. But that
+// would be a larger change, up where we decide to call contiguous.
+
+#endif /* defined (__aarch64__) && defined(HAVE_AESV8) */
+
+/*
+ * Generic ghash_init function
+ */
+__maybe_unused static void
+gcm_init_htab(uint64_t *Htable, const uint64_t H[2])
+{
+	Htable[0] = 0;
+	Htable[1] = 0;
+
+	Htable[2] = H[0];
+	Htable[3] = H[1];
+
+	for (int i = 2; i < 16; i++) {
+		uint64_t prev_hi = Htable[(i - 1) * 2];
+		uint64_t prev_lo = Htable[(i - 1) * 2 + 1];
+
+		uint64_t lo = (prev_lo >> 1) | (prev_hi << 63);
+		uint64_t hi = (prev_hi >> 1);
+
+		if (prev_lo & 1) {
+			hi ^= 0xe100000000000000ULL;
+		}
+
+		Htable[i * 2] = hi;
+		Htable[i * 2 + 1] = lo;
+	}
+}
 
 /*
  * Encrypt multiple blocks of data in GCM mode.  Decrypt for GCM mode
@@ -625,6 +711,21 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
 	const uint8_t *aad = (const uint8_t *)gcm_param->pAAD;
 	size_t aad_len = gcm_param->ulAADLen;
 
+	const gcm_impl_ops_t *gops = gcm_impl_get_ops();
+
+	if (gops->needs_htable) {
+		gcm_ctx->gcm_htab_len = 32 * sizeof (uint64_t);
+		gcm_ctx->gcm_Htable =
+		    kmem_alloc(gcm_ctx->gcm_htab_len, KM_SLEEP);
+
+		/*
+		 * We assume ghash_init is set to at least
+		 * gcm_init_htab() (generic), since this only
+		 * applies to new code with .needs_htable set.
+		 */
+		gops->ghash_init(gcm_ctx->gcm_Htable, gcm_ctx->gcm_H);
+	}
+
 #ifdef CAN_USE_GCM_ASM
 	boolean_t needs_bswap =
 	    ((aes_key_t *)gcm_ctx->gcm_keysched)->ops->needs_byteswap;
@@ -728,6 +829,9 @@ static const gcm_impl_ops_t *gcm_all_impl[] = {
 #if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
 	&gcm_pclmulqdq_impl,
 #endif
+#if defined(__aarch64__) && defined(HAVE_AESV8)
+	&gcm_ghashv8_impl,
+#endif
 };
 
 /* Indicate that benchmark has been completed */
@@ -810,8 +914,8 @@ gcm_impl_init(void)
 	 * hardware accelerated version is the fastest.
 	 */
 #if defined(__aarch64__) && defined(HAVE_ARMV8)
-	if (gcm_armv8_impl.is_supported()) {
-		memcpy(&gcm_fastest_impl, &gcm_armv8_impl,
+	if (gcm_ghashv8_impl.is_supported()) {
+		memcpy(&gcm_fastest_impl, &gcm_ghashv8_impl,
 		    sizeof (gcm_fastest_impl));
 	} else
 #endif
