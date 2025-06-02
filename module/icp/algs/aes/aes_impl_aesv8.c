@@ -19,11 +19,12 @@
  * CDDL HEADER END
  */
 
+#include <aes/aes_impl.h>
+
 /*
  * Copyright (c) 2023, Jorgen Lundman <lundman@lundman.net>
  */
 
-#define	HAVE_AESV8
 #if defined(__aarch64__) && defined(HAVE_AESV8)
 
 #include <sys/simd.h>
@@ -58,8 +59,6 @@ typedef struct aes_key_st {
 	int		rounds;
 	unsigned int	pad[3];
 } AES_KEY;
-
-#include <aes/aes_impl.h>
 
 /*
  * Expand the 32-bit AES cipher key array into the encryption and decryption
@@ -130,8 +129,15 @@ aes_aesv8_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
 static boolean_t
 aes_aesv8_will_work(void)
 {
+	/*
+	 * so msr is a system register that returns 0 below
+	 * EL1. But all APPLE M1 onwards support AES. We could
+	 * fetch it from sysctl here for userland.
+	 */
+#ifndef _KERNEL
+	return (B_TRUE);
+#endif
 	return (kfpu_allowed() && zfs_aesv8_available());
-
 }
 
 const aes_impl_ops_t aes_aesv8_impl = {
