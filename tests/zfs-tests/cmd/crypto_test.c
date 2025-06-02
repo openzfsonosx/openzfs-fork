@@ -518,6 +518,7 @@ static const char *aes_impl[] = {
 	"generic",
 	"x86_64",
 	"aesni",
+	"aesv8",
 };
 
 static const char *aes_gcm_impl[][2] = {
@@ -529,6 +530,8 @@ static const char *aes_gcm_impl[][2] = {
 	{ "aesni",   "pclmulqdq" },
 	{ "x86_64",  "avx" },
 	{ "aesni",   "avx" },
+	{ "aesv8",   "generic" },
+	{ "aesv8",   "ghashv8" },
 };
 
 /* signature of function to call after setting implementation params */
@@ -1135,6 +1138,9 @@ static int
 perf_main(const char *algname, crypto_test_outmode_t outmode)
 {
 	perf_alg_args_t args;
+
+	if (!algname)
+		return (1);
 
 	if (strcmp(algname, "AES-CCM") == 0)
 		args.alg = ALG_AES_CCM;
