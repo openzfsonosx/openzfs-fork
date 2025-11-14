@@ -64,8 +64,7 @@ libzfs_la_LIBADD = \
 	libshare.la \
 	libzfs_core.la \
 	libnvpair.la \
-	libzutil.la \
-	libuutil.la
+	libzutil.la
 
 libzfs_la_LIBADD += -lm $(LIBCRYPTO_LIBS) $(ZLIB_LIBS) $(LIBFETCH_LIBS) $(LTLIBINTL)
 if !BUILD_MACOS

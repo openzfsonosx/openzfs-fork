@@ -32,7 +32,6 @@ zpool_LDADD = \
 	libzfs.la \
 	libzfs_core.la \
 	libnvpair.la \
-	libuutil.la \
 	libzutil.la
 
 zpool_LDADD += $(LTLIBINTL)
