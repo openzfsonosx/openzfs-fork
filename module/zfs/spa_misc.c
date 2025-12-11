@@ -2671,7 +2671,6 @@ spa_init(spa_mode_t mode)
 	zpool_prop_init();
 	zpool_feature_init();
 	vdev_prop_init();
-	l2arc_start();
 	scan_init();
 	qat_init();
 	spa_import_progress_init();
@@ -2681,8 +2680,6 @@ spa_init(spa_mode_t mode)
 void
 spa_fini(void)
 {
-	l2arc_stop();
-
 	spa_evict_all();
 
 #ifdef _KERNEL
