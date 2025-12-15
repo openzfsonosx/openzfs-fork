@@ -7,6 +7,7 @@ KERNEL_H = \
 	$(top_srcdir)/include/os/macos/spl/sys/console.h \
 	$(top_srcdir)/include/os/macos/spl/sys/cred.h \
 	$(top_srcdir)/include/os/macos/spl/sys/debug.h \
+	$(top_srcdir)/include/os/macos/spl/sys/disp.h \
 	$(top_srcdir)/include/os/macos/spl/sys/errno.h \
 	$(top_srcdir)/include/os/macos/spl/sys/fcntl.h \
 	$(top_srcdir)/include/os/macos/spl/sys/file.h \

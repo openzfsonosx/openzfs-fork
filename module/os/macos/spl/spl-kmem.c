@@ -33,6 +33,7 @@
 #include <sys/debug.h>
 #include <sys/cdefs.h>
 #include <sys/cmn_err.h>
+#include <sys/disp.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/kstat.h>

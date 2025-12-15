@@ -887,7 +887,7 @@ out_mutex:
 
 	if (error == EINTR) {
 		error = ERESTART;
-		schedule();
+		(void) thread_block(THREAD_CONTINUE_NULL);
 	}
 	return (SET_ERROR(error));
 }

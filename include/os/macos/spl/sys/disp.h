@@ -22,4 +22,17 @@
 #ifndef _SPL_DISP_H
 #define	_SPL_DISP_H
 
+#define	KPREEMPT_SYNC		(-1)
+
+#define	kpreempt(unused)	(void) thread_block(THREAD_CONTINUE_NULL)
+
+/*
+ * XNU doesn't export _disable_preemption() or _enable_preemption() so we use
+ * ml_set_interrupts_enabled() instead.
+ */
+extern boolean_t ml_set_interrupts_enabled(boolean_t);
+
+#define	kpreempt_disable()	ml_set_interrupts_enabled(false)
+#define	kpreempt_enable()	ml_set_interrupts_enabled(true)
+
 #endif

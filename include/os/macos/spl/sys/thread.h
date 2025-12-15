@@ -178,12 +178,6 @@ extern void spl_set_thread_latency(thread_t,
 #define	delay osx_delay
 extern void osx_delay(clock_t);
 
-#define	KPREEMPT_SYNC 0
-static inline void kpreempt(int flags)
-{
-	(void) thread_block(THREAD_CONTINUE_NULL);
-}
-
 static inline char *
 getcomm(void)
 {

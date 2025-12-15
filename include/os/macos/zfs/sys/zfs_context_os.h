@@ -75,12 +75,6 @@ typedef struct spa_iokit spa_iokit_t;
 
 #define	noinline		__attribute__((noinline))
 
-/* really? */
-#define	kpreempt_disable()	((void)0)
-#define	kpreempt_enable()	((void)0)
-#define	cond_resched()	(void)thread_block(THREAD_CONTINUE_NULL);
-#define	schedule()	(void)thread_block(THREAD_CONTINUE_NULL);
-
 #define	current		curthread
 
 extern boolean_t ml_set_interrupts_enabled(boolean_t);
