@@ -16,12 +16,12 @@
 #                |--libzdb--zdb             |                    |
 #                |                          |                    |
 #             libzpool                   libzfs* ----------------+
-#             | | |  \                  / | | |\
-#    libicp --/ | |   \                /  | \ | \----- libshare
-#               | |    \              /   |  \ \
-#    libzstd ---/ |     \            /    |   \ \-------\
-#                 |      \          /     \    \         \
-#    libunicode --/       \        /       \    \-------\ \
+#             | |    \                  / | | |
+#    libicp --/ |     \                /  | \ |
+#               |      \              /   |  \ \
+#    libzstd ---/       \            /    |   \ \-------\
+#                        \          /     \    \         \
+#                         \        /       \    \-------\ \
 #                          \      /         \            \ |
 #                          libzutil        libzfs_core*  | |
 #                            | | | \          |     |    | |
@@ -66,7 +66,6 @@ endif
 include $(srcdir)/%D%/libavl/Makefile.am
 include $(srcdir)/%D%/libicp/Makefile.am
 include $(srcdir)/%D%/libnvpair/Makefile.am
-include $(srcdir)/%D%/libshare/Makefile.am
 include $(srcdir)/%D%/libspl/Makefile.am
 include $(srcdir)/%D%/libunicode/Makefile.am
 include $(srcdir)/%D%/libzdb/Makefile.am
