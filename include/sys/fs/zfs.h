@@ -203,11 +203,14 @@ typedef enum {
 	ZFS_PROP_DEFAULTUSEROBJQUOTA,
 	ZFS_PROP_DEFAULTGROUPOBJQUOTA,
 	ZFS_PROP_DEFAULTPROJECTOBJQUOTA,
+	ZFS_PROP_SNAPSHOTS_CHANGED_NSECS,
+
 	ZFS_PROP_BROWSE,		/* macOS: nobrowse/browse */
 	ZFS_PROP_IGNOREOWNER,	/* macOS: ignoreowner mount */
 	ZFS_PROP_LASTUNMOUNT,	/* macOS: Spotlight required */
 	ZFS_PROP_MIMIC,			/* macOS: mimic=hfs|apfs */
 	ZFS_PROP_DEVDISK,		/* macOS: create IOkit virtual disk */
+
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
