@@ -21,8 +21,8 @@ check:
 	cppcheck cppcheck-Linux cppcheck-FreeBSD cppcheck-macOS
 
 # For FreeBSD, use debug options from ./configure if not overridden.
-export WITH_DEBUG ?= @WITH_DEBUG@
-export WITH_INVARIANTS ?= @WITH_INVARIANTS@
+WITH_DEBUG ?= @WITH_DEBUG@
+WITH_INVARIANTS ?= @WITH_INVARIANTS@
 
 # Filter out options that FreeBSD make doesn't understand
 getflags = ( \
@@ -45,6 +45,7 @@ done; \
 echo $$fmakeflags \
 )
 FMAKEFLAGS = -C @abs_srcdir@ -f Makefile.bsd $(shell $(getflags))
+FMAKEFLAGS += WITH_DEBUG=$(WITH_DEBUG) WITH_INVARIANTS=$(WITH_INVARIANTS)
 
 ifneq (@abs_srcdir@,@abs_builddir@)
 FMAKEFLAGS += MAKEOBJDIR=@abs_builddir@
