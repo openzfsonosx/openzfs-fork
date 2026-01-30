@@ -1276,10 +1276,10 @@ zfs_vfs_mountroot(struct mount *mp, struct vnode *devvp, vfs_context_t ctx)
 		return (ENOMEM);
 	}
 
-	mutex_enter(&spa_namespace_lock);
+	spa_namespace_enter(FTAG);
 	spa = spa_next(NULL);
 	if (!spa) {
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 		cmn_err(CE_NOTE, "%s: no pool available",
 		    __func__);
 		goto out;
@@ -1288,12 +1288,12 @@ zfs_vfs_mountroot(struct mount *mp, struct vnode *devvp, vfs_context_t ctx)
 	error = dsl_dsobj_to_dsname(spa_name(spa),
 	    spa_bootfs(spa), zfs_bootfs);
 	if (error != 0) {
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 		cmn_err(CE_NOTE, "%s: bootfs to name error %d",
 		    __func__, error);
 		goto out;
 	}
-	mutex_exit(&spa_namespace_lock);
+	spa_namespace_exit(FTAG);
 
 	/*
 	 * By setting the dev_t value in the mount vfsp,

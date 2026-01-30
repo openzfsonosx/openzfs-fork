@@ -1484,13 +1484,13 @@ zfs_boot_publish_bootfs(IOService *zfs_hl, pool_list_t *pools)
 	}
 	zfs_bootfs[0] = '\0';
 
-	mutex_enter(&spa_namespace_lock);
+	spa_namespace_enter(FTAG);
 	spa = spa_next(NULL);
 	if (spa) {
 		bootfs = spa_bootfs(spa);
 	}
 	if (bootfs == 0) {
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 		dprintf("%s no bootfs, nothing to do\n", __func__);
 		kmem_free(zfs_bootfs, len);
 		return (0);
@@ -1500,7 +1500,7 @@ zfs_boot_publish_bootfs(IOService *zfs_hl, pool_list_t *pools)
 	/* Get pool proxy */
 	if (!spa->spa_iokit_proxy ||
 	    (pool_proxy = spa->spa_iokit_proxy->proxy) == NULL) {
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 		dprintf("%s no spa_pool_proxy\n", __func__);
 		kmem_free(zfs_bootfs, len);
 		return (0);
@@ -1509,7 +1509,7 @@ zfs_boot_publish_bootfs(IOService *zfs_hl, pool_list_t *pools)
 
 	error = dsl_dsobj_to_dsname(spa_name(spa),
 	    spa_bootfs(spa), zfs_bootfs);
-	mutex_exit(&spa_namespace_lock);
+	spa_namespace_exit(FTAG);
 
 	if (error != 0) {
 		dprintf("%s bootfs to name failed\n", __func__);
@@ -2404,14 +2404,14 @@ zfs_boot_update_bootinfo(spa_t *spa)
 	}
 
 	/* Grab necessary locks */
-	mutex_enter(&spa_namespace_lock);
+	spa_namespace_enter(FTAG);
 	spa_open_ref(spa, FTAG);
 
 	/* Get pool proxy */
 	if (!spa->spa_iokit_proxy ||
 	    (pool_proxy = spa->spa_iokit_proxy->proxy) == NULL) {
 		spa_close(spa, FTAG);
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 		dprintf("%s no spa_pool_proxy\n", __func__);
 		return (0);
 	}
@@ -2419,7 +2419,7 @@ zfs_boot_update_bootinfo(spa_t *spa)
 	pool_proxy->retain();
 
 	/* Don't need to hold this throughout */
-	mutex_exit(&spa_namespace_lock);
+	spa_namespace_exit(FTAG);
 
 	/* vdev state lock only requires an spa open ref */
 	spa_vdev_state_enter(spa, SCL_NONE);
@@ -2432,9 +2432,9 @@ zfs_boot_update_bootinfo(spa_t *spa)
 
 		/* Drop locks */
 		(void) spa_vdev_state_exit(spa, NULL, 0);
-		mutex_enter(&spa_namespace_lock);
+		spa_namespace_enter(FTAG);
 		spa_close(spa, FTAG);
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 		array->release();
 		pool_proxy->release();
 		return (error);
@@ -2453,9 +2453,9 @@ zfs_boot_update_bootinfo(spa_t *spa)
 	array->release();
 
 	/* Drop locks */
-	mutex_enter(&spa_namespace_lock);
+	spa_namespace_enter(FTAG);
 	spa_close(spa, FTAG);
-	mutex_exit(&spa_namespace_lock);
+	spa_namespace_exit(FTAG);
 	return (0);
 }
 

@@ -59,13 +59,13 @@ spa_import_os(spa_t *spa)
 	int haslock = 0;
 	int error;
 
-	haslock = mutex_owned(&spa_namespace_lock);
+	haslock = spa_namespace_held();
 
 	/* Increase open refcount */
 	spa_open_ref(spa, FTAG);
 
 	if (haslock) {
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 	}
 
 	/* Create IOKit pool proxy */
@@ -84,7 +84,7 @@ spa_import_os(spa_t *spa)
 
 	/* Drop open refcount */
 	if (haslock) {
-		mutex_enter(&spa_namespace_lock);
+		spa_namespace_enter(FTAG);
 	}
 
 	spa_close(spa, FTAG);

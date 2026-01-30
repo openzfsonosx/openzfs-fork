@@ -197,15 +197,15 @@ retry:
 
 		/* If this is to be first open, deal with spa_namespace */
 		if (zv->zv_open_count == 0 &&
-		    !mutex_owned(&spa_namespace_lock)) {
+		    !spa_namespace_held()) {
 			/*
 			 * We need to guarantee that the namespace lock is held
 			 * to avoid spurious failures in zvol_first_open.
 			 */
 			ret |= ZVOL_LOCK_SPA;
-			if (!mutex_tryenter(&spa_namespace_lock)) {
+			if (!spa_namespace_tryenter(FTAG)) {
 				rw_exit(&zvol_state_lock);
-				mutex_enter(&spa_namespace_lock);
+				spa_namespace_enter(FTAG);
 				/* Sadly, this will restart for loop */
 				goto retry;
 			}
@@ -226,7 +226,7 @@ retry:
 				/* If we hold spa_namespace, we can deadlock */
 				if (ret & ZVOL_LOCK_SPA) {
 					rw_exit(&zvol_state_lock);
-					mutex_exit(&spa_namespace_lock);
+					spa_namespace_exit(FTAG);
 					ret &= ~ZVOL_LOCK_SPA;
 					dprintf("%s: spa_namespace loop\n",
 					    __func__);
@@ -255,7 +255,7 @@ retry:
 
 	/* It's possible we grabbed spa, but then didn't re-find zv */
 	if (ret & ZVOL_LOCK_SPA)
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 	return (0);
 }
 
@@ -263,7 +263,7 @@ static void
 zvol_os_verify_lock_exit(zvol_state_t *zv, int locks)
 {
 	if (locks & ZVOL_LOCK_SPA)
-		mutex_exit(&spa_namespace_lock);
+		spa_namespace_exit(FTAG);
 	mutex_exit(&zv->zv_state_lock);
 	if (locks & ZVOL_LOCK_SUSPEND)
 		rw_exit(&zv->zv_suspend_lock);
