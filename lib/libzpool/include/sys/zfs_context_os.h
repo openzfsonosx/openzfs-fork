@@ -30,7 +30,7 @@
 #define	ZFS_CONTEXT_OS_H_
 
 #ifdef __APPLE__
-#include_next <sys/zfs_context_os.h>
+#include <sys/zfs_context_macos.h>
 #endif
 
 #define	HAVE_LARGE_STACKS	1
