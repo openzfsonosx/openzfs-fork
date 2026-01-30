@@ -190,6 +190,9 @@ extern "C" {
 #define	param_set_arc_max_args(var) \
     CTLTYPE_QUAD, &var, sizeof (var), param_set_arc_max, "QU"
 
+#define	spa_taskq_free_param_set_args(var) \
+    CTLTYPE_STRING, NULL, 0, spa_taskq_free_param, "A"
+
 #define	param_set_arc_int_args(var) \
     CTLTYPE_INT, &var, sizeof (var), param_set_arc_int, "I"
 
@@ -225,6 +228,9 @@ extern "C" {
 
 #define	spa_taskq_write_param_set_args(var)	\
 	CTLTYPE_STRING, NULL, 0, spa_taskq_write_param, "A"
+
+#define	spa_taskq_free_param_set_args(var) \
+	CTLTYPE_STRING, NULL, 0, spa_taskq_free_param, "A"
 
 #define	fletcher_4_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, fletcher_4_param, "A"

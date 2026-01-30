@@ -1536,7 +1536,8 @@ spa_taskq_param_get(zio_type_t t, char *buf, boolean_t add_newline)
 			    modes[zti->zti_mode], zti->zti_count,
 			    zti->zti_value);
 		else if (zti->zti_mode == ZTI_MODE_SCALE && zti->zti_value > 0)
-			pos += sprintf(&buf[pos], "%s%s,%u", sep,
+			pos += snprintf(&buf[pos], LINUX_MAX_MODULE_PARAM_LEN,
+			    "%s%s,%u", sep,
 			    modes[zti->zti_mode], zti->zti_value);
 		else
 			pos += snprintf(&buf[pos], LINUX_MAX_MODULE_PARAM_LEN,
