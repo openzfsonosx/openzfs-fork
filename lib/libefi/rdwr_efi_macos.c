@@ -475,8 +475,8 @@ efi_alloc_and_read(int fd, struct dk_gpt **vtoc)
 
 	/* figure out the number of entries that would fit into 16K */
 	nparts = EFI_MIN_ARRAY_SIZE / sizeof (efi_gpe_t);
-	length = (int) sizeof (struct dk_gpt) +
-	    (int) sizeof (struct dk_part) * (nparts - 1);
+	length = (int)sizeof (struct dk_gpt) +
+	    (int)sizeof (struct dk_part) * (nparts - 1);
 	vptr = calloc(1, length);
 
 	if (vptr == NULL)
@@ -487,8 +487,8 @@ efi_alloc_and_read(int fd, struct dk_gpt **vtoc)
 
 	if ((rval == VT_EINVAL) && vptr->efi_nparts > nparts) {
 		void *tmp;
-		length = (int) sizeof (struct dk_gpt) +
-		    (int) sizeof (struct dk_part) * (vptr->efi_nparts - 1);
+		length = (int)sizeof (struct dk_gpt) +
+		    (int)sizeof (struct dk_part) * (vptr->efi_nparts - 1);
 		nparts = vptr->efi_nparts;
 		if ((tmp = realloc(vptr, length)) == NULL) {
 			free(vptr);
@@ -745,7 +745,7 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	if (NBLOCKS(vtoc->efi_nparts, disk_info.dki_lbsize) < 34) {
 		label_len = EFI_MIN_ARRAY_SIZE + disk_info.dki_lbsize;
 	} else {
-		label_len = vtoc->efi_nparts * (int) sizeof (efi_gpe_t) +
+		label_len = vtoc->efi_nparts * (int)sizeof (efi_gpe_t) +
 		    disk_info.dki_lbsize;
 		if (label_len % disk_info.dki_lbsize) {
 			/* pad to physical sector size */
@@ -1199,8 +1199,9 @@ efi_use_whole_disk(int fd)
 	 * (for performance reasons). The alignment should match the
 	 * alignment used by the "zpool_label_disk" function.
 	 */
-	limit = P2ALIGN(efi_label->efi_last_lba - nblocks - EFI_MIN_RESV_SIZE,
-	    PARTITION_END_ALIGNMENT);
+	limit = P2ALIGN_TYPED(efi_label->efi_last_lba - nblocks -
+	    EFI_MIN_RESV_SIZE,
+	    PARTITION_END_ALIGNMENT, diskaddr_t);
 	if (data_start + data_size != limit || resv_start != limit)
 		sync_needed = B_TRUE;
 
