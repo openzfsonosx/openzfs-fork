@@ -55,6 +55,8 @@
 extern size_t spl_pagesize(void);
 #define	PAGESIZE	(spl_pagesize())
 
+#define	ptob(x)		((x) * PAGESIZE)
+
 extern int execvpe(const char *name, char * const argv[], char * const envp[]);
 
 struct zfs_handle;
