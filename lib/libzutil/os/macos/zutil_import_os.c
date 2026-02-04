@@ -63,7 +63,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/vdev_impl.h>
 
-#include <thread_pool.h>
+#include <sys/taskq.h>
 #include <libzutil.h>
 #include <libnvpair.h>
 
