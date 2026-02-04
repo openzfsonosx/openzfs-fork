@@ -33,7 +33,12 @@ const char* ZSTD_versionString(void) { return ZSTD_VERSION_STRING; }
 /*! ZSTD_isError() :
  *  tells if a return value is an error code
  *  symbol is required for external callers */
+#ifdef __APPLE__
+/* We could redo this leveraging __USER_LABEL_PREFIX__ */
+unsigned ZSTD_isError(size_t code) __asm__("_zfs_ZSTD_isError");
+#else
 unsigned ZSTD_isError(size_t code) __asm__("zfs_ZSTD_isError");
+#endif
 unsigned ZSTD_isError(size_t code) { return ERR_isError(code); }
 
 /*! ZSTD_getErrorName() :

@@ -1,6 +1,6 @@
 dnl #
 dnl # macOS - attempt to find kernel headers. This is expected to
-dnl # only run on mac platforms (using xcrun command) to iterate 
+dnl # only run on mac platforms (using xcrun command) to iterate
 dnl # through versions of xcode, and xnu kernel source locations
 dnl #
 AC_DEFUN([ZFS_AC_KERNEL_SRC_MACOS_HEADERS], [
@@ -89,6 +89,17 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_MACOS_HEADERS], [
 		])
 		AC_MSG_RESULT($machkernel)
 
+dnl Determine Clang resource headers (for intrinsics like emmintrin.h)
+dnl and arm_neon.h etc.
+AS_IF([test -z "$CLANG_RESOURCE_DIR"], [
+    clang_resdir=`$CC -print-resource-dir 2>/dev/null`
+        AS_IF([test -n "$clang_resdir" && test -d "$clang_resdir/include"], [
+	        CLANG_RESOURCE_DIR="$clang_resdir/include"
+	    ])
+    ])
+
+AC_SUBST([CLANG_RESOURCE_DIR])
+
 
 dnl More Generic names:
 	MACH_KERNEL=${machkernel}
@@ -100,4 +111,3 @@ dnl More Generic names:
 	AC_SUBST(MACH_KERNEL)
 	])
 ])
-
