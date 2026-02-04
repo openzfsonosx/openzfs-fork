@@ -40,9 +40,8 @@
 #include <unistd.h>
 #include <libintl.h>
 
-#include <libshare.h>
-#include "libshare_impl.h"
-#include "nfs.h"
+#include <libzfs.h>
+#include "../../libzfs_share.h"
 
 #define	OPTSSIZE	1024
 #define	MAXLINESIZE	(PATH_MAX + OPTSSIZE)
@@ -231,7 +230,7 @@ nfs_copy_entries(char *filename, const char *mountpoint)
 		return (SA_OK);
 
 	FILE *newfp = fopen(filename, "w+");
-	fputs(FILE_HEADER, newfp);
+	fputs(NFS_FILE_HEADER, newfp);
 	while ((line = zgetline(oldfp, mountpoint)) != NULL)
 		fprintf(newfp, "%s\n", line);
 	if (ferror(oldfp) != 0) {

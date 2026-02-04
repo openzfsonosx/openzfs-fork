@@ -35,9 +35,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libzfs.h>
-#include <libshare.h>
-#include "libshare_impl.h"
-#include "smb.h"
+#include "../../libzfs_share.h"
 
 #include <ctype.h>
 #include <sys/socket.h>

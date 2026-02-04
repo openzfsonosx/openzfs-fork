@@ -46,6 +46,8 @@ dist_libzfs_la_SOURCES += \
 	%D%/os/macos/libzfs_getmntany.c \
 	%D%/os/macos/libzfs_mount_os.c \
 	%D%/os/macos/libzfs_pool_os.c \
+	%D%/os/macos/libzfs_share_nfs.c \
+	%D%/os/macos/libzfs_share_smb.c \
 	%D%/os/macos/libzfs_util_os.c
 endif
 
