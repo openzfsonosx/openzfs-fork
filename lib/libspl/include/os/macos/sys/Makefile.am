@@ -13,5 +13,4 @@ libspl_HEADERS = \
 	$(top_srcdir)/lib/libspl/include/os/macos/sys/sysmacros.h \
 	$(top_srcdir)/lib/libspl/include/os/macos/sys/uio.h \
 	$(top_srcdir)/lib/libspl/include/os/macos/sys/vfs.h \
-	$(top_srcdir)/lib/libspl/include/os/macos/sys/xattr.h \
-	$(top_srcdir)/lib/libspl/include/os/macos/sys/zfs_context_os.h
+	$(top_srcdir)/lib/libspl/include/os/macos/sys/xattr.h

@@ -140,6 +140,5 @@ libsplmacos_sys_HEADERS = \
 	%D%/os/macos/sys/time.h \
 	%D%/os/macos/sys/uio.h \
 	%D%/os/macos/sys/vfs.h \
-	%D%/os/macos/sys/xattr.h \
-	%D%/os/macos/sys/zfs_context_os.h
+	%D%/os/macos/sys/xattr.h
 endif
