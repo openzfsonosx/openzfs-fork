@@ -49,7 +49,7 @@
 #include "../../libzfs_impl.h"
 #include <libzfs.h>
 
-#include <thread_pool.h>
+#include <sys/taskq.h>
 #include <sys/sysctl.h>
 #include <libzutil.h>
 #include <libdiskmgt.h>
