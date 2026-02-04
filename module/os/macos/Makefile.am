@@ -306,7 +306,6 @@ zcommon_SRCS = \
 	%D%/../../nvpair/nvpair.c \
 	%D%/../../nvpair/nvpair_alloc_fixed.c \
 	%D%/../../nvpair/nvpair_alloc_spl.c \
-	%D%/../../unicode/u8_textprep.c \
 	%D%/../../zcommon/zfs_comutil.c \
 	%D%/../../zcommon/zfs_deleg.c \
 	%D%/../../zcommon/zfs_fletcher.c \
