@@ -61,7 +61,9 @@ macos_zfs_CPPFLAGS = \
 	-I$(top_srcdir)/include \
 	-I@KERNEL_HEADERS@/Headers \
 	-I@KERNEL_HEADERS@/PrivateHeaders \
-	-I$(top_srcdir)/module/zstd/include
+	-I$(top_srcdir)/module/zstd/include \
+	-include $(top_srcdir)/module/zstd/include/zstd_compat_wrapper.h \
+	-isystem @CLANG_RESOURCE_DIR@
 
 
 macos_zfs_CPPFLAGS += @KERNEL_DEBUG_CPPFLAGS@
@@ -384,7 +386,6 @@ zstd_SRCS = \
         %D%/../../zstd/lib/common/fse_decompress.c \
         %D%/../../zstd/lib/common/pool.c \
         %D%/../../zstd/lib/common/zstd_common.c \
-        %D%/../../zstd/lib/common/xxhash.c \
         %D%/../../zstd/lib/compress/fse_compress.c \
         %D%/../../zstd/lib/compress/hist.c \
         %D%/../../zstd/lib/compress/huf_compress.c \
@@ -397,7 +398,9 @@ zstd_SRCS = \
         %D%/../../zstd/lib/compress/zstd_lazy.c \
         %D%/../../zstd/lib/compress/zstd_ldm.c \
         %D%/../../zstd/lib/compress/zstd_opt.c \
+        %D%/../../zstd/lib/compress/zstd_preSplit.c \
         %D%/../../zstd/lib/decompress/huf_decompress.c \
+        %D%/../../zstd/lib/decompress/huf_decompress_amd64.S \
         %D%/../../zstd/lib/decompress/zstd_ddict.c \
         %D%/../../zstd/lib/decompress/zstd_decompress.c \
         %D%/../../zstd/lib/decompress/zstd_decompress_block.c
