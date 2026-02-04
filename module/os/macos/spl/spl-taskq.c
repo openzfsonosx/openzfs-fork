@@ -979,7 +979,7 @@ taskq_dispatch_delay(taskq_t *tq, task_func_t func, void *arg, uint_t tqflags,
  * if it had to wait for it to finish. (Or ENOENT for unknown id)
  */
 int
-taskq_cancel_id(taskq_t *tq, taskqid_t id)
+taskq_cancel_id(taskq_t *tq, taskqid_t id, boolean_t wait)
 {
 	tqdelay_t *task = (tqdelay_t *)id;
 	tqdelay_t *tqdnode;
