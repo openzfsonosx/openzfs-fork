@@ -182,13 +182,11 @@ ${WORKDIR}/${bindir}/zsysctl
 ${WORKDIR}/${bindir}/mount_zfs
 ${WORKDIR}/${prefix}/libexec/zfs/zpool_influxdb
 ${WORKDIR}/${prefix}/lib/libnvpair.a
-${WORKDIR}/${prefix}/lib/libuutil.a
 ${WORKDIR}/${prefix}/lib/libzfs.a
 ${WORKDIR}/${prefix}/lib/libzpool.a
 ${WORKDIR}/${prefix}/lib/libzfs_core.a
 ${WORKDIR}/${prefix}/lib/librt.so.1
 ${WORKDIR}/${prefix}/lib/libnvpair.?.dylib
-${WORKDIR}/${prefix}/lib/libuutil.?.dylib
 ${WORKDIR}/${prefix}/lib/libzfs.?.dylib
 ${WORKDIR}/${prefix}/lib/libzpool.?.dylib
 ${WORKDIR}/${prefix}/lib/libzfs_core.?.dylib
