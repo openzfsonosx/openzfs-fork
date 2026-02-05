@@ -151,3 +151,19 @@ spl_cred_ismember_gid(cred_t *cr, gid_t gid)
 		return (TRUE);
 	return (FALSE);
 }
+
+void
+crhold(struct ucred *cr)
+{
+	if (cr != NULL)
+		(void) kauth_cred_ref((kauth_cred_t)cr);
+}
+
+void
+crfree(struct ucred *cr)
+{
+	if (cr != NULL) {
+		kauth_cred_t kcr = (kauth_cred_t)cr;
+		kauth_cred_unref(&kcr);
+	}
+}
