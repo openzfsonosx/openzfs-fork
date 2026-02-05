@@ -28,6 +28,7 @@
 
 #include_next <sys/stat.h>
 
+#include <sys/stdtypes.h>
 #include <sys/disk.h>
 #include <sys/mount.h> /* for BLKGETSIZE64 */
 
