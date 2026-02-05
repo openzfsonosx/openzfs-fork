@@ -337,5 +337,9 @@ rm -rfv /Library/Filesystems/zfs.fs
 echo "Telling OS X to forget zfs packages" | tee -a "$ULOG"
 pkgutil --pkgs | grep net | grep openzfsonosx | while read p ; do echo "Forgetting $p" ; pkgutil --forget "$p" ; done
 
+if [ -x "$(which kmutil)" ] ; then
+    kmutil clear-staging || true
+fi
+
 echo "Exiting uninstaller" | tee -a "$ULOG"
 echo "Uninstaller log is at $ULOG"
