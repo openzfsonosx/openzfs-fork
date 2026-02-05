@@ -341,6 +341,12 @@ ATOMIC_SWAP(ushort, ushort_t)
 extern void *
 atomic_cas_ptr(volatile void *target, void *cmp,  void *newval);
 
+static inline uint32_t
+atomic_load_32(volatile uint32_t *target)
+{
+	return (__atomic_load_n(target, __ATOMIC_ACQUIRE));
+}
+
 static inline uint64_t
 atomic_load_64(volatile uint64_t *target)
 {
