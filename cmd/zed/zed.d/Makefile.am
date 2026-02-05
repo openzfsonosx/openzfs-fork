@@ -23,7 +23,7 @@ dist_zedexec_SCRIPTS = \
 	%D%/statechange-sync-slot_off.sh \
 	%D%/trim_finish-notify.sh \
 	%D%/vdev_attach-sync-led.sh \
-	%D%/vdev_clear-sync-led.sh
+	%D%/vdev_clear-sync-led.sh \
 	%D%/zvol_create.sh \
 	%D%/zvol_remove.sh
 
@@ -47,7 +47,7 @@ zedconfdefaults = \
 	statechange-notify.sh \
 	statechange-sync-slot_off.sh \
 	vdev_attach-sync-led.sh \
-	vdev_clear-sync-led.sh
+	vdev_clear-sync-led.sh \
 	zvol_create.sh \
         zvol_remove.sh
 
