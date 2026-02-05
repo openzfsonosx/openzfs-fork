@@ -11,7 +11,7 @@
 /* Windows userland links with OpenSSL */
 #if !defined (_WIN32) || defined (_KERNEL)
 
-.section	.rodata
+SECTION_STATIC
 .balign	16
 
 
