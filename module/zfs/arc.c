@@ -492,13 +492,13 @@ static taskq_t *arc_flush_taskq;
 static uint_t zfs_arc_evict_threads = 0;
 
 /* The 7 states: */
-static arc_state_t ARC_anon;
+/*  */ arc_state_t ARC_anon;
 /*  */ arc_state_t ARC_mru;
-static arc_state_t ARC_mru_ghost;
+/*  */ arc_state_t ARC_mru_ghost;
 /*  */ arc_state_t ARC_mfu;
-static arc_state_t ARC_mfu_ghost;
-static arc_state_t ARC_l2c_only;
-static arc_state_t ARC_uncached;
+/*  */ arc_state_t ARC_mfu_ghost;
+/*  */ arc_state_t ARC_l2c_only;
+/*  */ arc_state_t ARC_uncached;
 
 arc_stats_t arc_stats = {
 	{ "hits",			KSTAT_DATA_UINT64 },

@@ -122,6 +122,7 @@ zfs_ASM_SOURCES_AS = \
 	%D%/../../icp/asm-x86_64/aes/aes_amd64.S \
 	%D%/../../icp/asm-x86_64/aes/aes_aesni.S \
 	%D%/../../icp/asm-x86_64/modes/aesni-gcm-x86_64.S \
+	%D%/../../icp/asm-x86_64/modes/aesni-gcm-avx2-vaes.S \
 	%D%/../../icp/asm-x86_64/modes/ghash-x86_64.S \
 	%D%/../../icp/asm-x86_64/modes/gcm_pclmulqdq.S \
 	%D%/../../icp/asm-x86_64/sha2/sha256-x86_64.S \
@@ -211,6 +212,7 @@ zfs_common_SRCS = \
 	%D%/../../zfs/space_map.c \
 	%D%/../../zfs/space_reftree.c \
 	%D%/../../zfs/txg.c \
+	%D%/../../zfs/u8_textprep.c \
 	%D%/../../zfs/uberblock.c \
 	%D%/../../zfs/unique.c \
 	%D%/../../zfs/vdev.c \

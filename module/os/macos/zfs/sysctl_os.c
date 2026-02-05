@@ -473,17 +473,6 @@ SYSCTL_PROC(_tunable, OID_AUTO, arc_max,
 /* dmu_zfetch.c */
 SYSCTL_NODE(_tunable, OID_AUTO, zfetch, CTLFLAG_RW, 0, "ZFS ZFETCH (LEGACY)");
 
-/* max bytes to prefetch per stream (default 8MB) */
-extern uint32_t	zfetch_max_distance;
-SYSCTL_UINT(_tunable_zfetch, OID_AUTO, max_distance, CTLFLAG_RWTUN,
-    &zfetch_max_distance, 0, "Max bytes to prefetch per stream (LEGACY)");
-
-/* max bytes to prefetch indirects for per stream (default 64MB) */
-extern uint32_t	zfetch_max_idistance;
-SYSCTL_UINT(_tunable_zfetch, OID_AUTO, max_idistance, CTLFLAG_RWTUN,
-    &zfetch_max_idistance, 0,
-    "Max bytes to prefetch indirects for per stream (LEGACY)");
-
 /* dsl_pool.c */
 
 /* dnode.c */
@@ -554,17 +543,6 @@ SYSCTL_INT(_tunable, OID_AUTO, condense_pct, CTLFLAG_RWTUN,
     &zfs_condense_pct, 0,
     "Condense on-disk spacemap when it is more than this many percents"
     " of in-memory counterpart");
-
-extern int zfs_remove_max_segment;
-SYSCTL_INT(_tunable, OID_AUTO, remove_max_segment, CTLFLAG_RWTUN,
-    &zfs_remove_max_segment, 0, "Largest contiguous segment ZFS will attempt to"
-    " allocate when removing a device");
-
-extern int zfs_removal_suspend_progress;
-SYSCTL_INT(_tunable, OID_AUTO, removal_suspend_progress, CTLFLAG_RWTUN,
-    &zfs_removal_suspend_progress, 0, "Ensures certain actions can happen while"
-    " in the middle of a removal");
-
 
 /*
  * Minimum size which forces the dynamic allocator to change
@@ -789,12 +767,6 @@ SYSCTL_INT(_tunable, OID_AUTO, standard_sm_blksz, CTLFLAG_RDTUN,
     &zfs_vdev_standard_sm_blksz, 0,
     "Block size for standard space map.  Power of 2 and greater than 4096.");
 
-extern int vdev_validate_skip;
-SYSCTL_INT(_tunable, OID_AUTO, validate_skip, CTLFLAG_RDTUN,
-    &vdev_validate_skip, 0,
-    "Enable to bypass vdev_validate().");
-
-
 /* vdev_cache.c */
 
 /* vdev_mirror.c */
@@ -826,11 +798,6 @@ SYSCTL_UINT(_tunable_vdev, OID_AUTO, name ## _max_active, CTLFLAG_RWTUN, \
 
 
 #undef ZFS_VDEV_QUEUE_KNOB
-
-extern uint32_t zfs_vdev_max_active;
-SYSCTL_UINT(_tunable, OID_AUTO, top_maxinflight, CTLFLAG_RWTUN,
-    &zfs_vdev_max_active, 0,
-    "The maximum number of I/Os of all types active for each device. (LEGACY)");
 
 /*extern uint64_t zfs_multihost_history;
 SYSCTL_UQUAD(_tunable, OID_AUTO, multihost_history, CTLFLAG_RWTUN,
