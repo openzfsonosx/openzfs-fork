@@ -496,6 +496,7 @@ spl_start(kmod_info_t *ki, void *d)
 
 #if defined(__arm64__)
 	num_ecores = (max_ncpus > 4) ? 4 : 0;
+	num_ecores += (max_ncpus > 16) ? 4 : 0;
 	boot_ncpus = MAX(1, (int)max_ncpus - (int)num_ecores);
 #else
 	boot_ncpus = max_ncpus;
