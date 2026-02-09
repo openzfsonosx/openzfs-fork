@@ -97,35 +97,43 @@ extern unsigned int num_ecores;
 #endif
 
 /*
- * 0..MAX_PRIO-1:		Process priority
- * 0..MAX_RT_PRIO-1:		RT priority tasks
- * MAX_RT_PRIO..MAX_PRIO-1:	SCHED_NORMAL tasks
+ * see osfmk/kern/sched.h
+ * In macOS, kernel thread priorities above 63 are reserved
+ * to the kernel, with BASEPRI_GRAPHICS set to 76.
  *
- * Treat shim tasks as SCHED_NORMAL tasks
+ * in osfmk/kern/task_policy.c we also see
+ *                 case TASK_GRAPHICS_SERVER:
+ *                        priority = BASEPRI_GRAPHICS;
+ *                        max_priority = MAXPRI_RESERVED;
+ *                        break;
+ *
+ * where MAXPRI_RESERVED is 79 in macos26 Tahoe.
+ *
+ * Our threads should max out below BASEPRI_GRAPHICS to
+ * avoid causing instabilities in WindowServer, especially
+ * in newer versions of macOS (e.g. macOS 26 Tahoe), which
+ * can trigger a watchdog panic like
+ *
+ * panic(cpu 0 caller 0xfffffe0035f0c0c4): userspace watchdog
+ * timeout: no successful checkins from WindowServer (2 induced crashes)
+ * in 120 seconds
+ *
+ * Our maximum therefore should be 75, whcih is one less than BASEPRI_GRAPHICS
+ * Our minimum should be 64, which is MINPRI_RESERVED.
+ * Our default should be somewhere in between: 70.
+ *
+ * We allow Xnu to dynamically adjust priorities of taskq threads.
+ *
+ * In spindump we will see threads with "priority XX-YY (base ZZ)"
+ * where the base will generally be one of these clsyspri macros,
+ * and XX-YY will be some values around that base, depending on
+ * system load, thread activity, and other macOS scheduler factors.
  */
 
-/*
- * In OSX, the kernel thread priorities start at 81 and goes to
- * 95 MAXPRI_KERNEL. BASEPRI_REALTIME starts from 96. Since
- * swap priority is at 92.  ZFS priorities should have a base below
- * 81 in general.  Xnu will dynamically adjust priorities of
- * some taskq threads around maxclsyspri.
- */
-#define	minclsyspri  70 /* well below the render server and other graphics */
-#define	defclsyspri  75 /* five below the xnu kernel services */
-#define	maxclsyspri  80 /* 1 less than base, 2 less than networking */
-
-#if defined(_KERNEL)
-#define	wtqclsyspri  76
-#else
-	/*
-	 * we want to be below maclsyspri for zio
-	 * taskqs on macOS, to avoid starving out
-	 * base=81 (maxclsyspri) kernel tasks when
-	 * doing computation-intensive checksums etc.
-	 */
-#define	wtqclsyspri  75
-#endif
+#define	minclsyspri  64 /* MINPRI_RESERVED */
+#define	defclsyspri  70 /* midpoint */
+#define	maxclsyspri  75 /* BASEPRI_GRAPHICS -1 */
+#define	wtqclsyspri  72 /* between max and def */
 
 /*
  * taskqs for scrubs can be lower-priority, and are better that way for wide
@@ -133,7 +141,7 @@ extern unsigned int num_ecores;
  *
  * This value is just below the level of bluetoothd or userland audio
  */
-#define	DSL_SCAN_ISS_SYSPRI	59
+#define	DSL_SCAN_ISS_SYSPRI	20 /* BASEPRI_UTILITY */
 
 /*
  * Missing macros

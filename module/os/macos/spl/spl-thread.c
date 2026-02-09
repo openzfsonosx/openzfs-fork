@@ -287,9 +287,9 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 /*
  * Set xnu kernel thread importance based on openzfs pri_t.
  *
- * Thread importance adjusts upwards and downwards from BASEPRI_KERNEL (defined
- * as 81).  Higher value is higher priority (e.g. BASEPRI_REALTIME is 96),
- * BASEPRI_GRAPHICS is 76, and MAXPRI_USER is 63.
+ * Thread importance adjusts upwards and downwards from BASEPRI_KERNEL (zero
+ * importance is defined as thread priority 81).  Higher positive value is
+ * higher priority. Lower negative value is lower priority.
  *
  * (See osfmk/kern/sched.h)
  *
@@ -298,11 +298,11 @@ timeout_generic(int type, void (*func)(void *), void *arg,
  * at BASEPRI_KERNEL + 1.
  *
  * We want maxclsyspri threads to have less xnu priority
- * BASEPRI_KERNEL, so as to avoid UI stuttering, network
+ * BASEPRI_GRAPHICS, so as to avoid UI stuttering, network
  * disconnection and other side-effects of high zfs load with
  * high thread priority.
  *
- * In <sysmacros.h> we define maxclsyspri to 80 with
+ * In <sysmacros.h> we define maxclsyspri to 75 with
  * defclsyspri and minclsyspri set below that.
  */
 
@@ -313,31 +313,36 @@ spl_set_thread_importance(thread_t thread, pri_t pri, const char *name)
 
 	/*
 	 * start by finding an offset from BASEPRI_KERNEL,
-	 * which is found in osfmk/kern/sched.h
+	 * the value which is found in osfmk/kern/sched.h
 	 *
-	 * (it's 81, importance is a signed-offset from that)
+	 * (it's 81, defining importance zero)
 	 */
 
 	const pri_t basepri = 81;
+
+	/* lower priorities lead to negative importance */
+
 	const pri_t importance = pri - basepri;
-	const pri_t importance_floor = DSL_SCAN_ISS_SYSPRI - basepri;
 
 	policy.importance = importance;
 
 	/*
 	 * dont let ANY of our threads run as high as networking & GPU
 	 *
-	 * hard cap on our maximum priority at 81 (BASEPRI_KERNEL),
+	 * hard cap on our maximum priority at 75 (BASEPRI_GRAPHICS-1),
 	 * which is then our maxclsyspri.
 	 */
 	if (policy.importance > 0)
 		policy.importance = 0;
+
+	/* DSL_SCAN_ISS_SYSPRI is our lowest supported priority */
+
+	const pri_t importance_floor = DSL_SCAN_ISS_SYSPRI - basepri;
+
 	/*
-	 * set a floor on importance at priority 59, which is just below
-	 * bluetoothd and userland audio, which are of relatively high
-	 * userland importance.
+	 * set a floor on importance
 	 */
-	else if (policy.importance < importance_floor)
+	if (policy.importance < importance_floor)
 		policy.importance = importance_floor;
 
 	int i = policy.importance;
