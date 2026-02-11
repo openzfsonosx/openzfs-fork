@@ -2884,42 +2884,46 @@ zfs_vnop_pageoutv2(struct vnop_pageout_args *ap)
 {
 	struct vnode *vp = ap->a_vp;
 	int a_flags = ap->a_flags;
-	vm_offset_t	a_pl_offset = ap->a_pl_offset;
+	vm_offset_t a_pl_offset = ap->a_pl_offset;
 	size_t a_size = ap->a_size;
 	upl_t upl = ap->a_pl;
-	upl_page_info_t *pl;
+	upl_page_info_t *pl = NULL;
+
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = NULL;
+
 	int error = 0;
-	uint64_t filesize;
-	zfs_locked_range_t *lr;
-	dmu_tx_t *tx;
-	caddr_t vaddr = NULL;
 	int merror = 0;
 
+	uint64_t filesize;
+	zfs_locked_range_t *lr = NULL;
+	dmu_tx_t *tx = NULL;
+
+	caddr_t vaddr = NULL;
+	vm_offset_t map_base = 0ULL;
+
+	dprintf("ZPO2: enter off=0x%llx len=0x%lx pl=%p "
+	    "pl_off=0x%lx flags=0x%x\n",
+	    ap->a_f_offset, a_size, upl, a_pl_offset, a_flags);
+
 	/*
-	 * We can still get into this function as non-v2 style, by the default
-	 * pager (ie, swap - when we eventually support it)
+	 * If some caller ever gives us a real UPL (non-v2 path),
+	 * relay to old vnop_pageout().
 	 */
-	if (upl) {
-		dprintf("ZFS: Relaying vnop_pageoutv2 to vnop_pageout\n");
+	if (upl != NULL) {
+		dprintf(
+		    "ZPO2: Relaying vnop_pageoutv2 to vnop_pageout (upl=%p)\n",
+		    upl);
 		return (zfs_vnop_pageout(ap));
 	}
 
-	if (!zp || !zp->z_zfsvfs) {
-		dprintf("ZFS: vnop_pageout: null zp or zfsvfs\n");
+	if (!zp || !zp->z_zfsvfs || ZTOV(zp) == NULL) {
+		dprintf("ZPO2: bad zp/zfsvfs/vp\n");
 		return (ENXIO);
 	}
 
-	if (ZTOV(zp) == NULL) {
-		dprintf("ZFS: vnop_pageout: null vp\n");
-		return (ENXIO);
-	}
-
-	// XNU can call us with iocount == 0 && usecount == 0. Grab
-	// a ref now so the vp doesn't reclaim while we are in here.
 	if (vnode_get(ZTOV(zp)) != 0) {
-		dprintf("ZFS: vnop_pageout: vnode_ref failed.\n");
+		dprintf("ZPO2: vnode_get failed\n");
 		return (ENXIO);
 	}
 
@@ -2938,141 +2942,150 @@ zfs_vnop_pageoutv2(struct vnop_pageout_args *ap)
 
 	mutex_exit(&zp->z_lock);
 
-	if (error) {
-		dprintf("ZFS: %s: can't hold_sa: %d\n", __func__, error);
-		vnode_put(ZTOV(zp));
-		return (ENXIO);
-	}
-
-	dprintf("+vnop_pageout2: off 0x%llx len 0x%lx upl_off 0x%lx: "
-	    "blksz 0x%x, z_size 0x%llx\n", ap->a_f_offset, a_size,
-	    a_pl_offset, zp->z_blksz,
-	    zp->z_size);
-
-
-	/* Start the pageout request */
 	/*
-	 * We can't leave this function without either calling upl_commit or
-	 * upl_abort. So use the non-error version.
+	 * Must commit/abort any UPL we create, so after
+	 * this point use goto paths
 	 */
 	if ((error = zfs_enter(zfsvfs, FTAG)) != 0) {
-		dprintf("ZFS: vnop_pageoutv2: abort on z_unmounted\n");
+		dprintf("ZPO2: zfs_enter failed\n");
 		zfsvfs = NULL;
 		error = EIO;
 		goto exit_abort;
 	}
-	if (vfs_flags(zfsvfs->z_vfs) & MNT_RDONLY) {
-		dprintf("ZFS: vnop_pageoutv2: readonly\n");
+    if (vfs_flags(zfsvfs->z_vfs) & MNT_RDONLY) {
+		dprintf("ZPO2: readonly\n");
 		error = EROFS;
 		goto exit_abort;
 	}
 
-	lr = zfs_rangelock_enter(&zp->z_rangelock, ap->a_f_offset, a_size,
-	    RL_WRITER);
+	lr = zfs_rangelock_enter(&zp->z_rangelock, ap->a_f_offset,
+	    a_size, RL_WRITER);
 
-	/* Grab UPL now */
-	int request_flags;
-
-	/*
-	 * we're in control of any UPL we commit
-	 * make sure someone hasn't accidentally passed in UPL_NOCOMMIT
-	 */
+	/* Ensure we control commit/abort */
 	a_flags &= ~UPL_NOCOMMIT;
 	a_pl_offset = 0;
 
+	int request_flags;
 	if (a_flags & UPL_MSYNC) {
 		request_flags = UPL_UBC_MSYNC | UPL_RET_ONLY_DIRTY;
 	} else {
 		request_flags = UPL_UBC_PAGEOUT | UPL_RET_ONLY_DIRTY;
 	}
 
-	error = ubc_create_upl(vp, ap->a_f_offset, ap->a_size, &upl, &pl,
+	error = ubc_create_upl(vp, ap->a_f_offset, a_size, &upl, &pl,
 	    request_flags);
-	if (error || (upl == NULL)) {
-		dprintf("ZFS: Failed to create UPL! %d\n", error);
+	if (error || upl == NULL || pl == NULL) {
+		dprintf("ZPO2: ubc_create_upl failed err=%d upl=%p pl=%p\n",
+		    error, upl, pl);
 		goto pageout_done;
 	}
 
 	tx = dmu_tx_create(zfsvfs->z_os);
-	dmu_tx_hold_write(tx, zp->z_id, ap->a_f_offset, ap->a_size);
+	dmu_tx_hold_write(tx, zp->z_id, ap->a_f_offset, a_size);
 
-	// NULL z_sa_hdl
-	if (z_sa_hdl != NULL)
-		dmu_tx_hold_sa(tx, z_sa_hdl, B_FALSE);
+	if (z_sa_hdl != NULL) {
+		dmu_tx_hold_sa(tx, zp->z_sa_hdl, B_FALSE);
+	}
 
 	zfs_sa_upgrade_txholds(tx, zp);
 	error = dmu_tx_assign(tx, DMU_TX_WAIT);
 	if (error != 0) {
+		dprintf("ZPO2: dmu_tx_assign failed %d\n", error);
 		dmu_tx_abort(tx);
-		ubc_upl_abort(upl, (UPL_ABORT_ERROR|UPL_ABORT_FREE_ON_EMPTY));
+		tx = NULL;
+		ubc_upl_abort(upl, (UPL_ABORT_ERROR | UPL_ABORT_FREE_ON_EMPTY));
+		upl = NULL;
 		goto pageout_done;
 	}
 
-	off_t f_offset;
-	int64_t offset;
-	int64_t isize;
+	filesize = zp->z_size;
+
+	off_t f_offset = ap->a_f_offset;
+	int64_t offset = 0;
+	int64_t isize = (int64_t)a_size;
 	int64_t pg_index;
 
-	filesize = zp->z_size; /* get consistent copy of zp_size */
-
-	isize = ap->a_size;
-	f_offset = ap->a_f_offset;
-
-	/*
-	 * Scan from the back to find the last page in the UPL, so that we
-	 * aren't looking at a UPL that may have already been freed by the
-	 * preceding aborts/completions.
-	 */
-	for (pg_index = ((isize) / PAGE_SIZE); pg_index > 0; ) {
+	/* Find last present page from the back (your safety logic) */
+	for (pg_index = (isize / PAGE_SIZE); pg_index > 0; ) {
 		if (upl_page_present(pl, --pg_index))
 			break;
 		if (pg_index == 0) {
-			dprintf("ZFS: failed on pg_index\n");
+			dprintf("ZPO2: no pages present\n");
 			dmu_tx_commit(tx);
+			tx = NULL;
 			ubc_upl_abort_range(upl, 0, isize,
 			    UPL_ABORT_FREE_ON_EMPTY);
+			upl = NULL;
 			goto pageout_done;
 		}
 	}
 
-	dprintf("ZFS: isize %llu pg_index %llu\n", isize, pg_index);
 	/*
-	 * initialize the offset variables before we touch the UPL.
-	 * a_f_offset is the position into the file, in bytes
-	 * offset is the position into the UPL, in bytes
-	 * pg_index is the pg# of the UPL we're operating on.
-	 * isize is the offset into the UPL of the last non-clean page.
+	 * IMPORTANT: Map using vm_upl_map_range with explicit prot.
+	 * This avoids the SPTM “illegal SPRR index” via ubc_upl_map().
 	 */
-	isize = ((pg_index + 1) * PAGE_SIZE);
+	dprintf("ZPO2: about to vm_upl_map_range upl=%p size=0x%lx\n",
+	    upl, (unsigned long) a_size);
 
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
+	(__MAC_OS_X_VERSION_MIN_REQUIRED >= 120000)
+	// macOS 12+ (Monterey+)
+	// Map only the range you need; offset is upl-offset in bytes.
+	// Make sure size is page-rounded as required by callers in XNU.
+	vm_size_t map_len = (vm_size_t)round_page(a_size);
+	int kr = ubc_upl_map_range(upl, (vm_offset_t)offset, map_len,
+	    VM_PROT_READ, &map_base);
+	if (kr != KERN_SUCCESS || map_base == 0) {
+		dprintf("ZPO2: vm_upl_map_range failed error=%d vaddr=%p\n",
+		    error, (void *)vaddr);
+		error = EINVAL;
+		goto out;
+	}
+	// already points at the start of the mapped range
+	vaddr = (caddr_t)map_base;
+
+#else
+	// Catalina / older
+	int kr = ubc_upl_map(upl, &map_base);
+	if (kr != KERN_SUCCESS || map_base == 0) {
+		dprintf("ZPO2: vm_upl_map_range failed error=%d vaddr=%p\n",
+		    error, (void *)vaddr);
+		error = EINVAL;
+		goto out;
+	}
+
+	// adjust into the mapped UPL
+	vaddr = (caddr_t)(map_base + offset);
+#endif
+
+	dprintf("ZPO2: mapped vaddr=%p\n", vaddr);
+
+	/* Walk dirty runs */
 	offset = 0;
 	pg_index = 0;
 	while (isize > 0) {
-		int64_t  xsize;
-		int64_t  num_of_pages;
+		int64_t xsize;
+		int64_t num_of_pages;
 
-		// printf("isize %d for page %d\n", isize, pg_index);
+		dprintf("ZPO2: walk: f_off=0x%llx offset=0x%llx remain=0x%llx"
+		    " pg=%lld\n",
+		    (unsigned long long)f_offset,
+		    (unsigned long long)offset,
+		    (unsigned long long)isize,
+		    (long long)pg_index);
 
 		if (!upl_page_present(pl, pg_index)) {
-			/*
-			 * we asked for RET_ONLY_DIRTY, so it's possible
-			 * to get back empty slots in the UPL.
-			 * just skip over them
-			 */
 			f_offset += PAGE_SIZE;
 			offset   += PAGE_SIZE;
 			isize    -= PAGE_SIZE;
 			pg_index++;
-
 			continue;
 		}
+
 		if (!upl_dirty_page(pl, pg_index)) {
-			/*
-			 * hfs has a call to panic here, but we trigger this
-			 * *a lot* so unsure what is going on
-			 */
-			dprintf("zfs_vnop_pageoutv2: unforeseen clean page "
-			    "@ index %lld for UPL %p\n", pg_index, upl);
+			dprintf(
+			    "ZPO2: clean page at pg=%lld upl=%p (skipping)\n",
+			    (long long)pg_index, upl);
 			f_offset += PAGE_SIZE;
 			offset   += PAGE_SIZE;
 			isize    -= PAGE_SIZE;
@@ -3080,10 +3093,6 @@ zfs_vnop_pageoutv2(struct vnop_pageout_args *ap)
 			continue;
 		}
 
-		/*
-		 * We know that we have at least one dirty page.
-		 * Now checking to see how many in a row we have
-		 */
 		num_of_pages = 1;
 		xsize = isize - PAGE_SIZE;
 
@@ -3095,43 +3104,28 @@ zfs_vnop_pageoutv2(struct vnop_pageout_args *ap)
 		}
 		xsize = num_of_pages * PAGE_SIZE;
 
-		if (!vnode_isswap(vp)) {
-			off_t end_of_range;
+		dprintf("ZPO2: dirty-run pages=%lld xsize=0x%llx\n",
+		    (long long)num_of_pages, (unsigned long long)xsize);
 
-			end_of_range = f_offset + xsize - 1;
-			if (end_of_range >= filesize) {
-				end_of_range = (off_t)(filesize - 1);
-			}
-		}
+		merror = bluster_pageout(zfsvfs, zp, upl,
+		    offset,
+		    f_offset,
+		    xsize,
+		    filesize,
+		    a_flags, vaddr, tx);
 
-		// Map it if needed
-		if (!vaddr) {
-			if ((ubc_upl_map(upl, (vm_offset_t *)&vaddr) !=
-				    KERN_SUCCESS) || vaddr == NULL) {
-				error = EINVAL;
-				vaddr = NULL;
-				dprintf("ZFS: unable to map\n");
-				goto out;
-			}
-			dprintf("ZFS: Mapped %p\n", vaddr);
-		}
-
-
-		dprintf("ZFS: bluster offset %lld fileoff %lld size %lld "
-			"filesize %lld\n", offset, f_offset, xsize, filesize);
-		merror = bluster_pageout(zfsvfs, zp, upl, offset, f_offset,
-		    xsize, filesize, a_flags, vaddr, tx);
-		/* remember the first error */
-		if ((error == 0) && (merror))
+		if (error == 0 && merror)
 			error = merror;
 
 		f_offset += xsize;
 		offset   += xsize;
 		isize    -= xsize;
 		pg_index += num_of_pages;
-	} // while isize
+	}
 
-	/* finish off transaction */
+	dprintf("ZPO2: while complete error=%d\n", error);
+
+	/* Log + commit tx */
 	if (error == 0) {
 		uint64_t mtime[2], ctime[2];
 		sa_bulk_attr_t bulk[3];
@@ -3143,54 +3137,65 @@ zfs_vnop_pageoutv2(struct vnop_pageout_args *ap)
 		    &ctime, 16);
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
 		    &zp->z_pflags, 8);
+
 		zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime);
 		zfs_log_write(zfsvfs->z_log, tx, TX_WRITE, zp, ap->a_f_offset,
 		    a_size, 0, B_FALSE, NULL, NULL);
 	}
 	dmu_tx_commit(tx);
+	tx = NULL;
 
-	// unmap
-	if (vaddr) {
-		ubc_upl_unmap(upl);
-		vaddr = NULL;
-	}
 out:
+
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
+	(__MAC_OS_X_VERSION_MIN_REQUIRED >= 120000)
+	if (map_base) {
+		dprintf("ZPO2: unmap range mapped=%p\n", (void *)map_base);
+		(void) ubc_upl_unmap_range(upl, (vm_offset_t)offset,
+		    map_len);
+		map_base = 0;
+	}
+#else
+	if (map_base) {
+		dprintf("ZPO2: unmap range mapped=%p\n", (void *)map_base);
+		(void) ubc_upl_unmap(upl);
+		map_base = 0;
+	}
+#endif
+
 	zfs_rangelock_exit(lr);
+	lr = NULL;
+
 	if (a_flags & UPL_IOSYNC)
-		zil_commit(zfsvfs->z_log, zp->z_id);
+		error = zil_commit(zfsvfs->z_log, zp->z_id);
 
 	if (error)
-		ubc_upl_abort(upl, (UPL_ABORT_ERROR|UPL_ABORT_FREE_ON_EMPTY));
+		ubc_upl_abort(upl, (UPL_ABORT_ERROR | UPL_ABORT_FREE_ON_EMPTY));
 	else
 		ubc_upl_commit_range(upl, 0, a_size, UPL_COMMIT_FREE_ON_EMPTY);
 
+	dprintf("ZPO2: abort/commit err=%d upl=%p size=0x%lx\n", error,
+	    upl, (unsigned long)a_size);
 	upl = NULL;
 
-	vnode_put(ZTOV(zp));
-
-	zfs_exit(zfsvfs, FTAG);
-	if (error)
-		dprintf("ZFS: pageoutv2 failed %d\n", error);
-	return (error);
-
 pageout_done:
-	zfs_rangelock_exit(lr);
+	if (lr != NULL) {
+		zfs_rangelock_exit(lr);
+		lr = NULL;
+	}
 
 exit_abort:
-	dprintf("ZFS: pageoutv2 aborted %d\n", error);
-	// VERIFY(ubc_create_upl(vp, off, len, &upl, &pl, flags) == 0);
-	// ubc_upl_abort(upl, UPL_ABORT_FREE_ON_EMPTY);
-
 	vnode_put(ZTOV(zp));
 
-	if (zfsvfs)
+	if (zfsvfs != NULL) {
 		zfs_exit(zfsvfs, FTAG);
+	}
+
+	if (error)
+		dprintf("ZPO2: exit error=%d\n", error);
+
 	return (error);
 }
-
-
-
-
 
 
 int
