@@ -417,22 +417,27 @@ pipe_io_relay(void *arg)
 		if (red < 0 && errno != EWOULDBLOCK)
 			break;
 
-		sent = write(writefd, buffer, red);
-#ifdef VERBOSE_WRAPFD
-		fprintf(stderr, "%s: write(%d): %d (errno %d)\r\n", __func__,
-		    writefd, sent, errno);
-#endif
-		if (sent < 0)
-			break;
+		while (red > 0) {
 
-		if (signal_received) {
+			sent = write(writefd, buffer, red);
+
 #ifdef VERBOSE_WRAPFD
-			fprintf(stderr, "sigint handler - exit\r\n");
+			fprintf(stderr, "%s: write(%d): %d (errno %d)\r\n",
+			    __func__, writefd, sent, errno);
 #endif
-			break;
+			if (sent < 0)
+				break;
+
+			if (signal_received) {
+#ifdef VERBOSE_WRAPFD
+				fprintf(stderr, "sigint handler - exit\r\n");
+#endif
+				break;
+			}
+
+			total += sent;
+			red -= sent;
 		}
-
-		total += red;
 	}
 
 

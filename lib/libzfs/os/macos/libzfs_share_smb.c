@@ -216,7 +216,7 @@ smb_retrieve_shares(void)
 	} // while fgets
 
 	fclose(file);
-	close(fd);
+	// close(fd);
 
 	if (name)   {	free(name); 	name  = NULL; }
 	if (path)   {	free(path); 	path  = NULL; }
