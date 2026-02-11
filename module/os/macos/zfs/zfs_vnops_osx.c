@@ -2715,7 +2715,7 @@ top:
 out:
 	zfs_rangelock_exit(lr);
 	if (flags & UPL_IOSYNC)
-		zil_commit(zfsvfs->z_log, zp->z_id);
+		err = zil_commit(zfsvfs->z_log, zp->z_id);
 
 	if (!(flags & UPL_NOCOMMIT)) {
 		if (err)
@@ -3909,7 +3909,7 @@ zfs_vnop_getnamedstream(struct vnop_getnamedstream_args *ap)
 			0, VNODE_UPDATE_NAME);
 	}
 
-	spa_strfree(prefixed_name);
+	spa_strfree(__DECONST(char *, prefixed_name));
 	kmem_free(cn.cn_nameptr, free_buflen);
 
 out:
@@ -5106,7 +5106,6 @@ int
 zfs_znode_asyncwait(zfsvfs_t *zfsvfs, znode_t *zp)
 {
 	int ret = -1;
-	int error = 0;
 
 	if (zp == NULL)
 		return (ret);
