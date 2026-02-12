@@ -11,6 +11,15 @@
 /* Windows userland links with OpenSSL */
 #if !defined (_WIN32) || defined (_KERNEL)
 
+
+// There is a bug in Xcode 16.0
+#if defined(__APPLE__) && (__clang_major__ >= 16)
+#define cfi_restore set ignore,
+#define cfi_def_cfa_register set ignore,
+#define cfi_adjust_cfa_offset set ignore,
+#endif
+
+
 SECTION_STATIC
 .balign	16
 
