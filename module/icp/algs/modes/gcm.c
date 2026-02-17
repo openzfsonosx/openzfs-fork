@@ -34,6 +34,7 @@
 #include <modes/gcm_impl.h>
 #ifdef CAN_USE_GCM_ASM
 #include <aes/aes_impl.h>
+#include <modes/gcm_asm_rename_funcs.h>
 #endif
 
 // CAN_USE_GCM_ASM appears to be an Intel thing
