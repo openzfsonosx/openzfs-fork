@@ -28,18 +28,15 @@
 #ifndef _SPL_SYS_SIGNAL_H
 #define	_SPL_SYS_SIGNAL_H
 
-struct kthread;
-typedef struct kthread *kthread_t;
-
+#include <mach/mach_types.h>
+#include <sys/kernel_types.h>
 #include <sys/vm.h>
 #include_next <sys/signal.h>
 
 #define	FORREAL			0		/* Usual side-effects */
 #define	JUSTLOOKING		1		/* Don't stop the process */
 
-struct proc;
-
-extern int thread_issignal(struct proc *, kthread_t, sigset_t);
+extern int thread_issignal(proc_t, thread_t, sigset_t);
 
 #define	THREADMASK (sigmask(SIGILL)|sigmask(SIGTRAP)|\
 		sigmask(SIGIOT)|sigmask(SIGEMT)|\
@@ -48,7 +45,7 @@ extern int thread_issignal(struct proc *, kthread_t, sigset_t);
 		sigmask(SIGPIPE)|sigmask(SIGKILL)|\
 		sigmask(SIGTERM)|sigmask(SIGINT))
 
-extern int issig();
+extern int issig(void);
 
 /* Always called with curthread */
 #define	signal_pending(p) issig()
