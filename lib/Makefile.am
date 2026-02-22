@@ -12,19 +12,19 @@
 #
 # CMDS:   zhack/ztest/                zfs/zpool/zed/
 #        raidz_{test,bench}          zinject/zstream
-#                |                          |
-# LIBS:          |                          |              libzfsbootenv*
-#                |--libzdb--zdb             |                    |
-#                |                          |                    |
-#             libzpool                   libzfs* ----------------+
-#             | |    \                  / | | |
-#    libicp --/ |     \                /  | \ |
-#               |      \              /   |  \ \
-#    libzstd ---/       \            /    |   \ \-------\
-#                        \          /     \    \         \
-#                         \        /       \    \-------\ \
-#                          \      /         \            \ |
-#                          libzutil        libzfs_core*  | |
+#                |         \_____          / |
+# LIBS:          |               \        /  |            libzfsbootenv*
+#                |--libzdb--zdb   \      /   |                  |
+#                |           |    |     /    |                  |
+#             libzpool-\     |    |    //-libzfs* --------------+
+#             | |    \  \    |    |   // / | \ \
+#    libicp --/ |     \  \   |    |  // /  |  \ \
+#               |      \ librange_tree /   |   \ \
+#    libzstd ---/       \  libbtree   /    |    \ \--------
+#                        \           /      \    \         \
+#                         \         /        \    \------  |
+#                          \       /          \          \ |
+#                           libzutil       libzfs_core*  | |
 #                            | | | \          |     |    | |
 #                            | | | |          |     |    | |
 #                            | | | |          |     |    | |
@@ -65,8 +65,10 @@ include $(srcdir)/%D%/libefi/Makefile.am
 endif
 
 include $(srcdir)/%D%/libavl/Makefile.am
+include $(srcdir)/%D%/libbtree/Makefile.am
 include $(srcdir)/%D%/libicp/Makefile.am
 include $(srcdir)/%D%/libnvpair/Makefile.am
+include $(srcdir)/%D%/librange_tree/Makefile.am
 include $(srcdir)/%D%/libspl/Makefile.am
 include $(srcdir)/%D%/libzdb/Makefile.am
 include $(srcdir)/%D%/libzfs_core/Makefile.am
