@@ -48,7 +48,7 @@ extern int thread_issignal(struct proc *, kthread_t, sigset_t);
 		sigmask(SIGPIPE)|sigmask(SIGKILL)|\
 		sigmask(SIGTERM)|sigmask(SIGINT))
 
-extern int issig();
+extern int issig(void);
 
 /* Always called with curthread */
 #define	signal_pending(p) issig()
