@@ -31,7 +31,7 @@ struct proc p0 = {0};
 
 
 int
-issig(int why)
+issig(void)
 {
 	return (thread_issignal(current_proc(), current_thread(),
 	    THREADMASK));
