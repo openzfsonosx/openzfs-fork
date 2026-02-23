@@ -6,13 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * You can obtain a copy of the license at usr/src/OPENSOLARISLOCAL_LABEL(ICENSE)
  * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
  * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * file and include the License file at usr/src/OPENSOLARISLOCAL_LABEL(ICENSE).
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -104,7 +104,7 @@ gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res) {
 //	 15, 14, 13, 12, 11, 10, 9, 8, 7, 6 ,5, 4, 3, 2, 1, 0 };
 SECTION_STATIC
 .balign XMM_ALIGN
-.Lbyte_swap16_mask:
+LOCAL_LABEL(byte_swap16_mask):
 	.byte	15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
 
 
@@ -150,7 +150,7 @@ ENTRY_NP(gcm_mul_pclmulqdq)
 	//
 	// Byte swap 16-byte input
 	//
-	lea	.Lbyte_swap16_mask(%rip), %rax
+	lea	LOCAL_LABEL(byte_swap16_mask)(%rip), %rax
 	movups	(%rax), %xmm10
 	pshufb	%xmm10, %xmm0
 	pshufb	%xmm10, %xmm1
