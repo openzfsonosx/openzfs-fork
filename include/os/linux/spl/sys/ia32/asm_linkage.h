@@ -203,6 +203,10 @@ y:
 
 #define	SET_OBJ(x) .type	x, @object
 
+/*
+ * LOCAL_LABEL defines a label which should not appear in the symbol table.
+ */
+#define LOCAL_LABEL(x) .L##x
 
 #endif /* _ASM */
 
