@@ -176,6 +176,11 @@ y:
 
 #define	SET_OBJ(x)
 
+/*
+ * LOCAL_LABEL defines a label which should not appear in the symbol table.
+ */
+#define LOCAL_LABEL(x) L##x
+
 #endif /* _ASM */
 
 #ifdef	__cplusplus
