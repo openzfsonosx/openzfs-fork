@@ -109,8 +109,6 @@ struct {
 #define	ABD_PGSIZE	PAGE_SIZE
 #endif
 
-const static size_t zfs_abd_chunk_size = ABD_PGSIZE;
-
 kmem_cache_t *abd_chunk_cache;
 static kstat_t *abd_ksp;
 

@@ -33,6 +33,8 @@
 #include <sys/vm.h>
 #include_next <sys/signal.h>
 
+typedef struct thread *thread_t;
+
 #define	FORREAL			0		/* Usual side-effects */
 #define	JUSTLOOKING		1		/* Don't stop the process */
 

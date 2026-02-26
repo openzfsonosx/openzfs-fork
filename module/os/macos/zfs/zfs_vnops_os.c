@@ -177,18 +177,6 @@ int zfs_vnop_force_formd_normalized_output = 0; /* disabled by default */
  *	return (error);			// done, report error
  */
 
-/*
- * Virus scanning is unsupported.  It would be possible to add a hook
- * here to performance the required virus scan.  This could be done
- * entirely in the kernel or potentially as an update to invoke a
- * scanning utility.
- */
-static int
-zfs_vscan(struct vnode *vp, cred_t *cr, int async)
-{
-	return (0);
-}
-
 int
 zfs_open(struct vnode *vp, int mode, int flag, cred_t *cr)
 {
@@ -819,8 +807,8 @@ out:
 		*zpp = zp;
 	}
 
-	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
+	if (!error && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+		error = zil_commit(zilog, 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (error);
@@ -1053,8 +1041,8 @@ out:
 	if (xzp)
 		zfs_zrele_async(xzp);
 
-	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
+	if (!error && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+		error = zil_commit(zilog, 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (error);
@@ -1244,13 +1232,14 @@ out:
 
 	zfs_dirent_unlock(dl);
 
-	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
-
 	if (error != 0) {
 		zrele(zp);
 	} else {
 	}
+
+	if (!error && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+		error = zil_commit(zilog, 0);
+
 	zfs_exit(zfsvfs, FTAG);
 	return (error);
 }
@@ -1376,8 +1365,8 @@ out:
 
 	zrele(zp);
 
-	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
+	if (!error && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+		error = zil_commit(zilog, 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (error);
@@ -1726,7 +1715,7 @@ zfs_fsync(znode_t *zp, int syncflag, cred_t *cr)
 {
 	zfsvfs_t *zfsvfs = ZTOZSB(zp);
 	vnode_t *vp = ZTOV(zp);
-	int error;
+	int error = 0;
 
 	if (zp->z_is_mapped /* && !(syncflag & FNODSYNC) */ &&
 	    vnode_isreg(vp) && !vnode_isswap(vp)) {
@@ -1737,11 +1726,11 @@ zfs_fsync(znode_t *zp, int syncflag, cred_t *cr)
 	    !vnode_isrecycled(ZTOV(zp))) {
 		if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
 			return (error);
-		zil_commit(zfsvfs->z_log, zp->z_id);
+		error = zil_commit(zfsvfs->z_log, zp->z_id);
 		zfs_exit(zfsvfs, FTAG);
 	}
 
-	return (0);
+	return (error);
 }
 
 /*
@@ -2788,8 +2777,8 @@ out:
 	}
 
 out2:
-	if (os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
+	if (!err && os->os_sync == ZFS_SYNC_ALWAYS)
+		err = zil_commit(zilog, 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (err);
@@ -3300,8 +3289,8 @@ out:
 		zrele(tzp);
 	}
 
-	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
+	if (!error && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+		error = zil_commit(zilog, 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (error);
@@ -3470,7 +3459,7 @@ top:
 		*zpp = zp;
 
 		if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-			zil_commit(zilog, 0);
+			error = zil_commit(zilog, 0);
 	} else {
 		zrele(zp);
 	}
@@ -3684,8 +3673,8 @@ top:
 
 	zfs_dirent_unlock(dl);
 
-	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zilog, 0);
+	if (!error && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+		error = zil_commit(zilog, 0);
 
 	zfs_exit(zfsvfs, FTAG);
 	return (error);

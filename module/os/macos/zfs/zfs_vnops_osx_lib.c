@@ -611,17 +611,17 @@ zfs_ioflags(int ap_ioflag)
 int
 zfs_vnop_ioctl_fullfsync(struct vnode *vp, vfs_context_t ct, zfsvfs_t *zfsvfs)
 {
-	int error;
+	int error = 0;
 
 	error = zfs_fsync(VTOZ(vp), /* syncflag */ 0, NULL);
 	if (error)
 		return (error);
 
 	if (zfsvfs->z_log != NULL)
-		zil_commit(zfsvfs->z_log, 0);
+		error = zil_commit(zfsvfs->z_log, 0);
 	else
 		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
-	return (0);
+	return (error);
 }
 
 
