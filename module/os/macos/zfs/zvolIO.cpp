@@ -778,11 +778,12 @@ org_openzfsonosx_zfs_zvol_device::doLockUnlockMedia(bool doLock)
 IOReturn
 org_openzfsonosx_zfs_zvol_device::doSynchronizeCache(void)
 {
+	int error = 0;
 	dprintf("doSync\n");
 	if (zv && zv->zv_zilog) {
-		zil_commit(zv->zv_zilog, ZVOL_OBJ);
+		error = zil_commit(zv->zv_zilog, ZVOL_OBJ);
 	}
-	return (kIOReturnSuccess);
+	return (!error ? kIOReturnSuccess : kIOReturnError);
 }
 
 char *

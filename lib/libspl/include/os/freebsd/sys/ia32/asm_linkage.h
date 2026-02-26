@@ -179,7 +179,7 @@ y:
 /*
  * LOCAL_LABEL defines a label which should not appear in the symbol table.
  */
-#define LOCAL_LABEL(x) .L##x
+#define	LOCAL_LABEL(x) .L##x
 
 #endif /* _ASM */
 
