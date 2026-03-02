@@ -262,10 +262,12 @@ zfs_vfs_sync(struct mount *vfsp, __unused int waitfor,
 		}
 
 		if (zfsvfs->z_log != NULL)
-			zil_commit(zfsvfs->z_log, 0);
+			error = zil_commit(zfsvfs->z_log, 0);
 
 		zfs_exit(zfsvfs, FTAG);
 
+		if (error != 0)
+			return (error);
 	} else {
 		/*
 		 * Sync all ZFS filesystems. This is what happens when you
