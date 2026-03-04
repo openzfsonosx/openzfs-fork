@@ -815,7 +815,7 @@ static gcm_impl_ops_t gcm_fastest_impl = {
 /* All compiled in implementations */
 static const gcm_impl_ops_t *gcm_all_impl[] = {
 	&gcm_generic_impl,
-#if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
+#if defined(__x86_64) && HAVE_SIMD(PCLMULQDQ)
 	&gcm_pclmulqdq_impl,
 #endif
 #if defined(__aarch64__) && defined(HAVE_AESV8)
@@ -905,13 +905,13 @@ gcm_impl_init(void)
 	 * Set the fastest implementation given the assumption that the
 	 * hardware accelerated version is the fastest.
 	 */
-#if defined(__aarch64__) && defined(HAVE_ARMV8)
+#if defined(__aarch64__) && HAVE_SIMD(ARMV8)
 	if (gcm_ghashv8_impl.is_supported()) {
 		memcpy(&gcm_fastest_impl, &gcm_ghashv8_impl,
 		    sizeof (gcm_fastest_impl));
 	} else
 #endif
-#if defined(__x86_64) && defined(HAVE_PCLMULQDQ)
+#if defined(__x86_64) && HAVE_SIMD(PCLMULQDQ)
 	if (gcm_pclmulqdq_impl.is_supported()) {
 		memcpy(&gcm_fastest_impl, &gcm_pclmulqdq_impl,
 		    sizeof (gcm_fastest_impl));
@@ -937,7 +937,7 @@ gcm_impl_init(void)
 	} else
 #endif
 	if (gcm_avx_will_work()) {
-#ifdef HAVE_MOVBE
+#if HAVE_SIMD(MOVBE)
 		if (zfs_movbe_available() == B_TRUE) {
 #ifdef __APPLE__
 			atomic_swap_32(
