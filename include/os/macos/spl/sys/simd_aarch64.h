@@ -79,7 +79,7 @@ zfs_sha512_available(void)
 {
 	uint64_t ftr;
 	get_ftr(ID_AA64ISAR0_EL1, ftr);
-	return ((ftr >> 12) & 0x3);
+	return (((ftr >> 12) & 0x3) >= 2);
 }
 
 /*
