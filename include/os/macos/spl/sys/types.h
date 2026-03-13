@@ -99,7 +99,7 @@ typedef enum { B_FALSE, B_TRUE }	boolean_t;
 #else
 
 #define	B_FALSE 0
-#define	B_TRUE  -1 // ewww
+#define	B_TRUE  1
 
 #endif /* NEED_SOLARIS_BOOLEAN */
 
