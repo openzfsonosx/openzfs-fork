@@ -33,3 +33,26 @@ For more details see the NOTICE, LICENSE and COPYRIGHT files; `UCRL-CODE-235197`
 # Supported Kernels
   * The `META` file contains the officially recognized supported Linux kernel versions.
   * Supported FreeBSD versions are any supported branches and releases starting from 13.0-RELEASE.
+
+# MacOS Tahoe 26.4 compiling steps
+```sh
+# 1) install build tools
+brew install autoconf automake libtool pkg-config openssl gettext coreutils
+# 2)
+git checkout zfs-macOS-2.4.1-release
+# 3)
+sh autogen.sh
+# 4)
+./configure \                         
+  CPPFLAGS="-I/opt/homebrew/opt/gettext/include -I/opt/homebrew/opt/openssl@3/include" \
+  LDFLAGS="-L/opt/homebrew/opt/gettext/lib -L/opt/homebrew/opt/openssl@3/lib"
+# 5)
+make -s -j$(sysctl -n hw.ncpu)
+```
+There should be compiling error:
+```sh
+module/os/macos/spl/spl-kmem.c:5662:32: error: incompatible function pointer types passing 'void (void)' to parameter of type 'thread_func_t'
+      (aka 'void (*)(void *)') [-Wincompatible-function-pointer-types]
+ 5662 |         (void) thread_create(NULL, 0, spl_free_thread, 0, 0, 0, 0, 92);
+```
+just modify module/os/macos/spl/spl-kmem.c:4650 to "spl_free_thread(void *arg __unused)", and continue.
