@@ -204,13 +204,12 @@ typedef enum {
 	ZFS_PROP_DEFAULTGROUPOBJQUOTA,
 	ZFS_PROP_DEFAULTPROJECTOBJQUOTA,
 	ZFS_PROP_SNAPSHOTS_CHANGED_NSECS,
-
+	ZFS_PROP_ZONED_UID,
 	ZFS_PROP_BROWSE,		/* macOS: nobrowse/browse */
 	ZFS_PROP_IGNOREOWNER,	/* macOS: ignoreowner mount */
 	ZFS_PROP_LASTUNMOUNT,	/* macOS: Spotlight required */
 	ZFS_PROP_MIMIC,			/* macOS: mimic=hfs|apfs */
 	ZFS_PROP_DEVDISK,		/* macOS: create IOkit virtual disk */
-
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -1803,6 +1802,7 @@ typedef enum {
 	ZFS_ERR_ASHIFT_MISMATCH,
 	ZFS_ERR_STREAM_LARGE_MICROZAP,
 	ZFS_ERR_TOO_MANY_SITOUTS,
+	ZFS_ERR_NO_USER_NS_SUPPORT,
 } zfs_errno_t;
 
 /*
