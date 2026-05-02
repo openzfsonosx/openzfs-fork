@@ -144,6 +144,7 @@ cstyle:
 		! -path './include/sys/lua/*' \
 		! -path './module/lua/l*.[ch]' \
 		! -path './module/zfs/lz4.c' \
+		! -path './tests/unit/munit.[ch]' \
 		$(cstyle_line)
 
 filter_executable = -exec test -x '{}' \; -print
