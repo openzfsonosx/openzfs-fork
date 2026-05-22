@@ -28,8 +28,8 @@
 extern "C" {
 #endif
 
-#define	abd_enter_critical(flags) (flags) = ml_set_interrupts_enabled(FALSE)
-#define	abd_exit_critical(flags) ml_set_interrupts_enabled((flags))
+#define	abd_enter_critical(flags)
+#define	abd_exit_critical(flags)
 
 #ifdef __cplusplus
 }
