@@ -188,8 +188,6 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 	 */
 	zfsvfs_t *zfsvfs;
 
-	zfsvfs = vfs_fsprivate(mp);
-
 	/* As set in vfs_fsadd() below */
 	char tname[MFSNAMELEN] = { 0 };
 	vfs_name(mp, tname);
@@ -197,11 +195,13 @@ zfs_findernotify_callback(mount_t mp, __unused void *arg)
 		return (SET_ERROR(VFS_RETURNED));
 
 	/*
-	 * The first entry in struct zfsvfs is the vfs ptr, so they
-	 * should be equal if it is ZFS
+	 * Obtain zfsvfs after the name check. Only check for NULL here; the
+	 * redundant mp != zfsvfs->z_vfs comparison dereferenced zfsvfs before
+	 * the teardown lock was held, creating a UAF window if unmount raced.
+	 * zfs_enter() is the correct guard against concurrent unmount.
 	 */
-	if (!zfsvfs ||
-	    (mp != zfsvfs->z_vfs))
+	zfsvfs = vfs_fsprivate(mp);
+	if (!zfsvfs)
 		return (SET_ERROR(VFS_RETURNED));
 
 	/* Guard against unmount */
@@ -332,6 +332,9 @@ zfs_findernotify_refresh(struct mount *mp)
 	zfsvfs_t *zfsvfs = vfs_fsprivate(mp);
 
 	dprintf("%s\n", __func__);
+
+	if (zfsvfs == NULL)
+		return;
 
 	/* Make sure it thinks delta needs updating */
 	zfsvfs->z_findernotify_space = ZFS_FINDERNOTIFY_REFRESH;
