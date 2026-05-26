@@ -214,7 +214,7 @@ libzpool_la_LIBADD = \
 
 libzpool_la_LIBADD += $(LIBCLOCK_GETTIME) $(ZLIB_LIBS) -lm
 
-libzpool_la_LDFLAGS = -pthread
+libzpool_la_LDFLAGS = -version-info 7:0:0
 
 if !BUILD_MACOS
 if !ASAN_ENABLED
@@ -230,8 +230,6 @@ endif
 if BUILD_FREEBSD
 libzpool_la_LIBADD += -lgeom
 endif
-
-libzpool_la_LDFLAGS += -version-info 7:0:0
 
 if TARGET_CPU_POWERPC
 module/zfs/libzpool_la-vdev_raidz_math_powerpc_altivec.$(OBJEXT) : CFLAGS += -maltivec

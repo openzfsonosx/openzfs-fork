@@ -90,7 +90,7 @@ if !BUILD_MACOS
 libzfs_la_LIBADD += -lrt
 endif
 
-libzfs_la_LDFLAGS = -pthread
+libzfs_la_LDFLAGS = -version-info 7:0:0
 
 if !BUILD_MACOS
 if !ASAN_ENABLED
@@ -101,8 +101,6 @@ endif
 if BUILD_FREEBSD
 libzfs_la_LIBADD += -lutil -lgeom
 endif
-
-libzfs_la_LDFLAGS += -version-info 7:0:0
 
 if BUILD_MACOS
 libzfs_la_LIBADD += \

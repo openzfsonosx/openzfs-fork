@@ -40,7 +40,7 @@ libzfs_core_la_LIBADD = \
 
 libzfs_core_la_LIBADD += $(LTLIBINTL)
 
-libzfs_core_la_LDFLAGS = -pthread
+libzfs_core_la_LDFLAGS = -version-info 3:0:0
 
 if !BUILD_MACOS
 if !ASAN_ENABLED
@@ -51,8 +51,6 @@ endif
 if BUILD_FREEBSD
 libzfs_core_la_LIBADD += -lutil -lgeom
 endif
-
-libzfs_core_la_LDFLAGS += -version-info 3:0:0
 
 pkgconfig_DATA += %D%/libzfs_core.pc
 
