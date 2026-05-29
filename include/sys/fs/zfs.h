@@ -1435,7 +1435,9 @@ typedef struct ddt_histogram {
 
 #define	ZVOL_DRIVER	"zvol"
 #define	ZFS_DRIVER	"zfs"
+#ifndef ZFS_DEV
 #define	ZFS_DEV		"/dev/zfs"
+#endif
 #define	ZFS_DEVDIR	"/dev"
 
 #define	ZFS_SUPER_MAGIC	0x2fc12fc1

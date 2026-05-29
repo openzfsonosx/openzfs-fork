@@ -100,7 +100,13 @@ extern void __dprintf(boolean_t dprint, const char *file, const char *func,
 #define	dprintf(...)				   \
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) \
 		__dprintf(B_TRUE, __FILE__, __func__, __LINE__, __VA_ARGS__)
-#endif
+#else /* KERNEL */
+#ifdef FSKIT
+#define	dprintf(...)				   \
+	if (zfs_flags & ZFS_DEBUG_DPRINTF) \
+		__dprintf(B_TRUE, __FILE__, __func__, __LINE__, __VA_ARGS__)
+#endif /* FSKIT */
+#endif /* KERNEL */
 
 #else /* !APPLE */
 

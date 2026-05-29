@@ -412,6 +412,7 @@ do_mount(zfs_handle_t *zhp, const char *dir, const char *optptr, int mflag)
 	int rv;
 	const char *spec = zfs_get_name(zhp);
 	const char *fstype = MNTTYPE_ZFS;
+
 	struct zfs_mount_args mnt_args;
 	char *rpath = NULL;
 	zfs_cmd_t zc = { "\0" };
