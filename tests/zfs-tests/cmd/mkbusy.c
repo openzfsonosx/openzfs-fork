@@ -19,6 +19,7 @@
  * simply open it directly and pause. If not, verify that the parent directory
  * exists, and create a new file in that directory.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <stdio.h>
 #include <sys/types.h>

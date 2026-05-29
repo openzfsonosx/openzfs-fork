@@ -25,6 +25,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <stdio.h>
 #include <ctype.h>

@@ -23,6 +23,7 @@
 /*
  * Copyright (c) 2024 by Triad National Security, LLC.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <sys/types.h>
 #include <sys/stat.h>

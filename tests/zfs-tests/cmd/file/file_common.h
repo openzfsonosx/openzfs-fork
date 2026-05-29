@@ -28,6 +28,8 @@
 #ifndef FILE_COMMON_H
 #define	FILE_COMMON_H
 
+#define	FSKIT_NO_POSIX_WRAPPER
+
 /*
  * header file for file_* utilities. These utilities
  * are used by the test cases to perform various file

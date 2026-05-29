@@ -27,6 +27,7 @@
  * Test for correct behavior of DOS mode READONLY flag on a file.
  * We should be able to open a file RW, set READONLY, and still write to the fd.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <sys/stat.h>
 #include <err.h>

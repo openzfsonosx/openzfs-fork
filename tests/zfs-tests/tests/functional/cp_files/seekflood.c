@@ -23,6 +23,7 @@
  *
  */
 
+#define	FSKIT_NO_POSIX_WRAPPER
 #ifndef	_GNU_SOURCE
 #define	_GNU_SOURCE
 #endif

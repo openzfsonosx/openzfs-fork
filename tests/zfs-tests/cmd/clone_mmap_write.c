@@ -33,6 +33,8 @@
 #define	_GNU_SOURCE
 #endif
 
+#define	FSKIT_NO_POSIX_WRAPPER
+
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>

@@ -36,6 +36,7 @@
  * --------------------------------------------------------------------
  *
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 #define	_REENTRANT 1
 #include <stdio.h>
 #include <fcntl.h>

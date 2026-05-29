@@ -24,6 +24,8 @@
  * Copyright (c) 2024 by Pawel Jakub Dawidek
  */
 
+#define	FSKIT_NO_POSIX_WRAPPER
+
 #include <sys/mman.h>
 #include <sys/stat.h>
 

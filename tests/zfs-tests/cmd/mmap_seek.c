@@ -23,6 +23,7 @@
 /*
  * Copyright (c) 2021 by Lawrence Livermore National Security, LLC.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <unistd.h>
 #include <fcntl.h>

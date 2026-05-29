@@ -39,6 +39,7 @@
  *		0 : no errors
  * --------------------------------------------------------------
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

@@ -23,6 +23,7 @@
 /*
  * Copyright (c) 2025, Klara, Inc.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <stdio.h>
 #include <unistd.h>

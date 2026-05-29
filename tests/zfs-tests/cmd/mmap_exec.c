@@ -28,6 +28,7 @@
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <stdio.h>
 #include <sys/stat.h>

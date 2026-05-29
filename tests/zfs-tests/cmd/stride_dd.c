@@ -13,6 +13,7 @@
 /*
  * Copyright (c) 2018 by Delphix. All rights reserved.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <sys/types.h>
 #include <errno.h>

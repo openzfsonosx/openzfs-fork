@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <stdlib.h>
 #include <stdio.h>

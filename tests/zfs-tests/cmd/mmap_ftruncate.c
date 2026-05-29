@@ -32,6 +32,7 @@
  * None of these are sync operations, so they should avoid the various "force
  * flush" codepaths.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <unistd.h>
 #include <fcntl.h>

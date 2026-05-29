@@ -14,6 +14,7 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright 2017, loli10K <ezomori.nozomu@gmail.com>. All rights reserved.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <fcntl.h>
 #include <sys/stat.h>

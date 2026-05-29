@@ -95,6 +95,8 @@
  * Copyright 2015 OpenZFS on OS X. All rights reserved.
  */
 
+#define	FSKIT_NO_POSIX_WRAPPER
+
 #include <unistd.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>

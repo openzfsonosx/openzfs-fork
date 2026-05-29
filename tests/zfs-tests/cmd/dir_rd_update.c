@@ -32,6 +32,7 @@
  *      concurrently on the same directory can lead to deadlock
  *	on a UFS logging file system, but not on a ZFS file system.
  */
+#define	FSKIT_NO_POSIX_WRAPPER
 
 #include <sys/types.h>
 #include <sys/stat.h>

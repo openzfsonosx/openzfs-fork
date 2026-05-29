@@ -28,6 +28,8 @@
  * compile and run even if these features aren't exposed through the libc.
  */
 
+#define	FSKIT_NO_POSIX_WRAPPER
+
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
