@@ -9309,8 +9309,10 @@ spa_async_thread(void *arg)
 
 	/*
 	 * See if the config needs to be updated.
+	 * Skip in read-only mode: spa_config_update → vdev_config_dirty
+	 * unconditionally asserts spa_writeable(spa).
 	 */
-	if (tasks & SPA_ASYNC_CONFIG_UPDATE) {
+	if ((tasks & SPA_ASYNC_CONFIG_UPDATE) && spa_writeable(spa)) {
 		uint64_t old_space, new_space;
 
 		spa_namespace_enter(FTAG);
