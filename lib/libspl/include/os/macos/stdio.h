@@ -30,5 +30,5 @@
 #define	dprintf xnu_dprintf
 #include_next <stdio.h>
 #undef dprintf
-#define	dprintf printf
+
 #endif

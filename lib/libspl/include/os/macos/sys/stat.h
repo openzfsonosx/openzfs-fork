@@ -38,41 +38,38 @@
 #include <sys/disk.h>
 #endif
 
-static inline int
-fstat_blk(int fd, struct stat *st)
-{
-	if (fstat(fd, st) == -1)
-		return (-1);
-
-	/* In OS X we need to use ioctl to get the size of a block dev */
-	if (st->st_mode & (S_IFBLK | S_IFCHR)) {
-		uint32_t blksize;
-		uint64_t blkcnt;
-
-		if (ioctl(fd, DKIOCGETBLOCKSIZE, &blksize) < 0) {
-			return (-1);
-		}
-		if (ioctl(fd, DKIOCGETBLOCKCOUNT, &blkcnt) < 0) {
-			return (-1);
-		}
-
-		st->st_size = (off_t)((uint64_t)blksize * blkcnt);
-	}
-
-	return (0);
-}
-
-
 /*
  * Deal with Linux use of 64 for everything.
  * OsX has moved past it, dropped all 32 versions, and
  * standard form is 64 bit.
  */
 
+#ifndef stat64
 #define	stat64		stat
+#endif
+#ifndef lstat64
 #define	lstat64		lstat
+#endif
+#ifndef fstat64
 #define	fstat64		fstat
+#endif
+#ifndef fstat64_blk
 #define	fstat64_blk	fstat_blk
+#endif
+#ifndef statfs64
 #define	statfs64	statfs
+#endif
+
+/*
+ * FSKit sandbox shim — included LAST so it can #undef and #redefine the
+ * symbols declared above without breaking their original definitions.
+ *
+ * Active for all FSKit builds (FSKIT defined globally by AC_DEFINE when
+ * --enable-fskit is configured).  fskit_fstat_blk and the device-size
+ * registry are implemented in libspl and available to all binaries.
+ */
+#ifdef FSKIT
+#include <sys/fskit_posix.h>
+#endif
 
 #endif /* _LIBSPL_SYS_STAT_H */

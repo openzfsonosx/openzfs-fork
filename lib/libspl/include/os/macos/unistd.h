@@ -31,11 +31,21 @@
 
 /* Handle Linux use of 64 names */
 
+#ifndef open64
 #define	open64		open
+#endif
+#ifndef pread64
 #define	pread64		pread
+#endif
+#ifndef pwrite64
 #define	pwrite64	pwrite
+#endif
+#ifndef ftruncate64
 #define	ftruncate64	ftruncate
+#endif
+#ifndef lseek64
 #define	lseek64		lseek
+#endif
 
 
 static inline int

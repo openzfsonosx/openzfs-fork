@@ -64,6 +64,11 @@ libspl_la_SOURCES += \
 	%D%/os/macos/zone.c
 endif
 
+if BUILD_FSKIT
+libspl_la_SOURCES += \
+	%D%/os/macos/fskit_posix.c
+endif
+
 libspl_la_LIBADD = \
 	libspl_assert.la
 

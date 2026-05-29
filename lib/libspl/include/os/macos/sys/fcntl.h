@@ -72,4 +72,14 @@ fdopendir(int fd)
 }
 #endif
 
+/*
+ * FSKit sandbox shim — redirect open() to fskit_open() for all FSKit
+ * builds so that /dev/fd/N paths are handled via dup() instead of a
+ * new open(2) that the App Sandbox would deny.
+ * Included LAST so all open() declarations are already visible.
+ */
+#ifdef FSKIT
+#include <sys/fskit_posix.h>
 #endif
+
+#endif	/* _LIBSPL_SYS_FCNTL_H */
