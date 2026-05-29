@@ -36,8 +36,12 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <os/log.h>
 
 #include <libzfs_impl.h>
+
+#define	MZLOG(fmt, ...) \
+	os_log(OS_LOG_DEFAULT, "mount_zfs: " fmt, ##__VA_ARGS__)
 
 #define	ZS_COMMENT	0x00000000	/* comment */
 #define	ZS_ZFSUTIL	0x00000001	/* caller is zfs(8) */
@@ -155,6 +159,44 @@ main(int argc, char **argv)
 
 	parse_dataset(argv[0], &pdataset);
 
+	MZLOG("called: device=%s dataset=%s mountpoint=%s",
+	    argv[0], pdataset, argv[1]);
+
+	if ((g_zfs = libzfs_init()) == NULL) {
+		MZLOG("libzfs_init failed: %s", libzfs_error_init(errno));
+		(void) fprintf(stderr, "%s\n", libzfs_error_init(errno));
+		return (MOUNT_SYSERR);
+	}
+
+	/*
+	 * When called as fskitd's FSMountExecutable, the ZFS pool may not yet
+	 * be imported into the kext (the FSKit check instance only imported it
+	 * in libzpool user-space which died with that process).  Import it now
+	 * from the device label so zfs_open() below can find it.
+	 */
+	if (!zfs_dataset_exists(g_zfs, pdataset, ZFS_TYPE_FILESYSTEM)) {
+		MZLOG("pool '%s' not in kext; importing from %s", pdataset, argv[0]);
+		int fd = open(argv[0], O_RDONLY | O_CLOEXEC);
+		if (fd >= 0) {
+			nvlist_t *config = NULL;
+			if (zpool_read_label(fd, &config, NULL) == 0 &&
+			    config != NULL) {
+				int ierr = zpool_import_props(g_zfs, config, NULL,
+				    NULL, ZFS_IMPORT_NORMAL);
+				MZLOG("zpool_import_props('%s') = %d (errno %d)",
+				    pdataset, ierr, errno);
+				nvlist_free(config);
+			} else {
+				MZLOG("zpool_read_label failed on %s", argv[0]);
+			}
+			(void) close(fd);
+		} else {
+			MZLOG("open(%s) failed: %s", argv[0], strerror(errno));
+		}
+	} else {
+		MZLOG("pool '%s' already in kext", pdataset);
+	}
+
 	/* canonicalize the mount point */
 	if (realpath(argv[1], mntpoint) == NULL) {
 		(void) fprintf(stderr, gettext("filesystem '%s' cannot be "
@@ -203,19 +245,18 @@ main(int argc, char **argv)
 	if (zfsflags & ZS_ZFSUTIL)
 		zfsutil = 1;
 
-	if ((g_zfs = libzfs_init()) == NULL) {
-		(void) fprintf(stderr, "%s\n", libzfs_error_init(errno));
-		return (MOUNT_SYSERR);
-	}
-
 	/* try to open the dataset to access the mount point */
+	MZLOG("zfs_open('%s')...", dataset);
 	if ((zhp = zfs_open(g_zfs, dataset,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT)) == NULL) {
+		MZLOG("zfs_open('%s') failed: %s", dataset,
+		    libzfs_error_description(g_zfs));
 		(void) fprintf(stderr, gettext("filesystem '%s' cannot be "
 		    "mounted, unable to open the dataset\n"), dataset);
 		libzfs_fini(g_zfs);
 		return (MOUNT_USAGE);
 	}
+	MZLOG("zfs_open('%s') ok, mountpoint prop='%s'", dataset, prop);
 
 	zfs_adjust_mount_options(zhp, mntpoint, mntopts, mtabopt);
 
@@ -269,9 +310,11 @@ main(int argc, char **argv)
 	}
 
 	if (!fake) {
+		MZLOG("do_mount('%s' -> '%s', opts='%s', flags=0x%lx)",
+		    dataset, mntpoint, mntopts, mntflags);
 		error = do_mount(zhp, mntpoint, mntopts, mntflags);
-		// error = mount(dataset, mntpoint, MNTTYPE_ZFS,
-		//    mntflags, mntopts);
+		MZLOG("do_mount returned %d (errno %d: %s)",
+		    error, errno, strerror(errno));
 	}
 
 	zfs_close(zhp);
