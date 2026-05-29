@@ -56,6 +56,10 @@
 #include <zfs_fletcher.h>
 #include <zlib.h>
 
+#ifdef FSKIT
+#include <os/log.h>
+#endif
+
 /*
  * Emulation of kernel services in userland.
  */
@@ -64,6 +68,7 @@ uint32_t hostid;
 
 /* If set, all blocks read will be copied to the specified directory. */
 char *vn_dumpdir = NULL;
+
 
 uint32_t
 zone_get_hostid(void *zonep)
@@ -116,6 +121,8 @@ void
 dprintf_setup(int *argc, char **argv)
 {
 	int i, j;
+
+	os_log(OS_LOG_DEFAULT, "ZFSFSKit: %{public}s", "Testing dprintfsetup\n");
 
 	/*
 	 * Debugging can be specified two ways: by setting the
@@ -188,7 +195,13 @@ __dprintf(boolean_t dprint, const char *file, const char *func,
 			(void) printf("%s, line %d: ", newfile, line);
 		(void) printf("dprintf: %s: ", func);
 		va_start(adx, fmt);
+#ifdef FSKIT
+		char buffer[1024];
+		vsnprintf(buffer, sizeof(buffer), fmt, adx);
+		os_log(OS_LOG_DEFAULT, "ZFSFSKit: %{public}s", buffer);
+#else
 		(void) vprintf(fmt, adx);
+#endif
 		va_end(adx);
 		funlockfile(stdout);
 	} else {
@@ -208,6 +221,10 @@ __dprintf(boolean_t dprint, const char *file, const char *func,
 		}
 
 		__zfs_dbgmsg(buf);
+
+#ifdef FSKIT
+		os_log(OS_LOG_DEFAULT, "ZFSFSKit: %{public}s", buf);
+#endif
 
 		umem_free(buf, size);
 	}
@@ -547,6 +564,19 @@ zfs_file_open(const char *path, int flags, int mode, zfs_file_t **fpp)
 
 	if (!(flags & O_CREAT) && S_ISBLK(st.st_mode))
 		flags |= O_DIRECT;
+
+#ifdef __APPLE__
+	/*
+	 * On macOS, opening a raw/character device without O_NONBLOCK can
+	 * return EINVAL when another driver (e.g. the IOKit ZFS kext) holds
+	 * an exclusive reference to the underlying device.  Opening through
+	 * the fdesc filesystem (/dev/fd/N) is subject to the same check.
+	 * O_NONBLOCK only affects the open() call itself; subsequent pread/
+	 * pwrite operations on disk devices are always synchronous.
+	 */
+	if (!(flags & O_CREAT) && (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)))
+		flags |= O_NONBLOCK;
+#endif
 
 	if (flags & O_CREAT)
 		old_umask = umask(0);

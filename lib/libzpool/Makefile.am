@@ -217,6 +217,11 @@ libzpool_la_CPPFLAGS += -DCLOSE_ON_UNMOUNT
 nodist_libzpool_la_SOURCES += module/os/macos/zfs/vdev_file_os.c
 endif
 
+# NOTE: libzpool is NOT compiled with -DFSKIT_EXT (FSKIT_EXT is unused now).
+# fstat64_blk → fskit_fstat_blk (in libspl) tries DKIOC ioctls; if blocked by
+# the App Sandbox it falls back to the path→size registry populated by
+# ZFSFileSystem.m via fskit_register_device() before calling spa_import.
+
 if BUILD_FREEBSD
 libzpool_la_LIBADD += -lgeom
 endif
