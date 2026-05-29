@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Bundle identity for the legacy .fs bundle.
+	     CFBundlePackageType must be exactly 4 chars: 'f','s',' ',' '.
+	     This bundle lives at /Library/Filesystems/zfs.fs/ and provides the
+	     FSMountExecutable path that fskitd resolves when spawning a mount.
+	     diskarbitrationd reads FSImplementation / FSPersonalities from here.
+	-->
+	<key>CFBundleIdentifier</key>
+	<string>org.openzfsonosx.filesystems.fs.zfs</string>
+	<key>CFBundleName</key>
+	<string>zfs</string>
+	<key>CFBundlePackageType</key>
+	<string>fs  </string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.4.1</string>
+	<key>CFBundleVersion</key>
+	<string>2410</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.4</string>
+
+	<!--
+	    FSMediaTypes: partition type GUIDs used by diskarbitrationd to decide
+	    which .fs bundle handles a given block device.
+	    6A898CC3-1DD2-11B2-99A6-080020736631 is the Solaris/ZFS data GUID.
+	    "Partitionless" catches whole-disk (non-partitioned) ZFS pools.
+	    No FSProbeExecutable: FSKit probe (probeResource:) handles probing.
+	-->
+	<key>FSMediaTypes</key>
+	<dict>
+		<key>6A898CC3-1DD2-11B2-99A6-080020736631</key>
+		<dict>
+			<key>FSMediaProperties</key>
+			<dict>
+				<key>Content Hint</key>
+				<string>6A898CC3-1DD2-11B2-99A6-080020736631</string>
+				<key>Leaf</key>
+				<true/>
+			</dict>
+			<key>FSProbeOrder</key>
+			<integer>850</integer>
+		</dict>
+		<key>Partitionless</key>
+		<dict>
+			<key>FSMediaProperties</key>
+			<dict>
+				<key>Leaf</key>
+				<true/>
+				<key>Whole</key>
+				<true/>
+			</dict>
+			<key>FSProbeOrder</key>
+			<integer>20000</integer>
+		</dict>
+	</dict>
+
+	<!--
+	    FSPersonalities: fskitd resolves FSMountExecutable relative to
+	    this bundle's Contents/Resources/ directory, then invokes it after
+	    the FSKit check phase completes.  The binary logs its arguments and
+	    exits 0; the actual VFS mount is created by lifs.kext via the FSKit
+	    volume callbacks (ZFSVolume.mountWithOptions:).
+	-->
+	<key>FSPersonalities</key>
+	<dict>
+		<key>ZFS</key>
+		<dict>
+			<key>FSName</key>
+			<string>ZFS</string>
+			<key>FSMountArguments</key>
+			<string></string>
+			<key>FSMountExecutable</key>
+			<string>mount_zfs</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

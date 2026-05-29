@@ -101,7 +101,7 @@
 #endif
 
 /* ------------------------------------------------------------------ */
-/* Debug logging                                                        */
+/* Debug logging */
 /* ------------------------------------------------------------------ */
 
 #define	FPOSIX_LOG(fmt, ...) \
@@ -109,7 +109,7 @@
 	    "ZFSFSKit fskit_posix: " fmt, ##__VA_ARGS__)
 
 /* ------------------------------------------------------------------ */
-/* Path → size registry                                                 */
+/* Path → size registry */
 /* ------------------------------------------------------------------ */
 
 #define	FSKIT_DEV_MAX	32	/* enough for any realistic pool topology */
@@ -144,7 +144,7 @@ fskit_register_device(const char *path, uint64_t size_bytes)
 		if (strncmp(fskit_dev_table[i].path, path, MAXPATHLEN) == 0) {
 			fskit_dev_table[i].size_bytes = size_bytes;
 			pthread_mutex_unlock(&fskit_dev_lock);
-			FPOSIX_LOG("register_device: updated '%s' → %llu bytes",
+			FPOSIX_LOG("register_device: updated '%s' %llu",
 			    path, (unsigned long long)size_bytes);
 			return;
 		}
@@ -152,7 +152,8 @@ fskit_register_device(const char *path, uint64_t size_bytes)
 
 	/* Add a new entry. */
 	if (fskit_dev_count < FSKIT_DEV_MAX) {
-		strlcpy(fskit_dev_table[fskit_dev_count].path, path, MAXPATHLEN);
+		strlcpy(fskit_dev_table[fskit_dev_count].path, path,
+		    MAXPATHLEN);
 		fskit_dev_table[fskit_dev_count].size_bytes = size_bytes;
 		fskit_dev_count++;
 		FPOSIX_LOG("register_device: added '%s' → %llu bytes",
@@ -209,7 +210,7 @@ registry_lookup(const char *path)
 }
 
 /* ------------------------------------------------------------------ */
-/* fskit_open — sandbox-safe open(2) / open64(2).                      */
+/* fskit_open — sandbox-safe open(2) / open64(2). */
 /* ------------------------------------------------------------------ */
 
 /*
@@ -245,7 +246,7 @@ fskit_open(const char *path, int flags, ...)
 }
 
 /* ------------------------------------------------------------------ */
-/* fskit_stat — sandbox-safe stat(2) / stat64(2).                      */
+/* fskit_stat — sandbox-safe stat(2) / stat64(2). */
 /* ------------------------------------------------------------------ */
 
 /*
@@ -272,7 +273,7 @@ fskit_stat(const char *path, struct fskit_stat *st)
 }
 
 /* ------------------------------------------------------------------ */
-/* fskit_fstat                                                          */
+/* fskit_fstat */
 /* ------------------------------------------------------------------ */
 
 int
@@ -284,7 +285,7 @@ fskit_fstat(int fd, struct fskit_stat *st)
 }
 
 /* ------------------------------------------------------------------ */
-/* fskit_fstat_blk — sandbox-safe fstat_blk replacement.               */
+/* fskit_fstat_blk — sandbox-safe fstat_blk replacement. */
 /* ------------------------------------------------------------------ */
 
 /*
@@ -316,7 +317,7 @@ fskit_fstat_blk(int fd, struct fskit_stat *st)
 		return (0);
 	}
 
-	/* Try ioctls — succeed outside the sandbox or with permissive profile. */
+	/* Try ioctls — succeed outside sandbox or with permissive profile. */
 	{
 		uint32_t blksize = 0;
 		uint64_t blkcnt  = 0;
@@ -334,8 +335,8 @@ fskit_fstat_blk(int fd, struct fskit_stat *st)
 	/*
 	 * DKIOC blocked by App Sandbox.
 	 * Resolve fd → device path via F_GETPATH and look up the registry
-	 * populated by ZFSFileSystem.m via fskit_register_device() before import.
-	 * F_GETPATH works on dup'd fds — it returns the underlying device path.
+	 * populated by ZFSFileSystem.m via fskit_register_device() before
+	 * import. F_GETPATH works on dup'd fds (returns the device path).
 	 */
 	{
 		char path[MAXPATHLEN];
@@ -351,26 +352,29 @@ fskit_fstat_blk(int fd, struct fskit_stat *st)
 			}
 
 			/*
-			 * Try the sibling path form: /dev/diskXsY ↔ /dev/rdiskXsY.
-			 * The kernel may return the block form when we registered the
-			 * raw form (or vice versa).
+			 * Try the sibling path form:
+			 * /dev/diskXsY ↔ /dev/rdiskXsY.
+			 * Kernel may return block form when raw was registered
+			 * (or vice versa).
 			 */
 			char alt[MAXPATHLEN];
 			alt[0] = '\0';
 			if (strncmp(path, "/dev/rdisk", 10) == 0) {
-				/* raw → block: /dev/rdiskXsY → /dev/diskXsY */
-				snprintf(alt, sizeof (alt), "/dev/%s", path + 6);
+				/* raw to block: rdiskXsY -> diskXsY */
+				snprintf(alt, sizeof (alt),
+				    "/dev/%s", path + 6);
 			} else if (strncmp(path, "/dev/disk", 9) == 0) {
-				/* block → raw: /dev/diskXsY → /dev/rdiskXsY */
-				snprintf(alt, sizeof (alt), "/dev/r%s", path + 5);
+				/* block to raw: diskXsY -> rdiskXsY */
+				snprintf(alt, sizeof (alt),
+				    "/dev/r%s", path + 5);
 			}
 
 			if (alt[0] != '\0') {
 				sz = registry_lookup(alt);
 				if (sz > 0) {
 					st->st_size = (off_t)sz;
-					FPOSIX_LOG("fstat_blk(%d): DKIOC blocked, "
-					    "registry hit (alt) '%s' → %llu bytes",
+					FPOSIX_LOG("fstat_blk(%d): DKIOC "
+					    "blocked, alt '%s' %llu",
 					    fd, alt, (unsigned long long)sz);
 					return (0);
 				}

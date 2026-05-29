@@ -122,7 +122,8 @@ dprintf_setup(int *argc, char **argv)
 {
 	int i, j;
 
-	os_log(OS_LOG_DEFAULT, "ZFSFSKit: %{public}s", "Testing dprintfsetup\n");
+	os_log(OS_LOG_DEFAULT, "ZFSFSKit: %{public}s",
+	    "Testing dprintfsetup\n");
 
 	/*
 	 * Debugging can be specified two ways: by setting the
@@ -197,7 +198,7 @@ __dprintf(boolean_t dprint, const char *file, const char *func,
 		va_start(adx, fmt);
 #ifdef FSKIT
 		char buffer[1024];
-		vsnprintf(buffer, sizeof(buffer), fmt, adx);
+		vsnprintf(buffer, sizeof (buffer), fmt, adx);
 		os_log(OS_LOG_DEFAULT, "ZFSFSKit: %{public}s", buffer);
 #else
 		(void) vprintf(fmt, adx);

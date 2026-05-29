@@ -23,7 +23,7 @@
  * Active when FSKIT is defined (build-wide via --enable-fskit / AC_DEFINE)
  * -------------------------------------------------------------------------
  *   open / open64  → fskit_open    dup(N) for /dev/fd/N, real open otherwise
- *   stat / stat64  → fskit_stat    fstat(N) for /dev/fd/N, real stat otherwise
+ *   stat / stat64  → fskit_stat    fstat(N) for /dev/fd/N, real stat else
  *   fstat          → fskit_fstat
  *   fstat64_blk    → fskit_fstat_blk
  *                    Tries DKIOC ioctls; if blocked by sandbox falls back to

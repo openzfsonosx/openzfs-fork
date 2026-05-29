@@ -131,14 +131,14 @@ lzc_ioctl_fd_os(int fd __attribute__((unused)), unsigned long request,
 	int		ret = 0;
 
 	/* Save caller's nvlist pointers/sizes before zeroing for wire */
-	conf_buf     = (void *)(uintptr_t)zc->zc_nvlist_conf;
-	conf_len     = (uint32_t)zc->zc_nvlist_conf_size;
-	src_buf      = (void *)(uintptr_t)zc->zc_nvlist_src;
-	src_len      = (uint32_t)zc->zc_nvlist_src_size;
-	dst_buf      = (void *)(uintptr_t)zc->zc_nvlist_dst;
+	conf_buf = (void *)(uintptr_t)zc->zc_nvlist_conf;
+	conf_len = (uint32_t)zc->zc_nvlist_conf_size;
+	src_buf = (void *)(uintptr_t)zc->zc_nvlist_src;
+	src_len = (uint32_t)zc->zc_nvlist_src_size;
+	dst_buf = (void *)(uintptr_t)zc->zc_nvlist_dst;
 	dst_buf_size = zc->zc_nvlist_dst_size;
 
-	/* Wire copy: zero pointer fields (sizes stay so daemon knows lengths) */
+	/* Wire copy: zero pointer fields (sizes stay for daemon) */
 	zc_wire = *zc;
 	zc_wire.zc_nvlist_conf = 0;
 	zc_wire.zc_nvlist_src  = 0;
@@ -160,11 +160,11 @@ lzc_ioctl_fd_os(int fd __attribute__((unused)), unsigned long request,
 	}
 
 	/* ---- Send request ---- */
-	if (fskit_write_all(g_sock_fd, &magic,    sizeof (magic))    < 0 ||
-	    fskit_write_all(g_sock_fd, &ioc,      sizeof (ioc))      < 0 ||
-	    fskit_write_all(g_sock_fd, &zc_wire,  sizeof (zc_wire))  < 0 ||
+	if (fskit_write_all(g_sock_fd, &magic, sizeof (magic)) < 0 ||
+	    fskit_write_all(g_sock_fd, &ioc, sizeof (ioc)) < 0 ||
+	    fskit_write_all(g_sock_fd, &zc_wire, sizeof (zc_wire)) < 0 ||
 	    fskit_write_all(g_sock_fd, &conf_len, sizeof (conf_len)) < 0 ||
-	    fskit_write_all(g_sock_fd, &src_len,  sizeof (src_len))  < 0)
+	    fskit_write_all(g_sock_fd, &src_len, sizeof (src_len)) < 0)
 		goto ioerr;
 
 	if (conf_len > 0 && conf_buf != NULL &&

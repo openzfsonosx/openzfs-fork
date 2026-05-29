@@ -175,16 +175,17 @@ main(int argc, char **argv)
 	 * from the device label so zfs_open() below can find it.
 	 */
 	if (!zfs_dataset_exists(g_zfs, pdataset, ZFS_TYPE_FILESYSTEM)) {
-		MZLOG("pool '%s' not in kext; importing from %s", pdataset, argv[0]);
+		MZLOG("pool '%s' not in kext; importing from %s",
+		    pdataset, argv[0]);
 		int fd = open(argv[0], O_RDONLY | O_CLOEXEC);
 		if (fd >= 0) {
 			nvlist_t *config = NULL;
 			if (zpool_read_label(fd, &config, NULL) == 0 &&
 			    config != NULL) {
-				int ierr = zpool_import_props(g_zfs, config, NULL,
-				    NULL, ZFS_IMPORT_NORMAL);
-				MZLOG("zpool_import_props('%s') = %d (errno %d)",
-				    pdataset, ierr, errno);
+				int ierr = zpool_import_props(g_zfs,
+				    config, NULL, ZFS_IMPORT_NORMAL);
+				MZLOG("zpool_import_props('%s') = %d",
+				    pdataset, ierr);
 				nvlist_free(config);
 			} else {
 				MZLOG("zpool_read_label failed on %s", argv[0]);

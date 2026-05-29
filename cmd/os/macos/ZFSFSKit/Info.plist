@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Bundle identity -->
+	<key>CFBundleIdentifier</key>
+	<string>org.openzfsonosx.filesystems.zfs.fsext</string>
+	<key>CFBundleName</key>
+	<string>zfs_fskit</string>
+	<key>CFBundleDisplayName</key>
+	<string>OpenZFS Filesystem Extension</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.4.1</string>
+	<key>CFBundleVersion</key>
+	<string>2410</string>
+	<key>CFBundleExecutable</key>
+	<string>ZFSFSKit</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.4</string>
+
+	<!-- ExtensionKit FSKit module descriptor.
+	     Extension point: com.apple.fskit.fsmodule  (lowercase, matches Apple's own)
+	     Principal class key: EXExtensionPrincipalClass  (not EXPrincipalClass)
+	     FSMediaTypes and other FSKit keys live INSIDE EXAppExtensionAttributes.
+	-->
+	<key>EXAppExtensionAttributes</key>
+	<dict>
+		<key>EXExtensionPointIdentifier</key>
+		<string>com.apple.fskit.fsmodule</string>
+		<key>EXExtensionPrincipalClass</key>
+		<string>ZFSFileSystem</string>
+
+		<key>FSShortName</key>
+		<string>zfs</string>
+		<key>FSSupportsBlockResources</key>
+		<true/>
+		<key>FSSupportsServerURLs</key>
+		<false/>
+
+		<!--
+		    FSActivateOptionSyntax — tells fskitd to drive the UserFS activate
+		    path: loadResource: → activateWithOptions: → mountWithOptions:.
+		    lifs.kext creates the VFS mount point when mountWithOptions: calls
+		    reply(nil).
+		    FSCheckOptionSyntax — no flags needed for ZFS self-check.
+		    FSVolumeAlwaysIgnoreOwnership — suppress ownership prompts.
+		-->
+		<key>FSActivateOptionSyntax</key>
+		<dict>
+			<key>shortOptions</key>
+			<string>o:</string>
+		</dict>
+		<key>FSCheckOptionSyntax</key>
+		<dict>
+			<key>shortOptions</key>
+			<string></string>
+		</dict>
+		<key>FSVolumeAlwaysIgnoreOwnership</key>
+		<true/>
+
+		<!--
+		    FSMediaTypes: partition type GUIDs / content hints fskitd uses to
+		    decide which devices to probe with this extension.
+		    6A898CC3-1DD2-11B2-99A6-080020736631 is the Solaris/ZFS data GUID.
+		    "Whole" catches whole-disk (non-partitioned) ZFS pools.
+		-->
+		<key>FSMediaTypes</key>
+		<dict>
+			<key>6A898CC3-1DD2-11B2-99A6-080020736631</key>
+			<dict>
+				<key>FSMediaProperties</key>
+				<dict>
+					<key>Content Hint</key>
+					<string>6A898CC3-1DD2-11B2-99A6-080020736631</string>
+					<key>Leaf</key>
+					<true/>
+				</dict>
+				<key>FSProbeOrder</key>
+				<integer>850</integer>
+			</dict>
+			<key>Partitionless</key>
+			<dict>
+				<key>FSMediaProperties</key>
+				<dict>
+					<key>Leaf</key>
+					<true/>
+					<key>Whole</key>
+					<true/>
+				</dict>
+				<key>FSProbeOrder</key>
+				<integer>20000</integer>
+			</dict>
+		</dict>
+
+		<key>FSPersonalities</key>
+		<dict>
+			<key>ZFS</key>
+			<dict>
+				<key>FSName</key>
+				<string>ZFS</string>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

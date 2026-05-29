@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	    FSKit filesystem extension entitlement.
+	    Apple will grant this to third-party filesystem developers.
+	    The team-prefixed app-identifier is required by ExtensionKit for
+	    sandbox validation — substitute your actual Team ID for "ADHOC".
+	-->
+	<key>com.apple.developer.fskit.fsmodule</key>
+	<true/>
+	<key>com.apple.application-identifier</key>
+	<string>ADHOC.org.openzfsonosx.filesystems.zfs.fsext</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>ADHOC</string>
+
+	<!--
+	    FSKit extensions MUST run in the App Sandbox — ExtensionKit rejects
+	    any extension process that lacks this entitlement.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+</dict>
+</plist>
