@@ -183,7 +183,7 @@ main(int argc, char **argv)
 			if (zpool_read_label(fd, &config, NULL) == 0 &&
 			    config != NULL) {
 				int ierr = zpool_import_props(g_zfs,
-				    config, NULL, ZFS_IMPORT_NORMAL);
+				    config, NULL, NULL, ZFS_IMPORT_NORMAL);
 				MZLOG("zpool_import_props('%s') = %d",
 				    pdataset, ierr);
 				nvlist_free(config);
