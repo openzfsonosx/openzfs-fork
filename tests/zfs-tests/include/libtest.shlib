@@ -34,6 +34,7 @@
 #
 
 . ${STF_SUITE}/include/tunables.cfg
+[ "$UNAME" = "Darwin" ] && . ${STF_SUITE}/include/tunables-macos.cfg
 
 . ${STF_TOOLS}/include/logapi.shlib
 . ${STF_SUITE}/include/math.shlib
