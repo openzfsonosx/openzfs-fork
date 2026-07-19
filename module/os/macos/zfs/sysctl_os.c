@@ -456,6 +456,23 @@ param_set_arc_int(ZFS_MODULE_PARAM_ARGS)
 	return (0);
 }
 
+int
+param_set_l2arc_dwpd_limit(ZFS_MODULE_PARAM_ARGS)
+{
+	uint64_t old_val = l2arc_dwpd_limit;
+	int err;
+
+	err = sysctl_handle_quad(oidp, arg1, 0, req);
+	if (err != 0 || req->newptr == (user_addr_t) NULL)
+		return (err);
+
+	if (l2arc_dwpd_limit != old_val)
+		l2arc_dwpd_bump_reset();
+
+	return (0);
+}
+
+
 SYSCTL_PROC(_tunable, OID_AUTO, arc_min,
     CTLTYPE_ULONG | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
     &zfs_arc_min, sizeof (zfs_arc_min), param_set_arc_min, "LU",

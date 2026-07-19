@@ -190,6 +190,9 @@ extern "C" {
 #define	param_set_arc_max_args(var) \
     CTLTYPE_QUAD, &var, sizeof (var), param_set_arc_max, "QU"
 
+#define	param_set_l2arc_dwpd_limit_args(var) \
+    CTLTYPE_U64, &var, 0, param_set_l2arc_dwpd_limit, "QU"
+
 #define	spa_taskq_free_param_set_args(var) \
     CTLTYPE_STRING, NULL, 0, spa_taskq_free_param, "A"
 
