@@ -306,6 +306,42 @@ param_set_arc_min(ZFS_MODULE_PARAM_ARGS)
 	return (0);
 }
 
+extern uint_t zfs_arc_free_target;
+
+int
+param_set_arc_free_target(ZFS_MODULE_PARAM_ARGS)
+{
+	uint_t val;
+	int err;
+
+	val = zfs_arc_free_target;
+	err = sysctl_handle_int(oidp, &val, 0, req);
+	if (err != 0 || req->newptr == (user_addr_t) NULL)
+		return (err);
+
+	zfs_arc_free_target = val;
+
+	return (0);
+}
+
+int
+param_set_arc_no_grow_shift(ZFS_MODULE_PARAM_ARGS)
+{
+	int err, val;
+
+	val = zfs_arc_no_grow_shift;
+	err = sysctl_handle_int(oidp, &val, 0, req);
+	if (err != 0 || req->newptr == (user_addr_t) NULL)
+		return (err);
+
+	if (val < 0 || val >= arc_shrink_shift)
+		return (SET_ERROR(EINVAL));
+
+	zfs_arc_no_grow_shift = val;
+
+	return (0);
+}
+
 /* legacy compat */
 extern uint64_t l2arc_write_max;	/* def max write size */
 extern uint64_t l2arc_write_boost;	/* extra warmup write */
@@ -405,28 +441,6 @@ SYSCTL_PROC(_tunable, OID_AUTO, l2c_only_size,
 /* dmu.c */
 
 /* dmu_zfetch.c */
-
-static int
-sysctl_tunable_arc_no_grow_shift(ZFS_MODULE_PARAM_ARGS)
-{
-	int err, val;
-
-	val = arc_no_grow_shift;
-	err = sysctl_handle_int(oidp, &val, 0, req);
-	if (err != 0 || req->newptr == (user_addr_t) NULL)
-		return (err);
-
-        if (val < 0 || val >= arc_shrink_shift)
-		return (EINVAL);
-
-	arc_no_grow_shift = val;
-	return (0);
-}
-
-SYSCTL_PROC(_tunable, OID_AUTO, arc_no_grow_shift,
-    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, NULL, sizeof (int),
-    sysctl_tunable_arc_no_grow_shift, "I",
-    "log2(fraction of ARC which must be free to allow growing)");
 
 int
 param_set_arc_u64(ZFS_MODULE_PARAM_ARGS)
