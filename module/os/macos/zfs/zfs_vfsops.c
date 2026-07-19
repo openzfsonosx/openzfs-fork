@@ -1590,11 +1590,18 @@ zfs_vfs_getattr(struct mount *mp, struct vfs_attr *fsap,
 	/*
 	 * Model after HFS in working out if we should use the legacy size
 	 * 512, or go to 4096. Note that XNU only likes those two
-	 * blocksizes, so we don't use the ZFS recordsize
+	 * blocksizes, so we don't use the ZFS recordsize.
+	 * For pools larger than 16 TiB, continue scaling the reported block
+	 * size by powers of 2 to keep f_blocks within UINT32_MAX.
+	 * macOS statvfs() returns fsblkcnt_t (unsigned int, 32-bit), so
+	 * block counts exceeding UINT32_MAX wrap and report a false size.
 	 */
 	log_blkcnt = (u_int64_t)((refdbytes + availbytes) >> SPA_MINBLOCKSHIFT);
 	log_blksize = (log_blkcnt > 0x000000007fffffff) ?
 	    4096 : (1 << SPA_MINBLOCKSHIFT);
+	uint64_t blkcnt = (refdbytes + availbytes) / log_blksize;
+	if (blkcnt > UINT32_MAX)
+		log_blksize <<= highbit64(blkcnt >> 32);
 
 	/*
 	 * The underlying storage pool actually uses multiple block sizes.
