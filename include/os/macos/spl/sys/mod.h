@@ -199,7 +199,10 @@ extern "C" {
 #define	param_set_arc_int_args(var) \
     CTLTYPE_INT, &var, sizeof (var), param_set_arc_int, "I"
 
-#define	param_set_deadman_failmode_args(var) \
+#define	param_set_arc_no_grow_shift_args(var) \
+    CTLTYPE_INT, NULL, 0, param_set_arc_no_grow_shift, "I"
+
+#define	param_set_deadman_failmode_args(var)					\
     CTLTYPE_STRING, NULL, 0, param_set_deadman_failmode, "A"
 
 #define	param_set_active_allocator_args(var) \

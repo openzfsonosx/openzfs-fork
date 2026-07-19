@@ -67,18 +67,6 @@ static boolean_t		arc_reclaim_thread_exit;
 static kcondvar_t		arc_reclaim_waiters_cv;
 
 /*
- * log2(fraction of ARC which must be free to allow growing).
- * I.e. If there is less than arc_c >> arc_no_grow_shift free memory,
- * when reading a new block into the ARC, we will evict an equal-sized block
- * from the ARC.
- *
- * This must be less than arc_shrink_shift, so that when we shrink the ARC,
- * we will still not allow it to grow.
- */
-extern uint_t	arc_no_grow_shift;
-
-
-/*
  * Return a default max arc size based on the amount of physical memory.
  */
 uint64_t
@@ -270,7 +258,8 @@ arc_reclaim_thread(void *unused)
 		if (free_memory < 0 || manual_pressure > 0) {
 
 			if (manual_pressure > 0 || free_memory <=
-			    (arc_c >> arc_no_grow_shift) + SPA_MAXBLOCKSIZE) {
+			    (arc_c >> zfs_arc_no_grow_shift) +
+			    SPA_MAXBLOCKSIZE) {
 
 				arc_no_grow = B_TRUE;
 
@@ -365,7 +354,7 @@ arc_reclaim_thread(void *unused)
 
 				goto lock_and_sleep;
 			}
-		} else if (free_memory < (arc_c >> arc_no_grow_shift) &&
+		} else if (free_memory < (arc_c >> zfs_arc_no_grow_shift) &&
 		    aggsum_value(&arc_sums.arcstat_size) >
 		    arc_c_min + SPA_MAXBLOCKSIZE) {
 			// relatively low memory and arc is above arc_c_min
