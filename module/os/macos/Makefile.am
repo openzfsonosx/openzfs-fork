@@ -55,6 +55,7 @@ macos_zfs_CPPFLAGS = \
 	-DAPPLE \
 	-DNeXT \
 	-include $(top_builddir)/zfs_config.h \
+	-include $(top_srcdir)/include/sys/simd_config.h \
 	-I$(top_srcdir)/include/os/macos/spl \
 	-I$(top_srcdir)/include/os/macos/zfs \
 	-I$(top_srcdir)/module/icp/include \
