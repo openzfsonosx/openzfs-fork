@@ -551,11 +551,6 @@ SYSCTL_INT(_tunable, OID_AUTO, condense_pct, CTLFLAG_RWTUN,
     " of in-memory counterpart");
 
 /* spa.c */
-extern int zfs_ccw_retry_interval;
-SYSCTL_INT(_tunable, OID_AUTO, ccw_retry_interval, CTLFLAG_RWTUN,
-    &zfs_ccw_retry_interval, 0,
-    "Configuration cache file write, retry after failure, interval (seconds)");
-
 extern uint64_t zfs_max_missing_tvds_cachefile;
 SYSCTL_UQUAD(_tunable, OID_AUTO, max_missing_tvds_cachefile, CTLFLAG_RWTUN,
     &zfs_max_missing_tvds_cachefile, 0,
