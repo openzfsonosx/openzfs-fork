@@ -539,31 +539,6 @@ param_set_active_allocator(ZFS_MODULE_PARAM_ARGS)
 }
 
 /*
- * In pools where the log space map feature is not enabled we touch
- * multiple metaslabs (and their respective space maps) with each
- * transaction group. Thus, we benefit from having a small space map
- * block size since it allows us to issue more I/O operations scattered
- * around the disk. So a sane default for the space map block size
- * is 8~16K.
- */
-extern int zfs_metaslab_sm_blksz_no_log;
-SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, sm_blksz_no_log, CTLFLAG_RDTUN,
-    &zfs_metaslab_sm_blksz_no_log, 0,
-    "Block size for space map in pools with log space map disabled.  "
-    "Power of 2 and greater than 4096.");
-
-/*
- * When the log space map feature is enabled, we accumulate a lot of
- * changes per metaslab that are flushed once in a while so we benefit
- * from a bigger block size like 128K for the metaslab space maps.
- */
-extern int zfs_metaslab_sm_blksz_with_log;
-SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, sm_blksz_with_log, CTLFLAG_RDTUN,
-    &zfs_metaslab_sm_blksz_with_log, 0,
-    "Block size for space map in pools with log space map enabled.  "
-    "Power of 2 and greater than 4096.");
-
-/*
  * The in-core space map representation is more compact than its on-disk form.
  * The zfs_condense_pct determines how much more compact the in-core
  * space map representation must be before we compact it on-disk.

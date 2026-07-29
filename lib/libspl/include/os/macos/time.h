@@ -39,8 +39,13 @@
 
 typedef void *timer_t;
 
-#if !defined(MAC_OS_X_VERSION_10_12) || \
-	(MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12)
+/*
+ * clockid_t was added to the macOS SDK in 10.12. Guard on CLOCK_REALTIME
+ * rather than availability macros: newer SDKs (macOS 26+) no longer define
+ * MAC_OS_X_VERSION_10_12, which would make the old !defined() check fire
+ * incorrectly and conflict with the SDK's own enum clockid_t.
+ */
+#ifndef CLOCK_REALTIME
 typedef int clockid_t;
 #endif
 

@@ -36,8 +36,7 @@
 #include <AvailabilityMacros.h>
 
 #if !defined(MAC_OS_X_VERSION_10_10) || \
-	(MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_10)
-
+	(MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_10)
 #define	AT_FDCWD -2
 #include <stdio.h>
 #include <stdarg.h>
