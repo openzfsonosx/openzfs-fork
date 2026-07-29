@@ -93,6 +93,7 @@ struct zfsvfs {
 	int	z_norm;	/* normalization flags */
 	boolean_t	z_atime;	/* enable atimes mount option */
 	boolean_t	z_unmounted;	/* unmounted */
+	boolean_t	z_use_hold;	/* held via dmu_objset_hold */
 	zfs_teardown_lock_t	z_teardown_lock;
 	zfs_teardown_inactive_lock_t z_teardown_inactive_lock;
 	list_t	z_all_znodes;	/* all vnodes in the fs */
@@ -293,6 +294,7 @@ extern boolean_t zfs_owner_overquota(zfsvfs_t *zfsvfs, struct znode *,
 extern boolean_t zfs_fuid_overquota(zfsvfs_t *zfsvfs, boolean_t isgroup,
     uint64_t fuid);
 extern int zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers);
+extern int zfsvfs_create_hold(const char *name, zfsvfs_t **zfvp);
 extern int zfsvfs_create_impl(zfsvfs_t **zfvp, zfsvfs_t *zfsvfs, objset_t *os);
 
 extern int zfs_get_zplprop(objset_t *os, zfs_prop_t prop,
