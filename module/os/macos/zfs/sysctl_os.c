@@ -550,32 +550,6 @@ SYSCTL_INT(_tunable, OID_AUTO, condense_pct, CTLFLAG_RWTUN,
     "Condense on-disk spacemap when it is more than this many percents"
     " of in-memory counterpart");
 
-/*
- * Minimum size which forces the dynamic allocator to change
- * it's allocation strategy.  Once the space map cannot satisfy
- * an allocation of this size then it switches to using more
- * aggressive strategy (i.e search by size rather than offset).
- */
-extern uint64_t metaslab_df_alloc_threshold;
-SYSCTL_QUAD(_tunable_zfs_metaslab, OID_AUTO, df_alloc_threshold, CTLFLAG_RWTUN,
-    &metaslab_df_alloc_threshold,
-#ifndef __APPLE__
-	0,
-#endif
-    "Minimum size which forces the dynamic allocator to change it's allocation strategy");
-
-/*
- * The minimum free space, in percent, which must be available
- * in a space map to continue allocations in a first-fit fashion.
- * Once the space map's free space drops below this level we dynamically
- * switch to using best-fit allocations.
- */
-extern int metaslab_df_free_pct;
-SYSCTL_INT(_tunable_zfs_metaslab, OID_AUTO, df_free_pct, CTLFLAG_RWTUN,
-    &metaslab_df_free_pct, 0,
-    "The minimum free space, in percent, which must be available in a "
-    "space map to continue allocations in a first-fit fashion");
-
 /* spa.c */
 extern int zfs_ccw_retry_interval;
 SYSCTL_INT(_tunable, OID_AUTO, ccw_retry_interval, CTLFLAG_RWTUN,
