@@ -195,6 +195,23 @@ ${WORKDIR}/Library/Filesystems/zfs.fs/Contents/Resources/zfs_util
 ${WORKDIR}/Library/Filesystems/zfs.fs/Contents/Resources/mount_zfs
 "
 
+# ZetaWatch is opt-in (--enable-zetawatch), so only add it to the codesign
+# lists when the tree was actually configured/built with it. Order matters
+# here: the privileged helper and the nested login-item bundle must already
+# be validly signed before the outer ZetaWatch.app bundle is signed, so the
+# helper goes into codesign_files (signed first, individually) and the two
+# bundles go into codesign_dirs in nested-first order (files are signed
+# before dirs, per the concatenation below).
+if [ -d "${WORKDIR}/Applications/ZetaWatch.app" ]; then
+    codesign_files="${codesign_files}
+${WORKDIR}/Applications/ZetaWatch.app/Contents/Library/LaunchServices/org.openzfsonosx.ZetaAuthorizationHelper
+"
+    codesign_dirs="${codesign_dirs}
+${WORKDIR}/Applications/ZetaWatch.app/Contents/Library/LoginItems/ZetaLoginItemHelper.app/
+${WORKDIR}/Applications/ZetaWatch.app/
+"
+fi
+
 codesign_all="$codesign_files $codesign_dirs"
 
 function fail
@@ -238,7 +255,13 @@ function do_codesign
     for file in ${codesign_all}
     do
 	echo "$file"
-	codesign --timestamp ${extra} -fvs "${PKG_CODESIGN_KEY}" "${file}" || failures=$((failures+1))
+	entitlements=""
+	case "$file" in
+	    */ZetaWatch.app/)
+		entitlements="--entitlements ${BASE_DIR}/../cmd/os/macos/ZetaWatch/ZetaWatch/ZetaWatch.entitlements"
+		;;
+	esac
+	codesign --timestamp ${extra} ${entitlements} -fvs "${PKG_CODESIGN_KEY}" "${file}" || failures=$((failures+1))
     done
 
     if [ "$failures" -ne 0 ]; then

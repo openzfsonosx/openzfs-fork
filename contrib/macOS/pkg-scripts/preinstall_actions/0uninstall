@@ -233,4 +233,12 @@ rm -rfv /System/Library/Filesystems/zfs.fs
 [ -d  /etc/zfs/zed.d ] && [ $(ls -A /etc/zfs/zed.d | wc -l) -eq 0 ] && rmdir /etc/zfs/zed.d
 [ -d  /etc/zfs ] && [ $(ls -A /etc/zfs | wc -l) -eq 0 ] && rmdir /etc/zfs
 
+# ZetaWatch's privileged helper is installed by the running app itself via
+# SMJobBless() on first launch, not by the pkg payload, so it has to be torn
+# down explicitly here rather than just via pkgutil's own file list.
+launchctl unload /Library/LaunchDaemons/org.openzfsonosx.ZetaAuthorizationHelper.plist 2>/dev/null || true
+rm -fv /Library/LaunchDaemons/org.openzfsonosx.ZetaAuthorizationHelper.plist
+rm -fv /Library/PrivilegedHelperTools/org.openzfsonosx.ZetaAuthorizationHelper
+rm -rfv /Applications/ZetaWatch.app
+
 exit 0
