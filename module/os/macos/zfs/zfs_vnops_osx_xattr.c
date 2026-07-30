@@ -380,6 +380,12 @@ __zpl_xattr_get(struct vnode *ip, const char *name, zfs_uio_t *uio,
 			goto out;
 	}
 
+	/* Known to have no xattr directory; skip the directory lookup. */
+	if (zp->z_xattr_dir_absent) {
+		error = ENOENT;
+		goto out;
+	}
+
 	error = zpl_xattr_get_dir(ip, name, uio, retsize, cr);
 
 out:

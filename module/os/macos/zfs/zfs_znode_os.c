@@ -551,6 +551,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_unlinked = 0;
 	zp->z_atime_dirty = 0;
 	zp->z_mapcnt = 0;
+	zp->z_xattr_dir_absent = B_FALSE;
 	zp->z_id = db->db_object;
 	zp->z_blksz = blksz;
 	zp->z_seq = 0x7A4653;
@@ -1282,6 +1283,8 @@ zfs_rezget(znode_t *zp)
 	}
 
 	rw_exit(&zp->z_xattr_lock);
+
+	zp->z_xattr_dir_absent = B_FALSE;
 
 	ASSERT(zp->z_sa_hdl == NULL);
 	err = sa_buf_hold(zfsvfs->z_os, obj_num, NULL, &db);
