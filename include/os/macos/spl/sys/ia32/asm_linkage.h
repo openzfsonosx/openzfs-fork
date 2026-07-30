@@ -135,18 +135,27 @@ extern "C" {
 	.globl	x; \
 x:
 
+/*
+ * Mach-O requires a leading underscore on C symbols. _CONCAT1's argument
+ * must go through _CONCAT so that macro-renamed symbol names (e.g. via
+ * gcm_asm_rename_funcs.h) are expanded before the "_" ## x paste - a bare
+ * "_##x" would paste the literal, unexpanded macro name instead.
+ */
+#define	_CONCAT(a, b)	a ## b
+#define	_CONCAT1(a, b)	_CONCAT(a, b)
+
 #define	ENTRY_NP(x) \
 	.text; \
 	.balign	ASM_ENTRY_ALIGN; \
-	.globl	_##x; \
-_##x:
+	.globl	_CONCAT1(_, x); \
+_CONCAT1(_, x):
 
 
 #define	ENTRY_ALIGN(x, a) \
 	.text; \
 	.balign	a; \
-	.globl	_##x; \
-_##x:
+	.globl	_CONCAT1(_, x); \
+_CONCAT1(_, x):
 
 #define	FUNCTION(x) \
 x:
