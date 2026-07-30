@@ -538,18 +538,6 @@ param_set_active_allocator(ZFS_MODULE_PARAM_ARGS)
 	return (param_set_active_allocator_common(buf));
 }
 
-/*
- * The in-core space map representation is more compact than its on-disk form.
- * The zfs_condense_pct determines how much more compact the in-core
- * space map representation must be before we compact it on-disk.
- * Values should be greater than or equal to 100.
- */
-extern int zfs_condense_pct;
-SYSCTL_INT(_tunable, OID_AUTO, condense_pct, CTLFLAG_RWTUN,
-    &zfs_condense_pct, 0,
-    "Condense on-disk spacemap when it is more than this many percents"
-    " of in-memory counterpart");
-
 /* spa.c */
 extern uint64_t zfs_max_missing_tvds_cachefile;
 SYSCTL_UQUAD(_tunable, OID_AUTO, max_missing_tvds_cachefile, CTLFLAG_RWTUN,
