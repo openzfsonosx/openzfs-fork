@@ -193,7 +193,10 @@ extern "C" {
 #define	param_set_l2arc_dwpd_limit_args(var) \
     CTLTYPE_U64, &var, 0, param_set_l2arc_dwpd_limit, "QU"
 
-#define	spa_taskq_free_param_set_args(var) \
+#define	param_set_arc_free_target_args(var) \
+    CTLTYPE_UINT, NULL, 0, param_set_arc_free_target, "IU"
+
+#define	spa_taskq_free_param_set_args(var)				\
     CTLTYPE_STRING, NULL, 0, spa_taskq_free_param, "A"
 
 #define	param_set_arc_int_args(var) \
