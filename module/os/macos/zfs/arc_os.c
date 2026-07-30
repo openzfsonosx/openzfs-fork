@@ -66,6 +66,8 @@ static kcondvar_t		arc_reclaim_thread_cv;
 static boolean_t		arc_reclaim_thread_exit;
 static kcondvar_t		arc_reclaim_waiters_cv;
 
+uint_t zfs_arc_free_target = 0;
+
 /*
  * Return a default max arc size based on the amount of physical memory.
  */
