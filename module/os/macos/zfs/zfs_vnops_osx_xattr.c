@@ -518,7 +518,7 @@ zpl_xattr_set_dir(struct vnode *ip, const char *name, zfs_uio_t *uio,
 		VATTR_SET(&vattr, va_gid, crgetfsgid(cr));
 
 		error = zfs_create(dxzp, (char *)name, &vattr, 0, 0644, &xzp,
-		    cr, 0, NULL, NULL);
+		    cr, 0, NULL);
 		if (error)
 			goto out;
 	}
