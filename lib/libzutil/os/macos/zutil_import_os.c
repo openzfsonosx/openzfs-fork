@@ -91,6 +91,36 @@ zpool_default_import_path[DEFAULT_IMPORT_PATH_SIZE] = {
 	"/dev"	/* Only with DEBUG build */
 };
 
+/*
+ * Do not even look at these devices.
+ */
+static const char * const excluded_devs[] = {
+	"nfslock",
+	"sequencer",
+	"zfs",
+};
+#define	EXCLUDED_DIR		"/dev/"
+#define	EXCLUDED_DIR_LEN	5
+
+static boolean_t
+excluded_dev(const char *name)
+{
+	size_t i;
+
+	if (strncmp(name, EXCLUDED_DIR, EXCLUDED_DIR_LEN) != 0)
+		return (B_FALSE);
+
+	name += EXCLUDED_DIR_LEN;
+	for (i = 0; i < ARRAY_SIZE(excluded_devs); ++i) {
+		const char *excluded_name = excluded_devs[i];
+		size_t len = strlen(excluded_name);
+		if (strncmp(name, excluded_name, len) == 0)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static boolean_t
 is_watchdog_dev(const char *dev)
 {
@@ -540,6 +570,58 @@ encode_device_strings(const char *path, vdev_dev_strs_t *ds,
 	(void) ds;
 	(void) wholedisk;
 	return (ENOENT);
+}
+
+/*
+ * Common predicate for zpool_dev_probe_ok() and its fd variant: only a
+ * disk device (character or block), or a regular file large enough to
+ * hold a label, may be probed.  Anything else is refused.
+ */
+static boolean_t
+dev_stat_probe_ok(const struct stat64 *statbuf)
+{
+	if (S_ISREG(statbuf->st_mode))
+		return (statbuf->st_size >= SPA_MINDEVSIZE);
+
+	return (S_ISCHR(statbuf->st_mode) || S_ISBLK(statbuf->st_mode));
+}
+
+/*
+ * Determine if a path may be safely opened to probe for a vdev label.
+ * Only regular files large enough to hold a label and disk devices
+ * (character or block) are acceptable.  Anything else is refused,
+ * opening other nodes can have side effects.  stat64() never blocks,
+ * even on a FIFO.
+ */
+boolean_t
+zpool_dev_probe_ok(const char *path)
+{
+	struct stat64 statbuf;
+
+	if (excluded_dev(path))
+		return (B_FALSE);
+
+	if (stat64(path, &statbuf) != 0)
+		return (B_FALSE);
+
+	return (dev_stat_probe_ok(&statbuf));
+}
+
+/*
+ * As zpool_dev_probe_ok(), but re-check the type of an object already
+ * opened.  A path naming a symlink may have been repointed at a different
+ * node between the stat64() above and the open(), so only trust a
+ * descriptor which is still a disk device or a large enough regular file.
+ */
+boolean_t
+zpool_dev_probe_ok_fd(int fd)
+{
+	struct stat64 statbuf;
+
+	if (fstat64(fd, &statbuf) != 0)
+		return (B_FALSE);
+
+	return (dev_stat_probe_ok(&statbuf));
 }
 
 /*
