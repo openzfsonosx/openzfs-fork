@@ -236,6 +236,8 @@ zfs_common_SRCS = \
 	%D%/../../zfs/vdev_root.c \
 	%D%/../../zfs/vdev_trim.c \
 	%D%/../../zfs/zap.c \
+	%D%/../../zfs/zap_fat.c \
+	%D%/../../zfs/zap_impl.c \
 	%D%/../../zfs/zap_leaf.c \
 	%D%/../../zfs/zap_micro.c \
 	%D%/../../zfs/zcp.c \
