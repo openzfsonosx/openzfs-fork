@@ -6,3 +6,7 @@ include $(srcdir)/%D%/zconfigd/Makefile.am
 include $(srcdir)/%D%/zfs_util/Makefile.am
 include $(srcdir)/%D%/zsysctl/Makefile.am
 include $(srcdir)/%D%/mount_zfs/Makefile.am
+
+if ENABLE_ZETAWATCH
+include $(srcdir)/%D%/ZetaWatch/Makefile.am
+endif
