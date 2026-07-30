@@ -1481,7 +1481,7 @@ zfs_vnop_create(struct vnop_create_args *ap)
 
 
 	error = zfs_create(VTOZ(ap->a_dvp), cnp->cn_nameptr, vap, excl, mode,
-	    &zp, cr, 0, NULL, NULL);
+	    &zp, cr, 0, NULL);
 	if (!error) {
 		cache_purge_negatives(ap->a_dvp);
 		*ap->a_vpp = ZTOV(zp);
@@ -1770,7 +1770,7 @@ zfs_vnop_mkdir(struct vnop_mkdir_args *ap)
 	znode_t *zp = NULL;
 	ap->a_vap->va_mode |= S_IFDIR;
 	error = zfs_mkdir(VTOZ(ap->a_dvp), ap->a_cnp->cn_nameptr, ap->a_vap,
-	    &zp, cr, /* flags */0, /* vsecp */NULL, NULL);
+	    &zp, cr, /* flags */0, /* vsecp */NULL);
 	if (!error) {
 		*ap->a_vpp = ZTOV(zp);
 		cache_purge_negatives(ap->a_dvp);
@@ -2057,8 +2057,7 @@ zfs_vnop_setattr(struct vnop_setattr_args *ap)
 
 	}
 
-	error = zfs_setattr(VTOZ(ap->a_vp), vap, /* flag */0, cr,
-	    NULL);
+	error = zfs_setattr(VTOZ(ap->a_vp), vap, /* flag */0, cr);
 
 	dprintf("vnop_setattr: called on vp %p with mask %llx, err=%d\n",
 	    ap->a_vp, vap->va_mask, error);
@@ -2153,7 +2152,7 @@ zfs_vnop_rename(struct vnop_rename_args *ap)
 	 */
 	error = zfs_rename(VTOZ(ap->a_fdvp), ap->a_fcnp->cn_nameptr,
 		VTOZ(ap->a_tdvp), ap->a_tcnp->cn_nameptr, cr, /* flags */0,
-	    /* rflags */ 0, NULL, NULL);
+	    /* rflags */ 0, NULL);
 
 	if (!error) {
 		cache_purge_negatives(ap->a_fdvp);
@@ -2226,7 +2225,7 @@ zfs_vnop_renamex(struct vnop_renamex_args *ap)
 	 */
 	error = zfs_rename(VTOZ(ap->a_fdvp), ap->a_fcnp->cn_nameptr,
 		VTOZ(ap->a_tdvp), ap->a_tcnp->cn_nameptr, cr,
-		(ap->a_flags&VFS_RENAME_EXCL), 0, NULL, NULL);
+		(ap->a_flags&VFS_RENAME_EXCL), 0, NULL);
 
 	if (!error) {
 		cache_purge_negatives(ap->a_fdvp);
@@ -2292,7 +2291,7 @@ zfs_vnop_symlink(struct vnop_symlink_args *ap)
 	znode_t *zp = NULL;
     ap->a_vap->va_mode |= S_IFLNK;
 	error = zfs_symlink(VTOZ(ap->a_dvp), ap->a_cnp->cn_nameptr,
-	    ap->a_vap, ap->a_target, &zp, cr, 0, NULL);
+	    ap->a_vap, ap->a_target, &zp, cr, 0);
 	if (!error) {
 		*ap->a_vpp = ZTOV(zp);
 		cache_purge_negatives(ap->a_dvp);
@@ -3990,7 +3989,7 @@ zfs_vnop_makenamedstream(struct vnop_makenamedstream_args *ap)
 	    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 
 	error = zfs_create(xdzp, (char *)prefixed_name, &vattr, NONEXCL,
-	    VTOZ(vp)->z_mode, &xzp, cr, 0, NULL, NULL);
+	    VTOZ(vp)->z_mode, &xzp, cr, 0, NULL);
 
 	if (error == 0) {
 		*ap->a_svpp = ZTOV(xzp);
@@ -4603,7 +4602,7 @@ zfs_vnop_clonefile(struct vnop_clonefile_args *ap)
 	 * we create a new entry like zfs_create().
 	 */
 	error = zfs_create(VTOZ(ap->a_dvp), cnp->cn_nameptr, vap, NONEXCL, mode,
-	    &outzp, cr, 0, NULL, NULL);
+	    &outzp, cr, 0, NULL);
 
 	if (error != 0)
 		return (SET_ERROR(error));

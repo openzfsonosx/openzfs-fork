@@ -760,7 +760,7 @@ zpl_obtain_xattr(znode_t *dzp, const char *name, mode_t mode, cred_t *cr,
 	VATTR_SET(&vattr, va_mode, mode & ~S_IFMT);
 
 	if ((error = zfs_acl_ids_create(dzp, 0,
-	    &vattr, cr, NULL, &acl_ids, NULL)) != 0) {
+	    &vattr, cr, NULL, &acl_ids)) != 0) {
 		zfs_exit(zfsvfs, FTAG);
 		return (error);
 	}
