@@ -205,6 +205,7 @@ ${WORKDIR}/Library/Filesystems/zfs.fs/Contents/Resources/mount_zfs
 if [ -d "${WORKDIR}/Applications/ZetaWatch.app" ]; then
     codesign_files="${codesign_files}
 ${WORKDIR}/Applications/ZetaWatch.app/Contents/Library/LaunchServices/org.openzfsonosx.ZetaAuthorizationHelper
+${WORKDIR}/Applications/ZetaWatch.app/Contents/MacOS/ZetaWatch
 "
     codesign_dirs="${codesign_dirs}
 ${WORKDIR}/Applications/ZetaWatch.app/Contents/Library/LoginItems/ZetaLoginItemHelper.app/
