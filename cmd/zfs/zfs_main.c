@@ -9162,7 +9162,18 @@ zfs_rewrite_file(const char *path, boolean_t verbose, zfs_rewrite_args_t *args)
 		return (ret);
 	}
 
+#ifdef __APPLE__
+	/*
+	 * On macOS, ioctl(2) on a regular file is restricted by the kernel
+	 * to a small allowlist (FIONREAD/FIONBIO/FIOASYNC) and never reaches
+	 * the filesystem's VNOP_IOCTL for anything else. fsctl(2)/ffsctl(2)
+	 * is the Darwin syscall for filesystem-specific control operations
+	 * on regular files, and does reach it.
+	 */
+	if (ffsctl(fd, ZFS_IOC_REWRITE, args, 0) < 0) {
+#else
 	if (ioctl(fd, ZFS_IOC_REWRITE, args) < 0) {
+#endif
 		ret = errno;
 		(void) fprintf(stderr, gettext("failed to rewrite %s: %s\n"),
 		    path, strerror(errno));
