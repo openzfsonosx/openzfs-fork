@@ -667,6 +667,23 @@ zfs_vnop_ioctl(struct vnop_ioctl_args *ap)
 		}
 #endif
 
+		case ZFS_IOC_REWRITE:
+		{
+			zfs_rewrite_args_t *args =
+			    (zfs_rewrite_args_t *)ap->a_data;
+
+			/*
+			 * Unlike ioctl(2), a_fflag is not reliably the
+			 * open(2) mode of the fd here since this arrives
+			 * via fsctl(2)/ffsctl(2) (see zfs_do_rewrite() in
+			 * zfs_main.c). zfs_rewrite() enforces read-only
+			 * pools itself (EROFS), so no separate FWRITE gate.
+			 */
+			error = zfs_rewrite(zp, args->off, args->len,
+			    args->flags, args->arg);
+			break;
+		}
+
 
 		/* ioctl required to simulate HFS mimic behavior */
 		case 0x80005802:
