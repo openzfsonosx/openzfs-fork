@@ -202,14 +202,29 @@ ${WORKDIR}/Library/Filesystems/zfs.fs/Contents/Resources/mount_zfs
 # helper goes into codesign_files (signed first, individually) and the two
 # bundles go into codesign_dirs in nested-first order (files are signed
 # before dirs, per the concatenation below).
+#
+# Contents/MacOS/ZetaWatch itself is deliberately NOT added to
+# codesign_files: it lives inside the .app bundle already listed in
+# codesign_dirs, and codesign'ing the bundle covers/reseals it. Signing
+# the loose executable directly first, before the bundle-level sign runs,
+# is redundant work superseded moments later - and on x86_64 (which,
+# unlike arm64, gets no automatic ad-hoc "linker-signed" signature at
+# build time) it prints a confusing but harmless
+# "code object is not signed at all" line. It still needs its external
+# library paths (e.g. openssl) fixed up like everything else though, so
+# it goes into fixlib_extra_files, which copy_fix_libraries() scans in
+# addition to codesign_files, without being in the codesign list itself.
+fixlib_extra_files=""
 if [ -d "${WORKDIR}/Applications/ZetaWatch.app" ]; then
     codesign_files="${codesign_files}
 ${WORKDIR}/Applications/ZetaWatch.app/Contents/Library/LaunchServices/org.openzfsonosx.ZetaAuthorizationHelper
-${WORKDIR}/Applications/ZetaWatch.app/Contents/MacOS/ZetaWatch
 "
     codesign_dirs="${codesign_dirs}
 ${WORKDIR}/Applications/ZetaWatch.app/Contents/Library/LoginItems/ZetaLoginItemHelper.app/
 ${WORKDIR}/Applications/ZetaWatch.app/
+"
+    fixlib_extra_files="${fixlib_extra_files}
+${WORKDIR}/Applications/ZetaWatch.app/Contents/MacOS/ZetaWatch
 "
 fi
 
@@ -332,7 +347,7 @@ function do_prune
 function copy_fix_libraries
 {
     echo "Fixing external libraries ... "
-    fixlib=$(otool -L ${codesign_files} | egrep '/usr/local/opt/|/opt/local/lib/|/opt/local/libexec/' |awk '{print $1;}' | grep '\.dylib$' | sort | uniq)
+    fixlib=$(otool -L ${codesign_files} ${fixlib_extra_files} | egrep '/usr/local/opt/|/opt/local/lib/|/opt/local/libexec/' |awk '{print $1;}' | grep '\.dylib$' | sort | uniq)
 
     # Add the libs into codesign list - both to be codesigned, and updated
     # between themselves (libssl depends on libcrypt)
@@ -363,7 +378,7 @@ function copy_fix_libraries
 	# We could just change $lib into $prefix, which will work for
 	# zfs libraries. But libssl having libcrypto might have a different
 	# path, so lookup the source path each time.
-	for file in $codesign_files
+	for file in $codesign_files $fixlib_extra_files
 	do
 	    chmod u+w "${file}"
 	    src=$(otool -L "$file" | grep -v ":$" | awk '{print $1;}' | grep "${name}.dylib")
