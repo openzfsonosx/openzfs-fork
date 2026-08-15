@@ -128,6 +128,7 @@ typedef enum cpuid_inst_sets {
 	PCLMULQDQ,
 	MOVBE,
 	SHANI,
+	SHA512EXT,
 } cpuid_inst_sets_t;
 
 /*
@@ -153,6 +154,7 @@ typedef struct cpuid_feature_desc {
 #define	_PCLMULQDQ_BIT		(1U << 1)
 #define	_MOVBE_BIT		(1U << 22)
 #define	_SHANI_BIT		(1U << 29)
+#define	_SHA512EXT_BIT		(1U << 0) /* leaf 7, subleaf 1, EAX */
 
 /*
  * Descriptions of supported instruction sets
@@ -182,6 +184,7 @@ static const cpuid_feature_desc_t spl_cpuid_features[] = {
 	[PCLMULQDQ]	= {1U, 0U, _PCLMULQDQ_BIT,	ECX	},
 	[MOVBE]	= {1U, 0U, _MOVBE_BIT,	ECX	},
 	[SHANI]	= {7U, 0U, _SHANI_BIT,	EBX	},
+	[SHA512EXT]	= {7U, 1U, _SHA512EXT_BIT,	EAX	},
 };
 
 /*
@@ -256,6 +259,7 @@ CPUID_FEATURE_CHECK(aes, AES);
 CPUID_FEATURE_CHECK(pclmulqdq, PCLMULQDQ);
 CPUID_FEATURE_CHECK(shani, SHANI);
 CPUID_FEATURE_CHECK(movbe, MOVBE);
+CPUID_FEATURE_CHECK(sha512ext, SHA512EXT);
 
 
 /*
@@ -446,6 +450,18 @@ static inline boolean_t
 zfs_shani_available(void)
 {
 	return (__cpuid_has_shani());
+}
+
+/*
+ * Check if SHA-512 extension is available
+ */
+static inline boolean_t
+zfs_sha512ext_available(void)
+{
+	boolean_t has_sha512ext;
+	has_sha512ext = __cpuid_has_sha512ext();
+
+	return (has_sha512ext && __ymm_enabled());
 }
 
 /*
