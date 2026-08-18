@@ -1148,7 +1148,7 @@ zfs_get_xattrdir(znode_t *zp, znode_t **xzpp, cred_t *cr, int flags)
 	 * or created.
 	 */
 	if (!(flags & CREATE_XATTR_DIR) && zp->z_xattr_dir_absent)
-		return (SET_ERROR(ENOATTR));
+		return (SET_ERROR(ENOENT));
 
 top:
 	error = zfs_dirent_lock(&dl, zp, "", &xzp, ZXATTR, NULL, NULL);
