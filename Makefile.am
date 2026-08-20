@@ -37,9 +37,10 @@ if BUILD_LINUX
 include $(srcdir)/%D%/udev/Makefile.am
 endif
 endif
-CPPCHECKDIRS += module
 if CONFIG_KERNEL
 SUBDIRS += module
+
+CPPCHECKDIRS += module
 
 extradir = $(prefix)/src/zfs-$(VERSION)
 extra_HEADERS = zfs.release.in zfs_config.h.in
