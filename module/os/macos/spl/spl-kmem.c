@@ -4647,9 +4647,11 @@ spl_maybe_send_large_pressure(uint64_t now, uint64_t minutes, boolean_t full)
 }
 
 static void
-spl_free_thread()
+spl_free_thread(void *notused)
 {
 	callb_cpr_t cpr;
+
+	(void) notused;
 
 	CALLB_CPR_INIT(&cpr, &spl_free_thread_lock, callb_generic_cpr, FTAG);
 
