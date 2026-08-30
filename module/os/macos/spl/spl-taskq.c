@@ -1616,6 +1616,16 @@ taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
 	ASSERT(!(tq->tq_flags & TASKQ_DYNAMIC));
 
 	/*
+	 * The tqe must not already be queued.  A prealloc'd tqe is owned by
+	 * exactly one dispatch at a time; the consumer clears tqent_next/prev
+	 * once it takes ownership (see taskq_thread()), so a non-empty tqe here
+	 * means the same entry was dispatched twice while still in flight -- a
+	 * caller bug that would silently corrupt the queue's linkage and later
+	 * fault an unrelated worker thread.  Catch it at the source instead.
+	 */
+	VERIFY(taskq_empty_ent(tqe));
+
+	/*
 	 * Mark it as a prealloc'd task.  This is important
 	 * to ensure that we don't free it later.
 	 */
