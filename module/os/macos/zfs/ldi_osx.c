@@ -2095,8 +2095,17 @@ ldi_ioctl(ldi_handle_t lh, int cmd, intptr_t arg,
 		}
 
 		dkc = (struct dk_callback *)arg;
-		/* Issue completion callback if set */
-		if (dkc->dkc_callback) {
+		/*
+		 * Issue the completion callback only on success.
+		 *
+		 * The caller (vdev_disk_io_start) treats a non-zero return as
+		 * "I own completion" and calls zio_execute(zio) itself.  If we
+		 * also fired the callback here, vdev_disk_ioctl_done() ->
+		 * zio_interrupt() would dispatch the very same zio->io_tqent a
+		 * second time, corrupting the taskq list.  Callback fires iff
+		 * error == 0, so the zio is completed exactly once.
+		 */
+		if (error == 0 && dkc->dkc_callback) {
 			(*dkc->dkc_callback)(dkc->dkc_cookie, error);
 		}
 

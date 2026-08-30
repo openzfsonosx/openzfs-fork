@@ -625,12 +625,22 @@ vdev_disk_io_start(zio_t *zio)
 			return;
 		}
 
-		if (zfs_nocacheflush)
-			break;
+		/*
+		 * A flush we are not going to issue must still complete the
+		 * zio here.  Falling through the switch drops into the
+		 * READ/WRITE submission path below (which begins with
+		 * ASSERT(io_type == READ || WRITE)), handing a FLUSH zio to the
+		 * bio path -- an assert in debug, undefined in release.
+		 */
+		if (zfs_nocacheflush) {
+			zio_interrupt(zio);
+			return;
+		}
 
 		if (vd->vdev_nowritecache) {
 			zio->io_error = SET_ERROR(ENOTSUP);
-			break;
+			zio_interrupt(zio);
+			return;
 		}
 
 		zio->io_vsd = dkc = kmem_alloc(sizeof (*dkc), KM_SLEEP);
