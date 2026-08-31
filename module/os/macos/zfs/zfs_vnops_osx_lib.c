@@ -435,8 +435,16 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 
 	} // active linkid
 
+	/*
+	 * XNU's NFSv3 server uses va_filerev as the READDIR/READDIRPLUS
+	 * cookie verifier (see nfsrv_readdir()), so it has to be stable
+	 * while the directory is unchanged and differ once it is not.
+	 * z_seq is bumped by zfs_tstamp_update_setup() on every modifying
+	 * tx and is persisted in SA_ZPL_SEQ, so it survives eviction and
+	 * remount; a plain readdir does not touch it.
+	 */
 	if (VATTR_IS_ACTIVE(vap, va_filerev)) {
-		VATTR_RETURN(vap, va_filerev, 0);
+		VATTR_RETURN(vap, va_filerev, atomic_load_64(&zp->z_seq));
 	}
 	if (VATTR_IS_ACTIVE(vap, va_fsid)) {
 		VATTR_RETURN(vap, va_fsid, zfsvfs->z_rdev);

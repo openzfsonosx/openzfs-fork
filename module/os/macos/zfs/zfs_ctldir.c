@@ -1059,8 +1059,9 @@ zfsctl_vnop_getattr(struct vnop_getattr_args *ap)
 	if (VATTR_IS_ACTIVE(vap, va_fsid))
 		VATTR_RETURN(vap, va_fsid, zfsvfs->z_rdev);
 
+	/* NFSv3 readdir cookie verifier; see zfs_getattr_znode_unlocked() */
 	if (VATTR_IS_ACTIVE(vap, va_filerev))
-		VATTR_RETURN(vap, va_filerev, 0);
+		VATTR_RETURN(vap, va_filerev, atomic_load_64(&zp->z_seq));
 	if (VATTR_IS_ACTIVE(vap, va_gen))
 		VATTR_RETURN(vap, va_gen, zp->z_gen);
 	if (VATTR_IS_ACTIVE(vap, va_type))
