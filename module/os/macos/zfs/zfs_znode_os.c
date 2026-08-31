@@ -150,6 +150,8 @@ zfs_znode_cache_constructor(void *buf, void *arg, int kmflags)
 {
 	znode_t *zp = buf;
 
+	POINTER_INVALIDATE(&zp->z_zfsvfs);
+
 	list_link_init(&zp->z_link_node);
 
 	mutex_init(&zp->z_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -176,6 +178,7 @@ zfs_znode_cache_destructor(void *buf, void *arg)
 {
 	znode_t *zp = buf;
 
+	ASSERT(!POINTER_IS_VALID(zp->z_zfsvfs));
 	ASSERT(ZTOV(zp) == NULL);
 	ASSERT(!list_link_active(&zp->z_link_node));
 	mutex_destroy(&zp->z_lock);
