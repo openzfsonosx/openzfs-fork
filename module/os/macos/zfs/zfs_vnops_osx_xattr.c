@@ -787,10 +787,23 @@ zpl_xattr_set(struct vnode *ip, const char *name, zfs_uio_t *uio, int flags,
 	 */
 	if (memcmp(XATTR_RESOURCEFORK_NAME, name,
 	    sizeof (XATTR_RESOURCEFORK_NAME)) == 0) {
+		znode_t *zp = ITOZ(ip);
+		zfsvfs_t *zfsvfs = ZTOZSB(zp);
+
+		/*
+		 * Unlike the other calls here, these two helpers are the
+		 * inner (locked) versions - so take z_xattr_lock, and
+		 * teardown protection, the same way _zpl_xattr_set() does.
+		 */
+		if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
+			goto out;
+		rw_enter(&zp->z_xattr_lock, RW_WRITER);
 		/* Clear any SA */
-		error = zpl_xattr_set_sa(ip, set_name, NULL, flags, cr);
+		(void) zpl_xattr_set_sa(ip, set_name, NULL, flags, cr);
 		/* Always create DIR */
 		error = zpl_xattr_set_dir(ip, set_name, uio, flags, cr);
+		rw_exit(&zp->z_xattr_lock);
+		zfs_exit(zfsvfs, FTAG);
 		goto out;
 	}
 
