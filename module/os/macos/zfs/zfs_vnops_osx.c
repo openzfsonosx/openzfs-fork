@@ -2653,7 +2653,7 @@ top:
 	}
 	dmu_tx_hold_write(tx, zp->z_id, off, len);
 
-	dmu_tx_hold_sa(tx, zp->z_sa_hdl, B_FALSE);
+	dmu_tx_hold_sa(tx, zp->z_sa_hdl, ZFS_SEQ_MAY_GROW(zp));
 	zfs_sa_upgrade_txholds(tx, zp);
 	err = dmu_tx_assign(tx, DMU_TX_WAIT);
 	if (err != 0) {
@@ -2714,7 +2714,7 @@ top:
 
 	if (err == 0) {
 		uint64_t mtime[2], ctime[2];
-		sa_bulk_attr_t bulk[3];
+		sa_bulk_attr_t bulk[4];
 		int count = 0;
 
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL,
@@ -2724,6 +2724,7 @@ top:
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
 		    &zp->z_pflags, 8);
 		zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime);
+		ZFS_PERSIST_SEQ(zp, bulk, count);
 		err = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 		ASSERT0(err);
 		zfs_log_write(zfsvfs->z_log, tx, TX_WRITE, zp, off, len, 0,

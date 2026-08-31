@@ -780,7 +780,7 @@ top:
 		goto out;
 	}
 	tx = dmu_tx_create(zfsvfs->z_os);
-	dmu_tx_hold_sa(tx, dzp->z_sa_hdl, B_FALSE);
+	dmu_tx_hold_sa(tx, dzp->z_sa_hdl, ZFS_SEQ_MAY_GROW(dzp));
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, (char *)name);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
 

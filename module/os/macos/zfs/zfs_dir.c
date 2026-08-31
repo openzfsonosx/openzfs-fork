@@ -616,9 +616,9 @@ zfs_purgedir(znode_t *dzp)
 		}
 
 		tx = dmu_tx_create(zfsvfs->z_os);
-		dmu_tx_hold_sa(tx, dzp->z_sa_hdl, B_FALSE);
+		dmu_tx_hold_sa(tx, dzp->z_sa_hdl, ZFS_SEQ_MAY_GROW(dzp));
 		dmu_tx_hold_zap(tx, dzp->z_id, FALSE, zap->za_name);
-		dmu_tx_hold_sa(tx, xzp->z_sa_hdl, B_FALSE);
+		dmu_tx_hold_sa(tx, xzp->z_sa_hdl, ZFS_SEQ_MAY_GROW(xzp));
 		dmu_tx_hold_zap(tx, zfsvfs->z_unlinkedobj, FALSE, NULL);
 		/* Is this really needed ? */
 		zfs_sa_upgrade_txholds(tx, xzp);
@@ -801,7 +801,7 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	zfsvfs_t *zfsvfs = ZTOZSB(zp);
 	uint64_t value;
 	int zp_is_dir = S_ISDIR(zp->z_mode);
-	sa_bulk_attr_t bulk[5];
+	sa_bulk_attr_t bulk[6];
 	uint64_t mtime[2], ctime[2];
 	int count = 0;
 	int error;
@@ -844,6 +844,7 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 		    ctime, sizeof (ctime));
 		zfs_tstamp_update_setup(zp, STATE_CHANGED, mtime,
 		    ctime);
+		ZFS_PERSIST_SEQ(zp, bulk, count);
 	}
 	error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 	ASSERT(error == 0);
@@ -866,6 +867,7 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
 	    &dzp->z_pflags, sizeof (dzp->z_pflags));
 	zfs_tstamp_update_setup(dzp, CONTENT_MODIFIED, mtime, ctime);
+	ZFS_PERSIST_SEQ(dzp, bulk, count);
 	error = sa_bulk_update(dzp->z_sa_hdl, bulk, count, tx);
 	ASSERT(error == 0);
 	mutex_exit(&dzp->z_lock);
@@ -936,7 +938,7 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	zfsvfs_t *zfsvfs = ZTOZSB(dzp);
 	int zp_is_dir = S_ISDIR(zp->z_mode);
 	boolean_t unlinked = B_FALSE;
-	sa_bulk_attr_t bulk[5];
+	sa_bulk_attr_t bulk[6];
 	uint64_t mtime[2], ctime[2];
 	int count = 0;
 	int error;
@@ -970,6 +972,13 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 			zp->z_unlinked = B_TRUE;
 			zp->z_links = 0;
 			unlinked = B_TRUE;
+			/*
+			 * NFS observers see nlink=0; advance change_cookie.
+			 * POSIX permits skipping the ctime stamp at nlink=0,
+			 * and the znode is destined for reap so persistence
+			 * would be wasted.
+			 */
+			atomic_inc_64(&zp->z_seq);
 		} else {
 			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs),
 			    NULL, &ctime, sizeof (ctime));
@@ -977,6 +986,7 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 			    NULL, &zp->z_pflags, sizeof (zp->z_pflags));
 			zfs_tstamp_update_setup(zp, STATE_CHANGED, mtime,
 			    ctime);
+			ZFS_PERSIST_SEQ(zp, bulk, count);
 		}
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_LINKS(zfsvfs),
 		    NULL, &zp->z_links, sizeof (zp->z_links));
@@ -1005,6 +1015,7 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs),
 	    NULL, &dzp->z_pflags, sizeof (dzp->z_pflags));
 	zfs_tstamp_update_setup(dzp, CONTENT_MODIFIED, mtime, ctime);
+	ZFS_PERSIST_SEQ(dzp, bulk, count);
 	error = sa_bulk_update(dzp->z_sa_hdl, bulk, count, tx);
 	ASSERT(error == 0);
 	mutex_exit(&dzp->z_lock);
