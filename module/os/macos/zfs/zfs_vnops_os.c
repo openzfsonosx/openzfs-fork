@@ -854,10 +854,6 @@ zfs_remove(znode_t *dzp, char *name, cred_t *cr, int flags)
 	if (name == NULL)
 		return (SET_ERROR(EINVAL));
 
-	if ((error = zfs_enter_verify_zp(zfsvfs, dzp, FTAG)) != 0)
-		return (error);
-	zilog = zfsvfs->z_log;
-
 	if (flags & FIGNORECASE) {
 		zflg |= ZCILOOK;
 
@@ -867,6 +863,23 @@ zfs_remove(znode_t *dzp, char *name, cred_t *cr, int flags)
 	}
 
 top:
+	/*
+	 * Enter inside the retry loop, not once before it. zfs_enter()
+	 * holds the teardown lock as a reader until zfs_exit(), and
+	 * zfsvfs_teardown() needs that lock as a writer. A thread looping
+	 * on ERESTART below therefore blocks unmount outright, which on
+	 * macOS wedges vfs_shutdown() and trips the hardware watchdog.
+	 * Dropping the lock around the wait lets a racing unmount win,
+	 * and re-entering re-checks z_unmounted so we fail with EIO
+	 * rather than retry forever against a filesystem going away.
+	 */
+	if ((error = zfs_enter_verify_zp(zfsvfs, dzp, FTAG)) != 0) {
+		if (realnmp)
+			kmem_free(realnm.cn_nameptr, realnm.cn_namelen);
+		return (error);
+	}
+	zilog = zfsvfs->z_log;
+
 	xattr_obj = 0;
 	xzp = NULL;
 	/*
@@ -951,6 +964,7 @@ top:
 			zrele(zp);
 			if (xzp)
 				zrele(xzp);
+			zfs_exit(zfsvfs, FTAG);
 			goto top;
 		}
 		if (realnmp)
