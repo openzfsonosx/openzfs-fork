@@ -168,6 +168,7 @@ zfs_znode_cache_constructor(void *buf, void *arg, int kmflags)
 	zp->z_dirlocks = NULL;
 	zp->z_acl_cached = NULL;
 	zp->z_xattr_cached = NULL;
+	zp->z_has_seq = B_FALSE;
 	zp->z_xattr_parent = 0;
 	zp->z_skip_truncate_undo_decmpfs = B_FALSE;
 	return (0);
@@ -603,6 +604,18 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 		kmem_cache_free(znode_cache, zp);
 		return (NULL);
 	}
+
+	/*
+	 * Restore z_seq from SA_ZPL_SEQ when present, marking the file
+	 * migrated via the in-core z_has_seq (never persisted). Absence
+	 * keeps the default z_seq set above; macOS never presented a
+	 * ctime-derived cookie, so no seed is needed across the upgrade.
+	 */
+	if (zp->z_is_sa && sa_lookup(zp->z_sa_hdl, SA_ZPL_SEQ(zfsvfs),
+	    &zp->z_seq, sizeof (zp->z_seq)) == 0)
+		zp->z_has_seq = B_TRUE;
+	else
+		zp->z_has_seq = B_FALSE;
 
 	zp->z_projid = projid;
 	zp->z_mode = mode;
@@ -1345,6 +1358,17 @@ zfs_rezget(znode_t *zp)
 	}
 
 	zp->z_projid = projid;
+
+	/*
+	 * Reload z_has_seq and z_seq from disk so stale in-core state from
+	 * before rollback/recv does not survive. A stale TRUE marker would
+	 * make ZFS_SEQ_MAY_GROW() skip the grow reservation while SA_ZPL_SEQ
+	 * is gone on disk.
+	 */
+	zp->z_has_seq = (zp->z_is_sa &&
+	    sa_lookup(zp->z_sa_hdl, SA_ZPL_SEQ(zfsvfs),
+	    &zp->z_seq, sizeof (zp->z_seq)) == 0);
+
 	zp->z_mode = mode;
 
 	if (gen != zp->z_gen) {
