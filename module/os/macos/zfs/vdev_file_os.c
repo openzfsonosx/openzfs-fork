@@ -142,7 +142,7 @@ vdev_file_os_io_start(zio_t *zio)
 		int error;
 
 		error = zfs_file_open(vd->vdev_path,
-		    vdev_file_open_mode(spa_mode(vd->vdev_spa)), 0, &fp);
+		    vdev_file_open_mode(spa_mode(vd->vdev_spa)), 0, NULL, &fp);
 
 		if (error == 0) {
 			atomic_cas_ptr(&vf->vf_file, NULL, fp);
