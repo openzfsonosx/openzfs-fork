@@ -182,3 +182,17 @@ zfs_uio_free_dio_pages(zfs_uio_t *uio, zfs_uio_rw_t rw)
 	    uio->uio_dio.npages * sizeof (vm_page_t));
 #endif
 }
+
+/*
+ * macOS has no Direct I/O support, and O_DIRECT is defined as 0, so
+ * zfs_setup_direct() short-circuits before ever reaching this. It still
+ * has to exist: at -O0 the compiler emits the unreachable call rather
+ * than folding it away, and the kext then fails to bind the symbol at
+ * load time.
+ */
+int
+zfs_uio_get_dio_pages_alloc(zfs_uio_t *uio, zfs_uio_rw_t rw)
+{
+	(void) uio, (void) rw;
+	return (EOPNOTSUPP);
+}
