@@ -26,4 +26,6 @@
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 
+#define	SIGRTMIN SIGUSR2
+
 #endif
