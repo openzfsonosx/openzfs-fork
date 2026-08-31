@@ -210,6 +210,7 @@ zfsctl_vnode_alloc(zfsvfs_t *zfsvfs, uint64_t id,
 	zp->z_is_mapped = B_FALSE;
 	zp->z_is_ctldir = B_TRUE;
 	zp->z_xattr_dir_absent = B_FALSE;
+	zp->z_has_seq = B_FALSE;
 	zp->z_sa_hdl = NULL;
 	zp->z_blksz = 0;
 	zp->z_seq = 0;
@@ -1166,6 +1167,14 @@ zfsctl_vnop_reclaim(struct vnop_reclaim_args *ap)
 	mutex_exit(&zfsvfs->z_znodes_lock);
 
 	zp->z_vnode = NULL;
+	/*
+	 * Return the buffer in the state zfs_znode_alloc() asserts on. The
+	 * kmem_cache constructor only runs when a buffer is constructed, so
+	 * whatever we leave here is what the next znode to draw this buffer
+	 * starts with, and z_zfsvfs was set live in zfsctl_vnode_alloc().
+	 */
+	zp->z_zfsvfs = NULL;
+	POINTER_INVALIDATE(&zp->z_zfsvfs);
 	kmem_cache_free(znode_cache, zp);
 
 	return (0);
