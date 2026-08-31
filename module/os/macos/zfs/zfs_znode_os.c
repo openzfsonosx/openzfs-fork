@@ -570,6 +570,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_name_cache[0] = 0;
 	zp->z_finder_parentid = 0;
 	zp->z_finder_hardlink = FALSE;
+	zp->z_skip_truncate_undo_decmpfs = B_FALSE;
 
 	taskq_init_ent(&zp->z_attach_taskq);
 
@@ -616,6 +617,16 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 		zp->z_has_seq = B_TRUE;
 	else
 		zp->z_has_seq = B_FALSE;
+
+	/*
+	 * Cache the xattr parent id. Cleared unconditionally first: the
+	 * kmem_cache constructor runs only when a buffer is constructed,
+	 * not on every kmem_cache_alloc(), so a recycled znode would
+	 * otherwise inherit the previous occupant's value.
+	 */
+	zp->z_xattr_parent = 0;
+	if (zp->z_pflags & ZFS_XATTR)
+		zp->z_xattr_parent = parent;
 
 	zp->z_projid = projid;
 	zp->z_mode = mode;
@@ -2031,6 +2042,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	rootzp->z_atime_dirty = 0;
 	rootzp->z_is_sa = USE_SA(version, os);
 	rootzp->z_projid = ZFS_DEFAULT_PROJID;
+	rootzp->z_has_seq = B_FALSE;
 
 	rootzp->z_vnode = NULL;
 #ifndef __APPLE__
