@@ -45,10 +45,21 @@
 /*
  * macOS has no O_DIRECT open(2) flag; the equivalent is per-fd, via
  * fcntl(F_NOCACHE), which reaches VNOP_READ/VNOP_WRITE as IO_NOCACHE and is
- * translated by zfs_ioflags(). Pick a bit XNU does not use in its O_* space
- * (nearest neighbours are O_CLOEXEC 0x01000000 and O_ALERT 0x20000000); the
- * value never leaves ZFS, as zfs_ioflags() builds a private flag set.
+ * translated to this bit by zfs_ioflags().
+ *
+ * There is no spare bit to take: counting the kernel-only definitions,
+ * XNU's bsd/sys/fcntl.h allocates every bit from 0x1 (FREAD) to 0x80000000
+ * (O_POPUP). Any value we pick therefore shares one. That is safe because
+ * this is a ZFS-private namespace - zfs_ioflags() builds the int from
+ * scratch out of IO_* inputs, and it never holds an XNU oflag or fg_flag.
+ * The invariant that does matter, that it not collide with the flags
+ * zfs_ioflags() itself sets, is asserted there.
+ *
+ * We deliberately reuse FNOCACHE's value rather than an arbitrary bit, so
+ * that if the two namespaces ever do meet they agree instead of conflict.
+ * Note this is only the kernel SPL; userland has its own O_DIRECT 0 in
+ * lib/libspl/include/os/macos/poll.h, which cmd/zpool passes to open(2).
  */
-#define	O_DIRECT		0x10000000
+#define	O_DIRECT		0x00040000	/* == FNOCACHE */
 
 #endif /* _SPL_FCNTL_H */

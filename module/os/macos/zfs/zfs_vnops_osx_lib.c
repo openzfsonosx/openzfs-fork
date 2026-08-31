@@ -601,6 +601,13 @@ zfs_access_native_mode(struct vnode *vp, int *mode, cred_t *cr,
 	return (error);
 }
 
+/*
+ * O_DIRECT is a ZFS-private bit on macOS (see spl/sys/fcntl.h): XNU has no
+ * spare one, so it necessarily shares a value with an XNU flag. What has to
+ * hold is that it does not collide with anything we put in the same int.
+ */
+CTASSERT_GLOBAL((O_DIRECT & (FAPPEND|FNONBLOCK|FSYNC|FDSYNC|FRSYNC)) == 0);
+
 int
 zfs_ioflags(int ap_ioflag)
 {
