@@ -92,8 +92,14 @@ int zfs_bclone_wait_dirty = 1;
  *
  * Disabled by default on FreeBSD until a potential range locking issue in
  * zfs_getpages() can be resolved.
+ *
+ * Disabled on macOS, which has no Direct I/O implementation at all: O_DIRECT
+ * is defined as 0 there, so zfs_setup_direct() can never reach the direct
+ * path anyway.
  */
 #ifdef __FreeBSD__
+static int zfs_dio_enabled = 0;
+#elif defined(__APPLE__)
 static int zfs_dio_enabled = 0;
 #else
 static int zfs_dio_enabled = 1;
