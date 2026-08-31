@@ -2190,8 +2190,18 @@ ZFS_MODULE_PARAM(zfs, zfs_, bclone_strict_properties, INT, ZMOD_RW,
 ZFS_MODULE_PARAM(zfs, zfs_, bclone_wait_dirty, INT, ZMOD_RW,
 	"Wait for dirty blocks when cloning");
 
+/*
+ * Read-only on macOS, which implements only the uncached tier: enabling it
+ * would let zfs_setup_direct() reach the unimplemented page-pinning path and
+ * fail every request with EOPNOTSUPP.
+ */
+#ifdef __APPLE__
+ZFS_MODULE_PARAM(zfs, zfs_, dio_enabled, INT, ZMOD_RD,
+	"Enable Direct I/O");
+#else
 ZFS_MODULE_PARAM(zfs, zfs_, dio_enabled, INT, ZMOD_RW,
 	"Enable Direct I/O");
+#endif
 
 ZFS_MODULE_PARAM(zfs, zfs_, dio_strict, INT, ZMOD_RW,
 	"Return errors on misaligned Direct I/O");

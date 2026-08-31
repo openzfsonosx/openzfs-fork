@@ -612,6 +612,15 @@ zfs_ioflags(int ap_ioflag)
 		flags |= FNONBLOCK;
 	if (ap_ioflag & IO_SYNC)
 		flags |= (FSYNC | FDSYNC | FRSYNC);
+	/*
+	 * fcntl(F_NOCACHE) and F_GLOBAL_NOCACHE arrive here as IO_NOCACHE.
+	 * macOS has no zero-copy Direct I/O, so this maps to the uncached
+	 * tier only: zfs_setup_direct() stops at the !zfs_dio_enabled guard
+	 * with O_DIRECT still set, which gets us DMU_UNCACHEDIO without ever
+	 * setting UIO_DIRECT.
+	 */
+	if (ap_ioflag & IO_NOCACHE)
+		flags |= O_DIRECT;
 
 	return (flags);
 }

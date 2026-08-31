@@ -41,6 +41,14 @@
 
 #define	O_LARGEFILE		0
 #define	O_RSYNC			0
-#define	O_DIRECT		0
+
+/*
+ * macOS has no O_DIRECT open(2) flag; the equivalent is per-fd, via
+ * fcntl(F_NOCACHE), which reaches VNOP_READ/VNOP_WRITE as IO_NOCACHE and is
+ * translated by zfs_ioflags(). Pick a bit XNU does not use in its O_* space
+ * (nearest neighbours are O_CLOEXEC 0x01000000 and O_ALERT 0x20000000); the
+ * value never leaves ZFS, as zfs_ioflags() builds a private flag set.
+ */
+#define	O_DIRECT		0x10000000
 
 #endif /* _SPL_FCNTL_H */
