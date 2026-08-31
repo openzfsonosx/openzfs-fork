@@ -437,9 +437,28 @@ handle_sync_iokit(struct ldi_handle *lhp)
 	    : kIOStorageSynchronizeOptionBarrier;
 	IOReturn ret = LH_MEDIA(lhp)->synchronize(LH_CLIENT(lhp),
 	    0, 0, synctype);
-	if (ret !=  kIOReturnSuccess) {
+
+	/*
+	 * A write barrier is faster but not supported by every device
+	 * (external NVMe/USB in particular).  When the barrier variant
+	 * fails, fall back to an ordinary cache sync rather than failing the
+	 * flush outright: returning an error here both leaves the cache
+	 * unflushed and drives the error-completion path in
+	 * vdev_disk_io_start().  Only retry if we actually asked for a
+	 * barrier -- if paranoia already selected a plain sync there is
+	 * nothing weaker to fall back to.
+	 */
+	if (ret != kIOReturnSuccess &&
+	    synctype == kIOStorageSynchronizeOptionBarrier) {
+		dprintf("%s barrier synchronize failed (0x%x), "
+		    "retrying without barrier\n", __func__, ret);
+		ret = LH_MEDIA(lhp)->synchronize(LH_CLIENT(lhp),
+		    0, 0, kIOStorageSynchronizeOptionNone);
+	}
+
+	if (ret != kIOReturnSuccess) {
 		printf("%s %s %d %s\n", __func__,
-		    "IOMedia synchronizeCache (with write barrier) failed",
+		    "IOMedia synchronizeCache failed",
 		    ret, "(see IOReturn.h)\n");
 		return (ENOTSUP);
 	}
