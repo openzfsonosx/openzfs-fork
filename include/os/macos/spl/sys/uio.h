@@ -188,11 +188,13 @@ zfs_uio_setsoffset(zfs_uio_t *uio, offset_t off)
 	uio->uio_soffset = off;
 }
 
+extern void zfs_uio_xnu_skip(struct uio *, size_t);
+
 static inline void
 zfs_uio_advance(zfs_uio_t *uio, size_t size)
 {
 	if (uio->uio_iov == NULL) {
-		uio_update(uio->uio_xnu, size);
+		zfs_uio_xnu_skip(uio->uio_xnu, size);
 	} else {
 		uio->uio_resid -= size;
 		uio->uio_loffset += size;

@@ -121,11 +121,37 @@ zfs_uiocopy(const char *p, size_t n, enum uio_rw rw, zfs_uio_t *uio,
 	return (result);
 }
 
+/*
+ * Advance an XNU uio by n bytes across iovec boundaries.
+ *
+ * uio_update() advances only the current iovec, but updates the residual
+ * and file offset by the requested count. Limit each update to the
+ * current iovec's remaining length so subsequent I/O resumes at the
+ * correct position.
+ */
+void
+zfs_uio_xnu_skip(struct uio *xuio, size_t n)
+{
+	while (n > 0 && uio_iovcnt(xuio) > 0) {
+		user_size_t cur = uio_curriovlen(xuio);
+
+		if (cur == 0) {
+			/* Skip over empty iovecs. */
+			uio_update(xuio, 0);
+			continue;
+		}
+		if (cur > n)
+			cur = n;
+		uio_update(xuio, cur);
+		n -= cur;
+	}
+}
+
 void
 zfs_uioskip(zfs_uio_t *uio, size_t n)
 {
 	if (uio->uio_iov == NULL) {
-		uio_update(uio->uio_xnu, n);
+		zfs_uio_xnu_skip(uio->uio_xnu, n);
 	} else {
 		if (n > uio->uio_resid)
 			return;
