@@ -14,6 +14,14 @@
 #
 # Cobbled togther with ChatGPT, and lundman@lundman.net
 #
+# --live: capturing a stuck/deadlocked thread's kernel stack yourself first --
+# use `sudo sample <pid> <duration>`, not `spindump`. Checked directly on the
+# same live-deadlocked process: spindump's kernel-frame walker gave 630 frames
+# of bare "[0x0]" (it lost the unwind chain entirely), while `sample` on the
+# identical pid/moment resolved every frame to a real address. No spindump
+# option found in `spindump -help` (checked the full list) affects this --
+# it looks like a real limitation of its kernel unwinder for threads blocked
+# this deep (e.g. inside lck_mtx_sleep), not something tunable.
 
 import argparse, os, re, sys, json, glob, shlex, subprocess, tempfile, atexit, shutil
 from collections import Counter
@@ -390,6 +398,272 @@ def symbolicate(obj: str, arch: str, text_load_hex: str, addr: int) -> str:
         return '(no symbol)'
     return out
 
+# ---------------------------------------------------------------------------
+# Live mode: symbolicate against the *running* kernel/kext with no panic file.
+#
+# kextstat/kmutil always report a third-party kext's load address as 0 --
+# that isn't hidden from the kernel itself, only from userspace tools. The
+# classic per-kext `kmod_info` linked list that used to carry it is dead
+# (NULL) on modern XNU; its replacement is `gLoadedKextSummaries`, an
+# OSKextLoadedKextSummaryHeader + OSKextLoadedKextSummary[] blob that dtrace
+# (running in kernel context) can read directly, bypassing the userspace
+# redaction entirely. No panic required.
+#
+# A third-party kext isn't just slid; kmutil *relinks* it into
+# AuxiliaryKernelCollection.kc, so its internal __TEXT/__TEXT_EXEC layout at
+# runtime no longer matches its standalone .kext bundle at all -- symbolicating
+# against the standalone binary (via -k/atos, as the panic path above does)
+# silently gives confidently-wrong function names. The only artifact whose
+# layout matches what's actually running is that .kc file itself. atos does
+# not handle these MH_FILESET collection images, so this path resolves
+# addresses in Python via nearest-preceding-symbol on `nm`, using the
+# collection's LC_FILESET_ENTRY vmaddr for the kext as the reference point.
+# ---------------------------------------------------------------------------
+
+AUXKC_CANDIDATES = [
+    "/var/db/KernelExtensionManagement/KernelCollections/AuxiliaryKernelCollection.kc",
+    "/System/Library/KernelCollections/BootKernelExtensions.kc",
+]
+
+def nm_addr(path: str, arch: str, symbol: str) -> Optional[int]:
+    """Static address of an exact global symbol (e.g. '_hz'), or None."""
+    r = run(f'nm -arch {arch} {shlex.quote(path)}')
+    if r.returncode != 0:
+        return None
+    want = symbol if symbol.startswith('_') else '_' + symbol
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[-1] == want:
+            try:
+                return int(parts[0], 16)
+            except ValueError:
+                pass
+    return None
+
+def nm_text_symbols(path: str, arch: str):
+    """Sorted [(addr, name), ...] for defined text symbols, for nearest-symbol lookup."""
+    r = run(f'nm -arch {arch} -n {shlex.quote(path)}')
+    if r.returncode != 0:
+        sys.exit(f"nm failed for {path}:\n{r.stderr}")
+    syms = []
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[1] in ('t', 'T'):
+            try:
+                syms.append((int(parts[0], 16), parts[-1]))
+            except ValueError:
+                continue
+    syms.sort()
+    return syms
+
+def nearest_symbol(syms, addr: int) -> str:
+    import bisect
+    addrs = [a for a, _ in syms]
+    i = bisect.bisect_right(addrs, addr) - 1
+    if i < 0:
+        return '(no symbol)'
+    a, name = syms[i]
+    return f"{name} + {hex(addr - a)}"
+
+def find_running_kernel(soc_hint: Optional[str] = None, allow_kasan: bool = False):
+    """Best-effort path to the currently-booted kernel Mach-O (not a KDK copy)."""
+    base = "/System/Library/Kernels"
+    if not os.path.isdir(base):
+        return None
+    names = [n for n in os.listdir(base) if n.startswith("kernel")]
+    if not allow_kasan:
+        names = [n for n in names if ".kasan" not in n]
+    if not soc_hint:
+        r = run('sysctl -n kern.version')
+        m = re.search(r'RELEASE_ARM64_T(\d+)', r.stdout) or re.search(r'AppleT(\d+)', r.stdout)
+        if m:
+            soc_hint = f"t{m.group(1)}"
+    order = []
+    if soc_hint:
+        order += [f"kernel.release.{soc_hint}", f"kernel.development.{soc_hint}"]
+    order += ["kernel.release", "kernel.development"]
+    for pat in order:
+        if pat in names:
+            return os.path.join(base, pat)
+    rel = sorted(n for n in names if n.startswith("kernel.release."))
+    if rel:
+        return os.path.join(base, rel[0])
+    return os.path.join(base, sorted(names)[0]) if names else None
+
+def derive_kernel_slide(kernel_path: str, arch: str):
+    """(slide, static_hz_addr) via a symbol dtrace can resolve (`hz` carries
+       full CTF variable info; `kmod_info`/`gLoadedKextSummaries` don't, so
+       they can only be read as raw memory once the slide is already known)."""
+    static_hz = nm_addr(kernel_path, arch, '_hz')
+    if static_hz is None:
+        sys.exit(f"Could not find _hz in {kernel_path} (wrong kernel image?)")
+    r = run('sudo dtrace -n \'BEGIN { printf("0x%llx", (uint64_t)&`hz); exit(0); }\'')
+    if r.returncode != 0:
+        sys.exit("dtrace failed to read `hz (need sudo / SIP allowing dtrace?):\n" + r.stderr)
+    m = re.search(HEX, r.stdout)
+    if not m:
+        sys.exit(f"Could not parse dtrace output for `hz:\n{r.stdout}\n{r.stderr}")
+    runtime_hz = int(m.group(0), 16)
+    return runtime_hz - static_hz, static_hz
+
+_KEXT_SUMMARY_ENTRY_SIZE = 136  # OSKextLoadedKextSummary, current XNU: name[64]+uuid[16]+address+size+version+loadTag+flags+reference_list+reserved
+
+def _run_dtrace_script(lines):
+    with tempfile.NamedTemporaryFile('w', suffix='.d', delete=False) as f:
+        f.write("\n".join(lines))
+        script_path = f.name
+    try:
+        return run(f'sudo dtrace -s {shlex.quote(script_path)}')
+    finally:
+        os.unlink(script_path)
+
+def derive_live_kext_base(bundle: str, kernel_path: str, arch: str, max_entries: int = 400):
+    """Walk gLoadedKextSummaries live via dtrace to find `bundle`'s real
+       runtime (address, size, uuid). Returns None if not currently loaded.
+
+       Two passes, because one dtrace program printing every field for every
+       entry blows past dtrace's DIF program-size limit once max_entries gets
+       past ~100: a cheap name-only scan (unrolled, but light per entry) to
+       find the index, then a second one-entry program for the full details.
+    """
+    slide, _ = derive_kernel_slide(kernel_path, arch)
+    static_summ = nm_addr(kernel_path, arch, '_gLoadedKextSummaries')
+    if static_summ is None:
+        sys.exit(f"Could not find _gLoadedKextSummaries in {kernel_path}")
+    var_addr = static_summ + slide
+
+    scan = [
+        "#pragma D option quiet",
+        "BEGIN",
+        "{",
+        f"\tthis->hdr = *(uint64_t *)0x{var_addr:x};",
+        "\tthis->numSummaries = *(uint32_t *)(this->hdr + 8);",
+        "\tthis->arr = this->hdr + 16;",
+        '\tprintf("NUM %u\\n", this->numSummaries);',
+    ]
+    for i in range(max_entries):
+        scan.append(f"\tthis->e{i} = this->arr + ({_KEXT_SUMMARY_ENTRY_SIZE} * {i});")
+        scan.append(f'\tprintf("E {i} %s\\n", stringof(*(string *)this->e{i}));')
+    scan.append("\texit(0);")
+    scan.append("}")
+
+    r = _run_dtrace_script(scan)
+    if r.returncode != 0:
+        sys.exit("dtrace failed walking gLoadedKextSummaries (need sudo?):\n" + r.stderr)
+
+    num = None
+    index = None
+    for line in r.stdout.splitlines():
+        if line.startswith("NUM "):
+            num = int(line.split()[1])
+        elif line.startswith("E "):
+            parts = line.split(None, 2)
+            if len(parts) == 3 and parts[2] == bundle:
+                index = int(parts[1])
+                break
+    if index is None:
+        if num is not None and num >= max_entries:
+            print(f"[live] warning: kernel reports {num} loaded kexts, only scanned "
+                  f"{max_entries}; re-run with a larger --max-entries if not found.")
+        return None
+
+    detail = [
+        "#pragma D option quiet",
+        "BEGIN",
+        "{",
+        f"\tthis->hdr = *(uint64_t *)0x{var_addr:x};",
+        f"\tthis->e = this->hdr + 16 + ({_KEXT_SUMMARY_ENTRY_SIZE} * {index});",
+        '\tprintf("%llx %llx %016llx%016llx\\n", '
+        '*(uint64_t *)(this->e+80), *(uint64_t *)(this->e+88), '
+        '*(uint64_t *)(this->e+64), *(uint64_t *)(this->e+72));',
+        "\texit(0);",
+        "}",
+    ]
+    r = _run_dtrace_script(detail)
+    if r.returncode != 0:
+        sys.exit("dtrace failed reading kext summary detail:\n" + r.stderr)
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and all(re.fullmatch(r'[0-9a-fA-F]+', p) for p in parts):
+            addr, size, h = int(parts[0], 16), int(parts[1], 16), parts[2]
+            uuid_disp = f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}".upper()
+            return addr, size, uuid_disp
+    sys.exit(f"Could not parse dtrace detail output:\n{r.stdout}")
+
+def fileset_entry_vmaddr(collection_path: str, bundle: str, arch: str) -> Optional[int]:
+    """vmaddr of `bundle`'s LC_FILESET_ENTRY within a .kc collection image --
+       kmutil's relink point of reference for that kext inside the collection."""
+    r = run(f'otool -arch {arch} -l {shlex.quote(collection_path)}')
+    if r.returncode != 0:
+        return None
+    vmaddr = None
+    for line in r.stdout.splitlines():
+        line = line.strip()
+        if line.startswith('vmaddr '):
+            try:
+                vmaddr = int(line.split()[1], 16)
+            except ValueError:
+                vmaddr = None
+        elif line.startswith('entry_id ') and bundle in line:
+            return vmaddr
+    return None
+
+def live_main(args, extra_addrs):
+    bundle = args.bundle
+    arch = 'arm64e'
+    kernel_path = args.kdk if (args.kdk and os.path.isfile(args.kdk)) else find_running_kernel(args.soc)
+    if not kernel_path or not os.path.isfile(kernel_path):
+        sys.exit("Could not find the running kernel image; pass --kdk <path to kernel.release.tXXXX>.")
+    print(f"[live] kernel image: {kernel_path}")
+
+    if args.base:
+        base = int(args.base, 16)
+        size = None
+        print(f"[live] using supplied base: {hex(base)}")
+    else:
+        print(f"[live] deriving {bundle}'s real load address via dtrace "
+              f"(gLoadedKextSummaries; this needs sudo) ...")
+        found = derive_live_kext_base(bundle, kernel_path, arch, args.max_entries)
+        if not found:
+            sys.exit(f"{bundle} not found among currently-loaded kexts "
+                      f"(unloaded since, or wrong -i bundle id?).")
+        base, size, uuid_disp = found
+        print(f"[live] {bundle}: base={hex(base)} size={hex(size) if size else '?'} uuid={uuid_disp}")
+        print(f"[live] pass -b {hex(base)} --live -i {bundle} next time to skip dtrace.")
+
+    collection = args.collection
+    if not collection:
+        for cand in AUXKC_CANDIDATES:
+            if os.path.isfile(cand):
+                collection = cand
+                break
+    if not collection:
+        sys.exit("Could not find AuxiliaryKernelCollection.kc/BootKernelExtensions.kc; "
+                  "pass --collection <path>.")
+    print(f"[live] collection:   {collection}")
+
+    ref_vmaddr = fileset_entry_vmaddr(collection, bundle, arch)
+    if ref_vmaddr is None:
+        sys.exit(f"{bundle} has no LC_FILESET_ENTRY in {collection}; "
+                  f"try --collection BootKernelExtensions.kc, or this kext isn't in either.")
+    kc_slide = base - ref_vmaddr
+    print(f"[live] {bundle} fileset vmaddr={hex(ref_vmaddr)}  -> collection slide={hex(kc_slide)}\n")
+
+    if not extra_addrs:
+        sys.exit("Give one or more runtime addresses (hex) to symbolicate, e.g.:\n"
+                  f"  {sys.argv[0]} --live -i {bundle} 0xfffffe0050fc8fc4 ...")
+
+    syms = nm_text_symbols(collection, arch)
+    print(f"=== {bundle} (live) ===")
+    for s in extra_addrs:
+        try:
+            a = depac(int(s, 16))
+        except ValueError:
+            print(f"{s}  (not a hex address)")
+            continue
+        kc_addr = a - kc_slide
+        print(f"{hex(a)}  [zfs]  {nearest_symbol(syms, kc_addr)}")
+
 def main():
     ap = argparse.ArgumentParser(description="Symbolicate macOS panic for ZFS kext and kernel (KDK).")
     ap.add_argument('-p','--panic', help='.panic or .ips path')
@@ -408,7 +682,21 @@ def main():
     ap.add_argument('--soc', help='Force SoC for kernel selection (e.g., t6041).')
     ap.add_argument('--prefer-release', action='store_true', help='Prefer kernel.release.* over development.')
     ap.add_argument('--allow-kasan', action='store_true', help='Allow picking KASAN kernels.')
+    ap.add_argument('--live', action='store_true',
+                    help='Symbolicate against the running kernel, no --panic needed. '
+                         'Derives the kext base via dtrace+gLoadedKextSummaries unless -b is '
+                         'given (pass positional hex addresses to resolve).')
+    ap.add_argument('--collection', help='Path to the loaded .kc collection for --live symbol '
+                                         'lookup (default: auto-detect Auxiliary/BootKernelExtensions.kc). '
+                                         'Needed because kmutil relinks 3rd-party kexts into it, so the '
+                                         'standalone kext binary\'s own layout no longer matches at runtime.')
+    ap.add_argument('--max-entries', type=int, default=400,
+                    help='--live only: cap on how many gLoadedKextSummaries entries dtrace scans.')
     args, extra_addrs = ap.parse_known_args()
+
+    if args.live:
+        live_main(args, extra_addrs)
+        return
 
     # Panic parse first: its kext UUID is what lets --pkg pick the right binary.
     pi = parse_panic(args.panic, args.bundle) if args.panic else {
