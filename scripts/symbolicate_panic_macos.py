@@ -517,7 +517,7 @@ def _run_dtrace_script(lines):
     finally:
         os.unlink(script_path)
 
-def derive_live_kext_base(bundle: str, kernel_path: str, arch: str, max_entries: int = 400):
+def derive_live_kext_base(bundle: str, kernel_path: str, arch: str, max_entries: int = 260):
     """Walk gLoadedKextSummaries live via dtrace to find `bundle`'s real
        runtime (address, size, uuid). Returns None if not currently loaded.
 
@@ -586,7 +586,14 @@ def derive_live_kext_base(bundle: str, kernel_path: str, arch: str, max_entries:
         parts = line.split()
         if len(parts) == 3 and all(re.fullmatch(r'[0-9a-fA-F]+', p) for p in parts):
             addr, size, h = int(parts[0], 16), int(parts[1], 16), parts[2]
-            uuid_disp = f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}".upper()
+            # h is two 16-hex-char halves, each a little-endian uint64 printed
+            # in normal (big-endian-looking) digit order by %016llx -- the
+            # actual UUID byte sequence is each half's bytes in *reverse*.
+            def bswap_half(s):
+                return ''.join(s[i:i+2] for i in range(14, -2, -2))
+            bytes_hex = bswap_half(h[0:16]) + bswap_half(h[16:32])
+            uuid_disp = (f"{bytes_hex[0:8]}-{bytes_hex[8:12]}-{bytes_hex[12:16]}-"
+                         f"{bytes_hex[16:20]}-{bytes_hex[20:32]}").upper()
             return addr, size, uuid_disp
     sys.exit(f"Could not parse dtrace detail output:\n{r.stdout}")
 
@@ -690,8 +697,10 @@ def main():
                                          'lookup (default: auto-detect Auxiliary/BootKernelExtensions.kc). '
                                          'Needed because kmutil relinks 3rd-party kexts into it, so the '
                                          'standalone kext binary\'s own layout no longer matches at runtime.')
-    ap.add_argument('--max-entries', type=int, default=400,
-                    help='--live only: cap on how many gLoadedKextSummaries entries dtrace scans.')
+    ap.add_argument('--max-entries', type=int, default=260,
+                    help='--live only: cap on how many gLoadedKextSummaries entries dtrace scans. '
+                         'Empirically, above ~300 the scan pass becomes unreliable (dtrace either '
+                         'hits its DIF program-size limit outright or just hangs); 260 is proven fast.')
     args, extra_addrs = ap.parse_known_args()
 
     if args.live:
