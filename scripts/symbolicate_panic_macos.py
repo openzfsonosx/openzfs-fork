@@ -14,14 +14,56 @@
 #
 # Cobbled togther with ChatGPT, and lundman@lundman.net
 #
-# --live: capturing a stuck/deadlocked thread's kernel stack yourself first --
-# use `sudo sample <pid> <duration>`, not `spindump`. Checked directly on the
-# same live-deadlocked process: spindump's kernel-frame walker gave 630 frames
-# of bare "[0x0]" (it lost the unwind chain entirely), while `sample` on the
-# identical pid/moment resolved every frame to a real address. No spindump
-# option found in `spindump -help` (checked the full list) affects this --
-# it looks like a real limitation of its kernel unwinder for threads blocked
-# this deep (e.g. inside lck_mtx_sleep), not something tunable.
+# --live: how to actually get a valid stack for a stuck/deadlocked thread,
+# to feed as the trailing addresses below.
+#
+# `spindump` and `sample` both fall short here, in different ways:
+#
+#   - `spindump <pid> <secs>`: checked directly on a live-deadlocked
+#     process, its kernel-frame walker gave 630 frames of bare "[0x0]" --
+#     it lost the unwind chain entirely partway through. No option in
+#     `spindump -help` (checked the full list) affects this; it looks
+#     like a real limitation of its kernel unwinder for threads blocked
+#     this deep (e.g. inside lck_mtx_sleep), not something tunable.
+#
+#   - `sudo sample <pid> <secs>`: worked once (resolved every frame to a
+#     real kernel address on a thread just gone to sleep), then on a
+#     later run against threads that had already been stuck for a while
+#     it stopped dead at the userland syscall trampoline (__msync, fsync,
+#     __mmap, ...) and never descended into the kernel at all. Whatever
+#     the exact trigger, it isn't reliable enough to depend on.
+#
+# What *is* reliable: arm a dtrace sched:::off-cpu probe BEFORE the hang
+# happens, so it captures the kernel stack at the exact moment the thread
+# goes to sleep (this can't be done after the fact -- a thread that's
+# already asleep has no "off-cpu transition" left to catch):
+#
+#   cat > /tmp/offcpu.d <<'EOF'
+#   #pragma D option quiet
+#   sched:::off-cpu
+#   /execname == "your_program"/
+#   {
+#       printf("\n=== OFFCPU pid=%d tid=%d ===\n", pid, tid);
+#       stack();
+#   }
+#   EOF
+#   sudo dtrace -s /tmp/offcpu.d -o /tmp/offcpu.log &
+#   # *then* run/trigger whatever reproduces the hang
+#   # once it's stuck: sudo pkill -9 -f offcpu.d   (plain -f alone can fail
+#   # to actually kill it -- confirm with `ps` that the dtrace pid is gone,
+#   # a still-running stale one will make the *next* dtrace invocation you
+#   # start silently hang trying to enable the same probes)
+#
+# A thread can go off-cpu several times on its way to a permanent block
+# (e.g. a timed wait before an indefinite one) -- take the LAST
+# "=== OFFCPU pid=... tid=... ===" block for the stuck tid; that's the
+# final, actually-stuck stack. Frames inside the target kext (as opposed
+# to the base kernel, which dtrace resolves fine on its own via CTF) print
+# as bare hex there -- collect those addresses and hand them to --live
+# below, e.g.:
+#
+#   ./symbolicate_panic_macos.py --live -i org.openzfsonosx.zfs \
+#       0xfffffe0046be4fc4 0xfffffe0046d268bc ...
 
 import argparse, os, re, sys, json, glob, shlex, subprocess, tempfile, atexit, shutil
 from collections import Counter
