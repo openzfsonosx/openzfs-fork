@@ -885,7 +885,7 @@ zfsvfs_create_impl(zfsvfs_t **zfvp, zfsvfs_t *zfsvfs, objset_t *os)
 	if (error != 0) {
 		dmu_objset_disown(os, B_TRUE, zfsvfs);
 		*zfvp = NULL;
-		kmem_free(zfsvfs, sizeof (zfsvfs_t));
+		zfsvfs_free(zfsvfs);
 		return (error);
 	}
 
