@@ -1047,6 +1047,8 @@ zfsvfs_free(zfsvfs_t *zfsvfs)
 
 	mutex_destroy(&zfsvfs->z_znodes_lock);
 	mutex_destroy(&zfsvfs->z_lock);
+	mutex_destroy(&zfsvfs->z_drain_lock);
+	cv_destroy(&zfsvfs->z_drain_cv);
 	list_destroy(&zfsvfs->z_all_znodes);
 	ZFS_TEARDOWN_DESTROY(zfsvfs);
 	ZFS_TEARDOWN_INACTIVE_DESTROY(zfsvfs);
