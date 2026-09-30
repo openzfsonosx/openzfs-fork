@@ -1304,6 +1304,16 @@ badlabel:
 			}
 			break;
 
+		case ZFS_PROP_ZONED_UID:
+			if (intval >= MAXUID) {
+				zfs_error_aux(hdl,
+				    "'%s' must be less than %llu", propname,
+				    (u_longlong_t)MAXUID);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto error;
+			}
+			break;
+
 		case ZFS_PROP_UTF8ONLY:
 			chosen_utf = (int)intval;
 			break;
@@ -2890,6 +2900,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 	case ZFS_PROP_PBKDF2_ITERS:
 	case ZFS_PROP_OWNERUID:
 	case ZFS_PROP_OWNERGID:
+	case ZFS_PROP_ZONED_UID:
 		/*
 		 * These properties are stored as numbers, but they are
 		 * identifiers or counters.
