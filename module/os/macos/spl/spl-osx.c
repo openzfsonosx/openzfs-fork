@@ -51,6 +51,20 @@ extern uint64_t		segkmem_total_mem_allocated;
 extern int bsd_hostname(char *, size_t, size_t *);
 static char spl_hostname[MAXHOSTNAMELEN];
 
+/*
+ * __attribute__((destructor)) built with a non-Apple clang leaves
+ * __cxa_atexit() unresolved at kext load time; the kernel never runs
+ * those registrations, so a stub that does nothing is enough.
+ */
+#ifdef _KERNEL
+int
+__cxa_atexit(void (*f)(void *), void *p, void *d)
+{
+	(void) f, (void) p, (void) d;
+	return (0);
+}
+#endif
+
 utsname_t *
 utsname(void)
 {
