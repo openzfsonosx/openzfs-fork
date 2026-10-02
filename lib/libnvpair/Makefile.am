@@ -42,7 +42,7 @@ nodist_libnvpair_la_SOURCES = \
 	module/nvpair/fnvpair.c
 
 libnvpair_la_LIBADD = \
-	libspl_assert.la
+	libspl.la
 
 libnvpair_la_LIBADD += $(LIBTIRPC_LIBS)
 
