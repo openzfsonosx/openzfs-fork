@@ -178,6 +178,27 @@ zfs_strcmp_pathname(const char *name, const char *cmp, int wholedisk)
 		strlcat(cmp_name, dir, sizeof (cmp_name));
 	}
 
+	/*
+	 * Canonicalize the directory part of the stored path the same way
+	 * zpool_find_import_scan_dir() canonicalized it when the pool was
+	 * imported: realpath() on the directory only, so a symlinked device
+	 * name is kept as the symlink. A path recorded by `zpool create`
+	 * is stored exactly as typed, so without this the two never agree
+	 * when the directory itself sits behind a symlink (macOS: /var is a
+	 * symlink to /private/var, and the default search paths are the
+	 * /private form), and every short-name lookup of a leaf vdev fails.
+	 */
+	if ((cmp_len = zfs_dirnamelen(cmp_name)) > 0 &&
+	    cmp_len < sizeof (path_name)) {
+		char rdir[MAXPATHLEN];
+
+		(void) strlcpy(path_name, cmp_name, cmp_len + 1);
+		if (realpath(path_name, rdir) != NULL &&
+		    snprintf(path_name, sizeof (path_name), "%s/%s", rdir,
+		    zfs_basename(cmp_name)) < sizeof (path_name))
+			(void) strlcpy(cmp_name, path_name, sizeof (cmp_name));
+	}
+
 	if (name[0] != '/')
 		return (zfs_strcmp_shortname(name, cmp_name, wholedisk));
 
