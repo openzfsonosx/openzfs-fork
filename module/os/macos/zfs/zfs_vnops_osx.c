@@ -3597,6 +3597,37 @@ zfs_vnop_pathconf(struct vnop_pathconf_args *ap)
 	case _PC_FILESIZEBITS:
 		*valp = 64;
 		break;
+	case _PC_MIN_HOLE_SIZE:
+	{
+		/*
+		 * Advertise SEEK_HOLE/SEEK_DATA support (see the
+		 * FSIOC_FIOSEEKHOLE/FSIOC_FIOSEEKDATA ioctls). zfs_holey()
+		 * reports holes at the file's block size granularity, so
+		 * follow FreeBSD: return z_blksz, except for files still
+		 * within their first block (including new, empty copy
+		 * destinations) where the eventual block size is unknown
+		 * and we report the recordsize. copyfile(3), and so cp(1)
+		 * and Finder, only attempt a sparse copy when both volumes
+		 * return at least their statfs f_bsize; libarchive/tar(1)
+		 * only looks for holes when the value is positive.
+		 */
+		znode_t *zp = VTOZ(ap->a_vp);
+		zfsvfs_t *zfsvfs = (zp != NULL) ? zp->z_zfsvfs : NULL;
+
+		if (zfsvfs == NULL) {
+			error = EINVAL;
+		} else if (vnode_isreg(ap->a_vp)) {
+			uint64_t blksz = zp->z_blksz;
+			if (zp->z_size <= blksz)
+				blksz = MAX(blksz, zfsvfs->z_max_blksz);
+			*valp = (int32_t)blksz;
+		} else if (vnode_isdir(ap->a_vp)) {
+			*valp = (int32_t)zfsvfs->z_max_blksz;
+		} else {
+			error = EINVAL;
+		}
+		break;
+	}
 	default:
 		printf("ZFS: unknown pathconf %d called.\n", ap->a_name);
 		error = EINVAL;
