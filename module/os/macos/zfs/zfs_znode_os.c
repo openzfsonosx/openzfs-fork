@@ -1732,16 +1732,14 @@ zfs_free_range(znode_t *zp, uint64_t off, uint64_t len)
 	if (off + len > zp->z_size)
 		len = zp->z_size - off;
 
+	/*
+	 * This frees a range inside the file and never changes its size, so
+	 * the UBC size stays as it is (truncation is zfs_trunc()). Callers
+	 * that can have the range cached, such as zfs_vnop_ioctl()'s
+	 * F_PUNCHHOLE, sync and invalidate the UBC around this; it cannot
+	 * be done here since pageout takes the range lock.
+	 */
 	error = dmu_free_long_range(zfsvfs->z_os, zp->z_id, off, len);
-
-	if (error == 0) {
-		/*
-		 * In FreeBSD we cannot free block in the middle of a file,
-		 * but only at the end of a file, so this code path should
-		 * never happen.
-		 */
-		vnode_pager_setsize(ZTOV(zp), off);
-	}
 
 #ifdef _LINUX
 	/*
@@ -1867,6 +1865,46 @@ zfs_trunc(znode_t *zp, uint64_t end)
 }
 
 /*
+ * Update mtime/ctime and log a TX_TRUNCATE record for a range that
+ * zfs_freesp() or zfs_freesp_keepsize() has just freed or extended.
+ */
+static int
+zfs_freesp_log(znode_t *zp, uint64_t off, uint64_t len)
+{
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	zilog_t *zilog = zfsvfs->z_log;
+	uint64_t mtime[2], ctime[2];
+	sa_bulk_attr_t bulk[4];
+	int count = 0;
+	dmu_tx_t *tx;
+	int error;
+
+	tx = dmu_tx_create(zfsvfs->z_os);
+	dmu_tx_hold_sa(tx, zp->z_sa_hdl, ZFS_SEQ_MAY_GROW(zp));
+	zfs_sa_upgrade_txholds(tx, zp);
+	error = dmu_tx_assign(tx, DMU_TX_WAIT);
+	if (error) {
+		dmu_tx_abort(tx);
+		return (error);
+	}
+
+	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL, mtime, 16);
+	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL, ctime, 16);
+	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs),
+	    NULL, &zp->z_pflags, 8);
+	zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime);
+	ZFS_PERSIST_SEQ(zp, bulk, count);
+	error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
+	ASSERT(error == 0);
+
+	zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
+
+	dmu_tx_commit(tx);
+
+	return (0);
+}
+
+/*
  * Free space in a file
  *
  *	IN:	zp	- znode of file to free data in.
@@ -1880,14 +1918,8 @@ zfs_trunc(znode_t *zp, uint64_t end)
 int
 zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 {
-//	struct vnode *vp = ZTOV(zp);
-	dmu_tx_t *tx;
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-	zilog_t *zilog = zfsvfs->z_log;
 	uint64_t mode;
-	uint64_t mtime[2], ctime[2];
-	sa_bulk_attr_t bulk[4];
-	int count = 0;
 	int error;
 
 	if (vnode_isfifo(ZTOV(zp)))
@@ -1914,33 +1946,48 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 	if (error || !log)
 		goto out;
 log:
-	tx = dmu_tx_create(zfsvfs->z_os);
-	dmu_tx_hold_sa(tx, zp->z_sa_hdl, ZFS_SEQ_MAY_GROW(zp));
-	zfs_sa_upgrade_txholds(tx, zp);
-	error = dmu_tx_assign(tx, DMU_TX_WAIT);
-	if (error) {
-		dmu_tx_abort(tx);
-		goto out;
-	}
-
-	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL, mtime, 16);
-	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL, ctime, 16);
-	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs),
-	    NULL, &zp->z_pflags, 8);
-	zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime);
-	ZFS_PERSIST_SEQ(zp, bulk, count);
-	error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
-	ASSERT(error == 0);
-
-	zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
-
-	dmu_tx_commit(tx);
-
-	error = 0;
-
+	error = zfs_freesp_log(zp, off, len);
 out:
 
 	return (error);
+}
+
+/*
+ * Free a range inside a file without ever changing its size, for
+ * F_PUNCHHOLE. Unlike zfs_freesp(), a range at or past EOF is not an
+ * extend and len 0 is not a truncate: the range is clipped to the
+ * current size, under the range lock in zfs_free_range(), so a
+ * concurrent truncate cannot make this grow the file.
+ *
+ *	IN:	zp	- znode of file to free data in.
+ *		off	- start of range
+ *		len	- length of range, > 0
+ *
+ *	RETURN:	0 on success, error code on failure
+ */
+int
+zfs_freesp_keepsize(znode_t *zp, uint64_t off, uint64_t len)
+{
+	uint64_t size;
+	int error;
+
+	ASSERT3U(len, >, 0);
+
+	error = zfs_free_range(zp, off, len);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Log the range that was actually freed, so that replay (which
+	 * goes through zfs_freesp()) does not extend the file either.
+	 */
+	size = zp->z_size;
+	if (off >= size)
+		return (0);
+	if (len > size - off)
+		len = size - off;
+
+	return (zfs_freesp_log(zp, off, len));
 }
 
 void

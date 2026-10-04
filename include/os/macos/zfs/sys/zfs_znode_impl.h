@@ -183,6 +183,7 @@ extern void	zfs_tstamp_update_setup_ext(struct znode *,
 extern void	zfs_tstamp_update_setup(struct znode *,
     uint_t, uint64_t [2], uint64_t [2]);
 extern void zfs_znode_free(struct znode *);
+extern int zfs_freesp_keepsize(struct znode *, uint64_t, uint64_t);
 
 extern zil_get_data_t zfs_get_data;
 extern zil_replay_func_t *const zfs_replay_vector[TX_MAX_TYPE];

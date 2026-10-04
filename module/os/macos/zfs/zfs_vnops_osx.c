@@ -478,6 +478,85 @@ zfs_vnop_close(struct vnop_close_args *ap)
 	return (zfs_close(ap->a_vp, ap->a_fflag, cr));
 }
 
+#ifdef F_PUNCHHOLE
+/*
+ * fcntl(F_PUNCHHOLE): deallocate [fp_offset, fp_offset + fp_length) and
+ * leave a hole that reads back as zeros, without changing the file size.
+ * As on APFS, the offset and length must be multiples of the volume block
+ * size (statfs f_bsize), a range running past EOF is clipped, and a zero
+ * length or a range past EOF does nothing. XNU has already checked that
+ * the fd is open for writing.
+ */
+static int
+zfs_punchhole(struct vnode *vp, const fpunchhole_t *args, cred_t *cr)
+{
+	znode_t *zp = VTOZ(vp);
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	off_t off = args->fp_offset;
+	off_t len = args->fp_length;
+	uint32_t bsize = vfs_statfs(vnode_mount(vp))->f_bsize;
+	off_t start, end;
+	int error;
+
+	if (!vnode_isreg(vp))
+		return (SET_ERROR(EINVAL));
+
+	if (off < 0 || len < 0)
+		return (SET_ERROR(EINVAL));
+
+	if (bsize != 0 && ((off % bsize) != 0 || (len % bsize) != 0))
+		return (SET_ERROR(EINVAL));
+
+	if (len == 0)
+		return (0);
+
+	if ((error = zfs_enter_verify_zp(zfsvfs, zp, FTAG)) != 0)
+		return (error);
+
+	if (zfs_is_readonly(zfsvfs)) {
+		error = SET_ERROR(EROFS);
+		goto out;
+	}
+
+	/*
+	 * Append-only is otherwise only enforced at open time, and an
+	 * O_APPEND fd must not be able to punch holes either.
+	 */
+	if (zp->z_pflags & (ZFS_IMMUTABLE | ZFS_READONLY | ZFS_APPENDONLY)) {
+		error = SET_ERROR(EPERM);
+		goto out;
+	}
+
+	if ((error = zfs_zaccess(zp, ACE_WRITE_DATA, 0, B_FALSE, cr)) != 0)
+		goto out;
+
+	if (off >= zp->z_size)
+		goto out;
+	if (len > zp->z_size - off)
+		len = zp->z_size - off;
+
+	/*
+	 * Write back dirty pages over the range first: pages that straddle
+	 * the hole's edges carry data outside it, and a dirty page inside
+	 * it must not be paged out into the hole later. Pageout takes the
+	 * range lock, so this cannot be done inside zfs_free_range().
+	 */
+	start = trunc_page_64(off);
+	end = round_page_64(off + len);
+	(void) ubc_msync(vp, start, end, NULL, UBC_PUSHDIRTY | UBC_SYNC);
+
+	error = zfs_freesp_keepsize(zp, off, len);
+
+	/* Drop the cached pages so the hole reads back as zeros. */
+	if (error == 0)
+		(void) ubc_msync(vp, start, end, NULL, UBC_INVALIDATE);
+
+out:
+	zfs_exit(zfsvfs, FTAG);
+	return (error);
+}
+#endif
+
 int
 zfs_vnop_ioctl(struct vnop_ioctl_args *ap)
 #if 0
@@ -536,6 +615,14 @@ zfs_vnop_ioctl(struct vnop_ioctl_args *ap)
 #endif
 			error = zfs_fsync(VTOZ(ap->a_vp), /* flag */0, cr);
 			break;
+
+#ifdef F_PUNCHHOLE
+		case F_PUNCHHOLE:
+			dprintf("%s F_PUNCHHOLE\n", __func__);
+			error = zfs_punchhole(ap->a_vp,
+			    (const fpunchhole_t *)ap->a_data, cr);
+			break;
+#endif
 
 		case F_CHKCLEAN:
 			dprintf("%s F_CHKCLEAN\n", __func__);
