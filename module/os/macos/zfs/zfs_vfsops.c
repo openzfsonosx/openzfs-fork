@@ -40,6 +40,7 @@
 #include <sys/dsl_dir.h>
 #include <sys/dataset_kstats.h>
 #include <sys/spa_impl.h> // spa_freeze_txg
+#include <sys/vdev_file.h>
 
 #define	vfs_optionisset(X, Y, Z) (vfs_flags(X)&(Y))
 
@@ -2356,7 +2357,6 @@ zfs_vfs_unmount(struct mount *mp, int mntflags, vfs_context_t context)
 
 #ifdef CLOSE_ON_UNMOUNT
 	/* See rant in vdev_file.c */
-	extern void vdev_file_close_all(objset_t *);
 	vdev_file_close_all(os);
 #endif
 

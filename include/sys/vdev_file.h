@@ -30,6 +30,9 @@ typedef struct vdev_file {
 extern void vdev_file_init(void);
 extern void vdev_file_fini(void);
 extern int vdev_file_os_io_start(zio_t *zio);
+#ifdef __APPLE__
+extern void vdev_file_close_all(objset_t *os);
+#endif
 
 #ifdef	__cplusplus
 }
