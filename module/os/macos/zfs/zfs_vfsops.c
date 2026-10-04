@@ -1692,6 +1692,8 @@ zfs_vfs_getattr(struct mount *mp, struct vfs_attr *fsap,
 		    VOL_CAP_INT_EXTENDED_ATTR |	// ZFS
 		    VOL_CAP_INT_VOL_RENAME |	// msdos..
 		    VOL_CAP_INT_ADVLOCK |
+		    VOL_CAP_INT_RENAME_SWAP |	// renamex_np(RENAME_SWAP)
+		    VOL_CAP_INT_RENAME_EXCL |	// renamex_np(RENAME_EXCL)
 			// ZFS does not yet have exchangedata (it's in a branch)
 			/* VOL_CAP_INT_EXCHANGEDATA| */
 			// ZFS does not yet have copyfile
@@ -1740,6 +1742,8 @@ zfs_vfs_getattr(struct mount *mp, struct vfs_attr *fsap,
 		    VOL_CAP_INT_ALLOCATE |
 		    VOL_CAP_INT_VOL_RENAME |
 		    VOL_CAP_INT_ADVLOCK |
+		    VOL_CAP_INT_RENAME_SWAP |
+		    VOL_CAP_INT_RENAME_EXCL |
 		    VOL_CAP_INT_FLOCK |
 		    VOL_CAP_INT_EXTENDED_ATTR |
 		    VOL_CAP_INT_USERACCESS |

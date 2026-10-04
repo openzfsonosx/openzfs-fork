@@ -2217,23 +2217,32 @@ zfs_vnop_renamex(struct vnop_renamex_args *ap)
 #endif
 {
 	DECLARE_CRED(ap);
+	vfs_rename_flags_t vflags = ap->a_flags & VFS_RENAME_FLAGS_MASK;
+	uint64_t rflags = 0;
 	int error;
 
-	dprintf("vnop_renamex\n");
+	dprintf("vnop_renamex flags 0x%x\n", ap->a_flags);
 
 	/*
-	 * extern int zfs_rename(struct vnode *sdvp, char *snm,
-	 *     struct vnode *tdvp, char *tnm, cred_t *cr, caller_context_t *ct,
-	 *     int flags);
-	 *
-	 * Currently, hfs only supports one flag, VFS_RENAME_EXCL, so
-	 * we will do the same. Since zfs_rename() only has logic for
-	 * FIGNORECASE, passing VFS_RENAME_EXCL should be ok, if a bit
-	 * hacky.
+	 * VFS_RENAME_SECLUDE (private) is not implemented and is treated
+	 * as a plain rename, as before.
 	 */
+	if ((vflags & VFS_RENAME_SWAP) && (vflags & VFS_RENAME_EXCL))
+		return (SET_ERROR(EINVAL));
+
+	if (vflags & VFS_RENAME_EXCL)
+		rflags |= RENAME_NOREPLACE;
+
+	if (vflags & VFS_RENAME_SWAP) {
+		/* XNU already returns ENOENT for this, but be sure. */
+		if (ap->a_tvp == NULL)
+			return (SET_ERROR(ENOENT));
+		rflags |= RENAME_EXCHANGE;
+	}
+
 	error = zfs_rename(VTOZ(ap->a_fdvp), ap->a_fcnp->cn_nameptr,
 		VTOZ(ap->a_tdvp), ap->a_tcnp->cn_nameptr, cr,
-		(ap->a_flags&VFS_RENAME_EXCL), 0, NULL);
+		0, rflags, NULL);
 
 	if (!error) {
 		cache_purge_negatives(ap->a_fdvp);
@@ -2246,6 +2255,26 @@ zfs_vnop_renamex(struct vnop_renamex_args *ap)
 							ap->a_tcnp->cn_nameptr);
 		if (ap->a_tvp) {
 			cache_purge(ap->a_tvp);
+		}
+
+		if (rflags & RENAME_EXCHANGE) {
+			/*
+			 * The target now lives at the source name. XNU's
+			 * renameat() only updates fvp's name and parent, so
+			 * do tvp here, along with its hardlink entry.
+			 */
+			int update_flags = VNODE_UPDATE_NAME;
+
+			if (ap->a_fdvp != ap->a_tdvp)
+				update_flags |= VNODE_UPDATE_PARENT;
+
+			zfs_rename_hardlink(ap->a_tvp, ap->a_fvp,
+			    ap->a_tdvp, ap->a_fdvp,
+			    ap->a_tcnp->cn_nameptr,
+			    ap->a_fcnp->cn_nameptr);
+			vnode_update_identity(ap->a_tvp, ap->a_fdvp,
+			    ap->a_fcnp->cn_nameptr, ap->a_fcnp->cn_namelen,
+			    0, update_flags);
 		}
 
 #ifdef __APPLE__

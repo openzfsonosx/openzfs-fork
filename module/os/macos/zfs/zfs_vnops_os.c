@@ -2877,9 +2877,15 @@ zfs_rename_unlock(zfs_zlock_t **zlpp)
  * Lock each directory in the chain to prevent concurrent renames.
  * Fail any attempt to move a directory into one of its own descendants.
  * XXX - z_parent_lock can overlap with map or grow locks
+ *
+ * With nowait set, return EAGAIN instead of blocking on a contended lock.
+ * RENAME_EXCHANGE uses this for its second walk, which runs while the
+ * locks from the first walk are held; the caller drops everything and
+ * retries.
  */
 static int
-zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
+zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp,
+    boolean_t nowait)
 {
 	zfs_zlock_t	*zl;
 	znode_t		*zp = tdzp;
@@ -2894,6 +2900,8 @@ zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
 	 */
 	do {
 		if (!rw_tryenter(rwlp, rw)) {
+			if (nowait)
+				return (SET_ERROR(EAGAIN));
 			/*
 			 * Another thread is renaming in this path.
 			 * Note that if we are a WRITER, we don't have any
@@ -2947,6 +2955,69 @@ zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
 }
 
 /*
+ * Swap the directory entries of a RENAME_EXCHANGE inside the caller's
+ * assigned tx: szp moves to tdl's name and tzp to sdl's name, keeping
+ * their link counts (ZRENAMING) while the parents' ".." counts and the
+ * moved directories' parent pointers follow the entries. Follows the
+ * Linux zfs_rename(); on failure the original entries are put back.
+ */
+static int
+zfs_rename_exchange_links(zfsvfs_t *zfsvfs, zfs_dirlock_t *sdl, znode_t *szp,
+    zfs_dirlock_t *tdl, znode_t *tzp, int zflg, dmu_tx_t *tx)
+{
+	znode_t *sdzp = sdl->dl_dzp;
+	znode_t *tdzp = tdl->dl_dzp;
+	int error;
+
+	szp->z_pflags |= ZFS_AV_MODIFIED;
+	if (tdzp->z_pflags & ZFS_PROJINHERIT)
+		szp->z_pflags |= ZFS_PROJINHERIT;
+	VERIFY0(sa_update(szp->z_sa_hdl, SA_ZPL_FLAGS(zfsvfs),
+	    (void *)&szp->z_pflags, sizeof (uint64_t), tx));
+
+	tzp->z_pflags |= ZFS_AV_MODIFIED;
+	if (sdzp->z_pflags & ZFS_PROJINHERIT)
+		tzp->z_pflags |= ZFS_PROJINHERIT;
+	VERIFY0(sa_update(tzp->z_sa_hdl, SA_ZPL_FLAGS(zfsvfs),
+	    (void *)&tzp->z_pflags, sizeof (uint64_t), tx));
+
+	error = zfs_link_destroy(sdl, szp, tx, ZRENAMING, NULL);
+	if (error != 0)
+		return (error);
+
+	error = zfs_link_destroy(tdl, tzp, tx, zflg | ZRENAMING, NULL);
+	if (error != 0) {
+		VERIFY0(zfs_link_create(sdl, szp, tx, ZRENAMING));
+		return (error);
+	}
+
+	/*
+	 * Both names were just removed in this tx, so re-adding them
+	 * cannot fail.
+	 */
+	VERIFY0(zfs_link_create(tdl, szp, tx, ZRENAMING));
+	VERIFY0(zfs_link_create(sdl, tzp, tx, ZRENAMING));
+
+	/*
+	 * Entries that changed directory get a new ADDEDTIME for
+	 * FinderInfo, as in the plain rename path.
+	 */
+	if (sdzp != tdzp && zfsvfs->z_use_sa == B_TRUE) {
+		uint64_t addtime[2];
+		timestruc_t now;
+
+		gethrestime(&now);
+		ZFS_TIME_ENCODE(&now, addtime);
+		(void) sa_update(szp->z_sa_hdl, SA_ZPL_ADDTIME(zfsvfs),
+		    (void *)&addtime, sizeof (addtime), tx);
+		(void) sa_update(tzp->z_sa_hdl, SA_ZPL_ADDTIME(zfsvfs),
+		    (void *)&addtime, sizeof (addtime), tx);
+	}
+
+	return (0);
+}
+
+/*
  * Move an entry from the provided source directory to the target
  * directory.  Change the entry name as indicated.
  *
@@ -2956,6 +3027,10 @@ zfs_rename_lock(znode_t *szp, znode_t *tdzp, znode_t *sdzp, zfs_zlock_t **zlpp)
  *		tnm	- New entry name.
  *		cr	- credentials of caller.
  *		flags	- case flags
+ *		rflags	- RENAME_NOREPLACE: fail with EEXIST if tnm exists
+ *			  RENAME_EXCHANGE: atomically swap snm and tnm,
+ *			  which must both exist (renamex_np(RENAME_SWAP))
+ *		wo_vap	- must be NULL (no RENAME_WHITEOUT on macOS)
  *
  *	RETURN:	0 on success, error code on failure.
  *
@@ -2972,13 +3047,24 @@ zfs_rename(znode_t *sdzp, char *snm, znode_t *tdzp, char *tnm,
 	uint64_t addtime[2];
 	zfs_dirlock_t	*sdl, *tdl;
 	dmu_tx_t	*tx;
-	zfs_zlock_t	*zl;
+	zfs_zlock_t	*zl, *tzl;
 	int		cmp, serr, terr;
 	int		error = 0;
 	int		zflg = 0;
 	boolean_t	waited = B_FALSE;
+	boolean_t	exchange = (rflags & RENAME_EXCHANGE) != 0;
 
 	if (snm == NULL || tnm == NULL)
+		return (SET_ERROR(EINVAL));
+
+	if (rflags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE))
+		return (SET_ERROR(EINVAL));
+
+	if (exchange && (rflags & RENAME_NOREPLACE))
+		return (SET_ERROR(EINVAL));
+
+	/* RENAME_WHITEOUT is not supported, so there is no whiteout vattr. */
+	if (wo_vap != NULL)
 		return (SET_ERROR(EINVAL));
 
 	if ((error = zfs_enter_verify_zp(zfsvfs, sdzp, FTAG)) != 0)
@@ -3009,6 +3095,7 @@ top:
 	szp = NULL;
 	tzp = NULL;
 	zl = NULL;
+	tzl = NULL;
 
 	/*
 	 * This is to prevent the creation of links into attribute space
@@ -3147,6 +3234,20 @@ top:
 		goto out;
 	}
 
+	if (exchange) {
+		/* Target must exist for RENAME_EXCHANGE. */
+		if (tzp == NULL) {
+			error = SET_ERROR(ENOENT);
+			goto out;
+		}
+		/* The target moves into the source directory. */
+		if (sdzp->z_pflags & ZFS_PROJINHERIT &&
+		    sdzp->z_projid != tzp->z_projid) {
+			error = SET_ERROR(EXDEV);
+			goto out;
+		}
+	}
+
 	/*
 	 * Must have write access at the source to remove the old entry
 	 * and write access at the target to create the new entry.
@@ -3157,12 +3258,48 @@ top:
 	if ((error = zfs_zaccess_rename(sdzp, szp, tdzp, tzp, cr)))
 		goto out;
 
+	/* An exchange also moves the target into the source directory. */
+	if (exchange &&
+	    (error = zfs_zaccess_rename(tdzp, tzp, sdzp, szp, cr)))
+		goto out;
+
 	if (S_ISDIR(szp->z_mode)) {
 		/*
 		 * Check to make sure rename is valid.
 		 * Can't do a move like this: /usr/a/b to /usr/a/b/c/d
 		 */
-		if ((error = zfs_rename_lock(szp, tdzp, sdzp, &zl)))
+		if ((error = zfs_rename_lock(szp, tdzp, sdzp, &zl, B_FALSE)))
+			goto out;
+	}
+
+	/*
+	 * An exchange across directories also moves the target directory
+	 * into the source directory, so check that it is not an ancestor of
+	 * it either. Linux leaves this to its VFS; XNU only compares the
+	 * immediate parents. This walk runs with the first walk's locks
+	 * held, so it must not block: on contention drop everything and
+	 * start over.
+	 */
+	if (exchange && sdzp != tdzp && S_ISDIR(tzp->z_mode)) {
+		error = zfs_rename_lock(tzp, sdzp, tdzp, &tzl, B_TRUE);
+		if (error == EAGAIN) {
+			zfs_rename_unlock(&tzl);
+			if (zl != NULL)
+				zfs_rename_unlock(&zl);
+			zfs_dirent_unlock(sdl);
+			zfs_dirent_unlock(tdl);
+			if (sdzp == tdzp)
+				rw_exit(&sdzp->z_name_lock);
+			zrele(szp);
+			zrele(tzp);
+			zfs_exit(zfsvfs, FTAG);
+			delay(1);
+			if ((error = zfs_enter_verify_zp(zfsvfs, sdzp,
+			    FTAG)) != 0)
+				return (error);
+			goto top;
+		}
+		if (error != 0)
 			goto out;
 	}
 
@@ -3171,16 +3308,15 @@ top:
 	 */
 	if (tzp) {
 		/*
-		 * Source and target must be the same type.
+		 * Source and target must be the same type (unless
+		 * exchanging).
 		 */
-		if (S_ISDIR(szp->z_mode)) {
-			if (!S_ISDIR(tzp->z_mode)) {
-				error = SET_ERROR(ENOTDIR);
-				goto out;
-			}
-		} else {
-			if (S_ISDIR(tzp->z_mode)) {
-				error = SET_ERROR(EISDIR);
+		if (!exchange) {
+			boolean_t s_is_dir = S_ISDIR(szp->z_mode) != 0;
+			boolean_t t_is_dir = S_ISDIR(tzp->z_mode) != 0;
+
+			if (s_is_dir != t_is_dir) {
+				error = SET_ERROR(s_is_dir ? ENOTDIR : EISDIR);
 				goto out;
 			}
 		}
@@ -3194,15 +3330,11 @@ top:
 			goto out;
 		}
 
-#if defined(MAC_OS_X_VERSION_10_12) &&	\
-	(MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_12)
-		/* If renamex(VFS_RENAME_EXCL) is used, error out */
-		if (flags & VFS_RENAME_EXCL) {
-			error = EEXIST;
+		/* renamex_np(RENAME_EXCL) */
+		if (rflags & RENAME_NOREPLACE) {
+			error = SET_ERROR(EEXIST);
 			goto out;
 		}
-#endif
-
 	}
 
 	tx = dmu_tx_create(zfsvfs->z_os);
@@ -3213,14 +3345,16 @@ top:
 	dmu_tx_hold_sa(tx, szp->z_sa_hdl, ZFS_SEQ_MAY_GROW(szp));
 #endif
 	dmu_tx_hold_sa(tx, sdzp->z_sa_hdl, ZFS_SEQ_MAY_GROW(sdzp));
-	dmu_tx_hold_zap(tx, sdzp->z_id, FALSE, snm);
+	dmu_tx_hold_zap(tx, sdzp->z_id, exchange, snm);
 	dmu_tx_hold_zap(tx, tdzp->z_id, TRUE, tnm);
 	if (sdzp != tdzp) {
 		dmu_tx_hold_sa(tx, tdzp->z_sa_hdl, ZFS_SEQ_MAY_GROW(tdzp));
 		zfs_sa_upgrade_txholds(tx, tdzp);
 	}
 	if (tzp) {
-		dmu_tx_hold_sa(tx, tzp->z_sa_hdl, ZFS_SEQ_MAY_GROW(tzp));
+		/* An exchange sets ADDTIME on tzp too, which may grow SA */
+		dmu_tx_hold_sa(tx, tzp->z_sa_hdl,
+		    exchange ? B_TRUE : ZFS_SEQ_MAY_GROW(tzp));
 		zfs_sa_upgrade_txholds(tx, tzp);
 	}
 
@@ -3229,6 +3363,8 @@ top:
 	error = dmu_tx_assign(tx, (waited ? DMU_TX_NOTHROTTLE : 0) |
 	    DMU_TX_NOWAIT);
 	if (error) {
+		if (tzl != NULL)
+			zfs_rename_unlock(&tzl);
 		if (zl != NULL)
 			zfs_rename_unlock(&zl);
 		zfs_dirent_unlock(sdl);
@@ -3265,6 +3401,16 @@ top:
 			zrele(tzp);
 		zfs_exit(zfsvfs, FTAG);
 		return (error);
+	}
+
+	if (exchange) {
+		error = zfs_rename_exchange_links(zfsvfs, sdl, szp, tdl, tzp,
+		    zflg, tx);
+		if (error == 0)
+			zfs_log_rename_exchange(zilog, tx,
+			    (flags & FIGNORECASE ? TX_CI : 0), sdzp,
+			    sdl->dl_name, tdzp, tdl->dl_name, szp);
+		goto exchanged;
 	}
 
 	if (tzp)	/* Attempt to remove the existing target */
@@ -3331,6 +3477,7 @@ top:
 		}
 	}
 
+exchanged:
 	if (error == 0) {
 		/*
 		 * Update cached name - for vget, and access
@@ -3352,6 +3499,8 @@ top:
 
 	dmu_tx_commit(tx);
 out:
+	if (tzl != NULL)
+		zfs_rename_unlock(&tzl);
 	if (zl != NULL)
 		zfs_rename_unlock(&zl);
 

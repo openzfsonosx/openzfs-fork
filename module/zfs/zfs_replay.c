@@ -646,12 +646,16 @@ do_zfs_replay_rename(zfsvfs_t *zfsvfs, _lr_rename_t *lr, char *sname,
 	znode_t *sdzp, *tdzp;
 	int error, vflg = 0;
 
-	/* Only Linux currently supports RENAME_* flags. */
+	/* Only Linux and macOS currently support RENAME_* flags. */
 #ifdef __linux__
 	VERIFY0(rflags & ~(RENAME_EXCHANGE | RENAME_WHITEOUT));
 
 	/* wo_vap must be non-NULL iff. we're doing RENAME_WHITEOUT */
 	VERIFY_EQUIV(rflags & RENAME_WHITEOUT, wo_vap != NULL);
+#elif defined(__APPLE__)
+	/* macOS supports RENAME_EXCHANGE (renamex_np(RENAME_SWAP)) only. */
+	VERIFY0(rflags & ~RENAME_EXCHANGE);
+	VERIFY0P(wo_vap);
 #else
 	VERIFY0(rflags);
 #endif
@@ -696,7 +700,7 @@ zfs_replay_rename(void *arg1, void *arg2, boolean_t byteswap)
 static int
 zfs_replay_rename_exchange(void *arg1, void *arg2, boolean_t byteswap)
 {
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 	zfsvfs_t *zfsvfs = arg1;
 	lr_rename_t *lrr = arg2;
 	_lr_rename_t *lr = &lrr->lr_rename;

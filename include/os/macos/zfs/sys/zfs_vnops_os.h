@@ -137,6 +137,23 @@ extern int zfs_mkdir(znode_t *dzp, char *dirname, vattr_t *vap,
 extern int zfs_rmdir(znode_t *dzp, char *name, znode_t *cwd,
 	cred_t *cr, int flags);
 extern int zfs_setattr(znode_t *zp, vattr_t *vap, int flag, cred_t *cr);
+
+/*
+ * zfs_rename() rflags, using the Linux renameat2() names and values so
+ * the shared ZIL replay code can use them. zfs_vnop_renamex() maps
+ * VFS_RENAME_EXCL to RENAME_NOREPLACE and VFS_RENAME_SWAP to
+ * RENAME_EXCHANGE. RENAME_WHITEOUT is not supported on macOS.
+ */
+#ifndef RENAME_NOREPLACE
+#define	RENAME_NOREPLACE	(1 << 0)	/* Don't overwrite target */
+#endif
+#ifndef RENAME_EXCHANGE
+#define	RENAME_EXCHANGE		(1 << 1)	/* Exchange source and dest */
+#endif
+#ifndef RENAME_WHITEOUT
+#define	RENAME_WHITEOUT		(1 << 2)	/* Whiteout source */
+#endif
+
 extern int zfs_rename(znode_t *sdzp, char *snm, znode_t *tdzp,
 	char *tnm, cred_t *cr, int flags, uint64_t rflags, vattr_t *wo_vap);
 extern int zfs_symlink(znode_t *dzp, char *name, vattr_t *vap,
