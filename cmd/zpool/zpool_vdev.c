@@ -929,8 +929,8 @@ check_replication(nvlist_t *config, nvlist_t *newroot)
 static int
 zero_label(const char *path)
 {
-	const int size = 4096;
-	char buf[size];
+	char buf[4096];
+	const int size = sizeof (buf);
 	int err, fd;
 
 	if ((fd = open(path, O_WRONLY|O_EXCL)) < 0) {
@@ -1473,7 +1473,7 @@ draid_config_by_type(nvlist_t *nv, const char *type, uint64_t width,
 
 	if (fgrps > 1 && nfdomain && nfdomain != children) {
 		fprintf(stderr, gettext("invalid number of failure domains "
-		    "%d, must be %lu\n"), nfdomain, children);
+		    "%d, must be %llu\n"), nfdomain, (u_longlong_t)children);
 		return (EINVAL);
 	}
 
