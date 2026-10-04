@@ -71,7 +71,9 @@
 #define	WATCHDOG_TIMEOUT_SECS	120
 #define	MAX_SECS_FOR_BACKTRACE	2
 
+#ifndef __APPLE__
 static sem_t sem_thread_bt_complete;	/* thread -> watchdog */
+#endif
 
 /*
  * Signal handler for THREAD_BACKTRACE_SIGNAL, run by all threads except the
@@ -83,7 +85,9 @@ backtrace_self(int signal)
 	(void) signal;
 	ssize_t dummy __maybe_unused = write(STDERR_FILENO, "\n", 1);
 	libspl_backtrace(STDERR_FILENO);
+#ifndef __APPLE__
 	sem_post(&sem_thread_bt_complete);
+#endif
 
 	sigset_t mask;
 	sigfillset(&mask);
@@ -157,8 +161,15 @@ watchdog(void *nope)
 void
 watchdog_init(void)
 {
+	/*
+	 * macOS has no unnamed POSIX semaphores: sem_init() is deprecated
+	 * and fails with ENOSYS at run time. backtrace_all_threads() is a
+	 * no-op there, so the semaphore is never waited on or posted.
+	 */
+#ifndef __APPLE__
 	if (sem_init(&sem_thread_bt_complete, 0, 0) != 0)
 		err(1, "watchdog sem_init failed");
+#endif
 
 	safe_create_thread(watchdog, NULL, "watchdog", B_TRUE);
 
