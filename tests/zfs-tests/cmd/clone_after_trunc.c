@@ -25,9 +25,12 @@ _Static_assert(sizeof (loff_t) == sizeof (off_t),
 	"loff_t and off_t must be the same size");
 #endif
 
+#ifndef __APPLE__
+/* The macOS SPL unistd.h shim already provides copy_file_range(). */
 ssize_t
 copy_file_range(int, off_t *, int, off_t *, size_t, unsigned int)
     __attribute__((weak));
+#endif
 
 #define	FILE_SIZE	(1024 * 1024)
 #define	RECORD_SIZE	(128 * 1024)

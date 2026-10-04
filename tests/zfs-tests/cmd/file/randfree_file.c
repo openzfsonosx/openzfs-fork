@@ -115,6 +115,7 @@ main(int argc, char *argv[])
 	}
 #else /* !(defined(FALLOC_FL_PUNCH_HOLE) && defined(FALLOC_FL_KEEP_SIZE)) */
 	{
+		(void) start_off, (void) off_len;
 		perror("FALLOC_FL_PUNCH_HOLE and SPACECTL_DEALLOC unsupported");
 		close(fd);
 		return (1);
