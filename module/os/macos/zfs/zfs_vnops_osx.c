@@ -71,9 +71,6 @@
 #ifdef _KERNEL
 #include <sys/sysctl.h>
 #include <sys/hfs_internal.h>
-unsigned int zfs_vnop_ignore_negatives = 0;
-unsigned int zfs_vnop_ignore_positives = 0;
-unsigned int zfs_vnop_create_negatives = 1;
 unsigned int zfs_disable_spotlight = 0;
 unsigned int zfs_disable_trashes = 0;
 #endif
@@ -1403,7 +1400,6 @@ zfs_vnop_lookup(struct vnop_lookup_args *ap)
 	struct componentname *cnp = ap->a_cnp;
 	DECLARE_CRED(ap);
 	int error;
-	int negative_cache = 0;
 	znode_t *zp = NULL;
 	int direntflags = 0;
 	char *filename = NULL;
@@ -1425,7 +1421,6 @@ zfs_vnop_lookup(struct vnop_lookup_args *ap)
 	memcpy(filename, cnp->cn_nameptr, cnp->cn_namelen);
 	filename[cnp->cn_namelen] = '\0';
 
-#if 1
 	/*
 	 * cache_lookup() returns 0 for no-entry
 	 * -1 for cache found (a_vpp set)
@@ -1435,26 +1430,15 @@ zfs_vnop_lookup(struct vnop_lookup_args *ap)
 	if (error) {
 		/* We found a cache entry, positive or negative. */
 		if (error == -1) {	/* Positive entry? */
-			if (!zfs_vnop_ignore_positives) {
-				error = 0;
-				goto exit;	/* Positive cache, return it */
-			}
-			/* Release iocount held by cache_lookup */
-			vnode_put(*ap->a_vpp);
+			error = 0;
+			goto exit;	/* Positive cache, return it */
 		}
 		/* Negatives are only followed if not CREATE, from HFS+. */
-
-		if (cnp->cn_nameiop != CREATE) {
-			if (!zfs_vnop_ignore_negatives) {
-				goto exit; /* Negative cache hit */
-			}
-			negative_cache = 1;
-		}
+		if (cnp->cn_nameiop != CREATE)
+			goto exit; /* Negative cache hit */
 	}
-#endif
 
-	dprintf("+vnop_lookup '%s' %s\n", filename,
-			negative_cache ? "negative_cache":"");
+	dprintf("+vnop_lookup '%s'\n", filename);
 
 	/*
 	 * 'cnp' passed to us is 'readonly' as XNU does not expect a return
@@ -1479,36 +1463,32 @@ zfs_vnop_lookup(struct vnop_lookup_args *ap)
 	else if (error == ENOTSUP) // formD return for not enough space
 		error = ENAMETOOLONG;
 
-#if 1
 	/*
 	 * XNU's VFS layer only enters positive name-cache entries; negative
 	 * entries are added here, guarded against concurrent creates by
 	 * zfs_negcache_enter().
 	 */
-	if (!negative_cache) {
-		if ((error == ENOENT) && zfs_vnop_create_negatives) {
-			if ((ap->a_cnp->cn_nameiop == CREATE ||
-			    ap->a_cnp->cn_nameiop == RENAME) &&
-			    (cnp->cn_flags & ISLASTCN)) {
-				error = EJUSTRETURN;
-				goto exit;
+	if (error == ENOENT) {
+		/* The last component of a create or rename target */
+		if ((ap->a_cnp->cn_nameiop == CREATE ||
+		    ap->a_cnp->cn_nameiop == RENAME) &&
+		    (cnp->cn_flags & ISLASTCN)) {
+			error = EJUSTRETURN;
+			goto exit;
+		}
+		/* Insert name into cache (non-existent) */
+		if ((cnp->cn_flags & MAKEENTRY) &&
+		    ap->a_cnp->cn_nameiop != CREATE) {
+			if (zfs_negcache_enter(ap->a_dvp, ap->a_cnp,
+			    negcache_gen)) {
+				dprintf("Negative-cache made for '%s'\n",
+				    filename);
+			} else {
+				dprintf("Negative-cache skipped for '%s': "
+				    "directory changed\n", filename);
 			}
-			/* Insert name into cache (non-existent) */
-			if ((cnp->cn_flags & MAKEENTRY) &&
-			    ap->a_cnp->cn_nameiop != CREATE) {
-				if (zfs_negcache_enter(ap->a_dvp, ap->a_cnp,
-				    negcache_gen)) {
-					dprintf("Negative-cache made for "
-					    "'%s'\n", filename);
-				} else {
-					dprintf("Negative-cache skipped for "
-					    "'%s': directory changed\n",
-					    filename);
-				}
-			}
-		} /* ENOENT */
+		}
 	}
-#endif
 
 exit:
 

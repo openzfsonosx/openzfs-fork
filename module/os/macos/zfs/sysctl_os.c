@@ -814,9 +814,6 @@ param_set_multihost_interval(ZFS_MODULE_PARAM_ARGS)
  * macOS specific tunables.
  */
 
-extern unsigned int zfs_vnop_ignore_negatives;
-extern unsigned int zfs_vnop_ignore_positives;
-extern unsigned int zfs_vnop_create_negatives;
 extern unsigned int zfs_vnop_skip_unlinked_drain;
 extern uint64_t zfs_vfs_sync_paranoia;
 extern uint64_t zfs_iokit_sync_paranoia;
@@ -842,12 +839,6 @@ ZFS_MODULE_IMPL( , vnop_num_vnodes, active_vnodes, ULLONG, ZMOD_RD,
 	"Num active vnodes");
 ZFS_MODULE_IMPL( , vnop_num_reclaims, reclaim_nodes, ULLONG, ZMOD_RD,
 	"Num reclaimed vnodes");
-ZFS_MODULE_IMPL( , zfs_vnop_ignore_negatives, ignore_negatives,
-    UINT, ZMOD_RW, "Ignore negative cached names");
-ZFS_MODULE_IMPL( , zfs_vnop_ignore_positives, ignore_positives,
-    UINT, ZMOD_RW, "Ignore positives cached names");
-ZFS_MODULE_IMPL( , zfs_vnop_create_negatives, create_negatives,
-    UINT, ZMOD_RW, "Create negative cached names on ENOENT");
 ZFS_MODULE_IMPL( , zfs_vnop_force_formd_normalized_output,
     force_formd_normalized, UINT, ZMOD_RW, "Force FormD normalize");
 ZFS_MODULE_IMPL( , zfs_vnop_skip_unlinked_drain, skip_unlinked_drain,
