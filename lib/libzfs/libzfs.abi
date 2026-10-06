@@ -209,10 +209,22 @@
     <elf-symbol name='getzoneid' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='is_mounted' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='is_mpath_whole_disk' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_alloc' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_alloc_aligned' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='kmem_asprintf' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_cache_alloc' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_cache_create' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_cache_destroy' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_cache_free' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='kmem_cache_reap_active' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_cache_reap_now' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_free' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_free_aligned' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='kmem_scnprintf' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_strdup' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_strfree' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='kmem_vasprintf' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+    <elf-symbol name='kmem_zalloc' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='ksid_lookupdomain' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='ksiddomain_rele' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
     <elf-symbol name='kstat_create' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
@@ -1373,6 +1385,16 @@
   </abi-instr>
   <abi-instr address-size='64' path='lib/libspl/kmem.c' language='LANG_C99'>
     <typedef-decl name='fstrans_cookie_t' type-id='95e97e5e' id='059934c1'/>
+    <function-decl name='posix_memalign' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='63e171df'/>
+      <parameter type-id='b59d7dce'/>
+      <parameter type-id='b59d7dce'/>
+      <return type-id='95e97e5e'/>
+    </function-decl>
+    <function-decl name='kmem_strdup' mangled-name='kmem_strdup' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_strdup'>
+      <parameter type-id='80f4b756' name='str'/>
+      <return type-id='26a90f95'/>
+    </function-decl>
     <function-decl name='kmem_vasprintf' mangled-name='kmem_vasprintf' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_vasprintf'>
       <parameter type-id='80f4b756' name='fmt'/>
       <parameter type-id='b7f2d5e6' name='adx'/>
@@ -1390,13 +1412,68 @@
       <parameter is-variadic='yes'/>
       <return type-id='95e97e5e'/>
     </function-decl>
+    <function-decl name='spl_fstrans_mark' mangled-name='spl_fstrans_mark' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='spl_fstrans_mark'>
+      <return type-id='059934c1'/>
+    </function-decl>
     <function-decl name='spl_fstrans_unmark' mangled-name='spl_fstrans_unmark' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='spl_fstrans_unmark'>
       <parameter type-id='059934c1' name='cookie'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <pointer-type-def type-id='d5027220' size-in-bits='64' id='b7f2d5e6'/>
+    <class-decl name='__va_list_tag' size-in-bits='192' is-struct='yes' visibility='default' id='d5027220'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='gp_offset' type-id='f0981eeb' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='32'>
+        <var-decl name='fp_offset' type-id='f0981eeb' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='overflow_arg_area' type-id='eaa32e2f' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='128'>
+        <var-decl name='reg_save_area' type-id='eaa32e2f' visibility='default'/>
+      </data-member>
+    </class-decl>
+  </abi-instr>
+  <abi-instr address-size='64' path='lib/libspl/kmem_cache.c' language='LANG_C99'>
+    <function-decl name='kmem_cache_reap_now' mangled-name='kmem_cache_reap_now' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_cache_reap_now'>
+      <parameter type-id='23bd1729' name='cp'/>
       <return type-id='48b5725f'/>
     </function-decl>
     <function-decl name='kmem_cache_reap_active' mangled-name='kmem_cache_reap_active' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_cache_reap_active'>
       <return type-id='95e97e5e'/>
     </function-decl>
+    <pointer-type-def type-id='5cd0fe54' size-in-bits='64' id='23bd1729'/>
+    <typedef-decl name='kmem_cache_t' type-id='a3119fea' id='5cd0fe54'/>
+    <class-decl name='kmem_cache' size-in-bits='768' is-struct='yes' visibility='default' id='a3119fea'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='cache_name' type-id='16dc656a' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='256'>
+        <var-decl name='cache_bufsize' type-id='b59d7dce' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='320'>
+        <var-decl name='cache_align' type-id='b59d7dce' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='384'>
+        <var-decl name='cache_constructor' type-id='eb09ea77' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='448'>
+        <var-decl name='cache_destructor' type-id='395e69ca' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='512'>
+        <var-decl name='cache_reclaim' type-id='e1cc7b4e' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='576'>
+        <var-decl name='cache_private' type-id='eaa32e2f' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='640'>
+        <var-decl name='cache_arena' type-id='eaa32e2f' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='704'>
+        <var-decl name='cache_cflags' type-id='95e97e5e' visibility='default'/>
+      </data-member>
+    </class-decl>
   </abi-instr>
   <abi-instr address-size='64' path='lib/libspl/kstat.c' language='LANG_C99'>
     <class-decl name='kstat' size-in-bits='448' is-struct='yes' visibility='default' id='5f5c9d88'>
@@ -2758,13 +2835,6 @@
     </function-decl>
     <function-decl name='zfs_crypto_unload_key' mangled-name='zfs_crypto_unload_key' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_crypto_unload_key'>
       <parameter type-id='9200a744'/>
-      <return type-id='95e97e5e'/>
-    </function-decl>
-    <function-decl name='zfs_iter_children_v2' mangled-name='zfs_iter_children_v2' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_iter_children_v2'>
-      <parameter type-id='9200a744'/>
-      <parameter type-id='95e97e5e'/>
-      <parameter type-id='d8e49ab9'/>
-      <parameter type-id='eaa32e2f'/>
       <return type-id='95e97e5e'/>
     </function-decl>
     <function-decl name='zfs_iter_dependents_v2' mangled-name='zfs_iter_dependents_v2' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_iter_dependents_v2'>
@@ -4485,6 +4555,13 @@
     <function-decl name='zfs_prop_default_numeric' mangled-name='zfs_prop_default_numeric' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_prop_default_numeric'>
       <parameter type-id='58603c44'/>
       <return type-id='9c313c2d'/>
+    </function-decl>
+    <function-decl name='zfs_iter_children_v2' mangled-name='zfs_iter_children_v2' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_iter_children_v2'>
+      <parameter type-id='9200a744'/>
+      <parameter type-id='95e97e5e'/>
+      <parameter type-id='d8e49ab9'/>
+      <parameter type-id='eaa32e2f'/>
+      <return type-id='95e97e5e'/>
     </function-decl>
     <function-decl name='zfs_iter_snapshots_v2' mangled-name='zfs_iter_snapshots_v2' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_iter_snapshots_v2'>
       <parameter type-id='9200a744'/>
@@ -6324,18 +6401,15 @@
     </function-decl>
   </abi-instr>
   <abi-instr address-size='64' path='lib/libzfs/libzfs_pool.c' language='LANG_C99'>
-    <class-decl name='prop_flags' size-in-bits='32' is-struct='yes' visibility='default' id='5e913e44'>
-      <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='create' type-id='f0981eeb' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='1'>
-        <var-decl name='import' type-id='f0981eeb' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='2'>
-        <var-decl name='vdevprop' type-id='f0981eeb' visibility='default'/>
-      </data-member>
-    </class-decl>
-    <typedef-decl name='prop_flags_t' type-id='5e913e44' id='a6594d72'/>
+    <array-type-def dimensions='1' type-id='9c313c2d' size-in-bits='4096' id='ed4ceada'>
+      <subrange length='64' type-id='7359adad' id='b10be967'/>
+    </array-type-def>
+    <array-type-def dimensions='1' type-id='b96825af' size-in-bits='infinite' id='048fe7bc'>
+      <subrange length='infinite' type-id='7359adad' id='031f2035'/>
+    </array-type-def>
+    <array-type-def dimensions='1' type-id='4dc107b1' size-in-bits='8128' id='017d5779'>
+      <subrange length='127' type-id='7359adad' id='5ed08de5'/>
+    </array-type-def>
     <class-decl name='splitflags' size-in-bits='64' is-struct='yes' visibility='default' id='dc01bf52'>
       <data-member access='public' layout-offset-in-bits='0'>
         <var-decl name='dryrun' type-id='f0981eeb' visibility='default'/>
@@ -6363,6 +6437,18 @@
       </data-member>
     </class-decl>
     <typedef-decl name='trimflags_t' type-id='8ef58008' id='a093cbb8'/>
+    <class-decl name='prop_flags' size-in-bits='32' is-struct='yes' visibility='default' id='5e913e44'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='create' type-id='f0981eeb' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1'>
+        <var-decl name='import' type-id='f0981eeb' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='2'>
+        <var-decl name='vdevprop' type-id='f0981eeb' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='prop_flags_t' type-id='5e913e44' id='a6594d72'/>
     <enum-decl name='zpool_status_t' naming-typedef-id='d3dd6294' id='5e770b40'>
       <underlying-type type-id='9cac1fee'/>
       <enumerator name='ZPOOL_STATUS_CORRUPT_CACHE' value='0'/>
@@ -6410,6 +6496,84 @@
       <enumerator name='ZPOOL_COMPATIBILITY_NOFILES' value='4'/>
     </enum-decl>
     <typedef-decl name='zpool_compat_status_t' type-id='20676925' id='901b78d1'/>
+    <class-decl name='zfs_btree_hdr' size-in-bits='128' is-struct='yes' visibility='default' id='fc907d62'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='bth_parent' type-id='0cafbda7' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='bth_first' type-id='8f92235e' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='96'>
+        <var-decl name='bth_count' type-id='8f92235e' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='zfs_btree_hdr_t' type-id='fc907d62' id='336228ae'/>
+    <class-decl name='zfs_btree_core' size-in-bits='8256' is-struct='yes' visibility='default' id='c2a40bdf'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='btc_hdr' type-id='336228ae' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='128'>
+        <var-decl name='btc_children' type-id='017d5779' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='8256'>
+        <var-decl name='btc_elems' type-id='048fe7bc' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <class-decl name='zfs_btree_leaf' size-in-bits='128' is-struct='yes' visibility='default' id='15b0aea0'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='btl_hdr' type-id='336228ae' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='128'>
+        <var-decl name='btl_elems' type-id='048fe7bc' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='zfs_btree_leaf_t' type-id='15b0aea0' id='b685aaea'/>
+    <class-decl name='zfs_btree_index' size-in-bits='128' is-struct='yes' visibility='default' id='378b800c'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='bti_node' type-id='4dc107b1' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='bti_offset' type-id='8f92235e' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='96'>
+        <var-decl name='bti_before' type-id='c19b74c3' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='zfs_btree_index_t' type-id='378b800c' id='a481467c'/>
+    <typedef-decl name='zfs_btree_t' type-id='a0c8756d' id='aa8d6647'/>
+    <typedef-decl name='bt_find_in_buf_f' type-id='d12cb521' id='f3d91629'/>
+    <class-decl name='btree' size-in-bits='576' is-struct='yes' visibility='default' id='a0c8756d'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='bt_compar' type-id='585e1de9' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='bt_find_in_buf' type-id='f3d91629' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='128'>
+        <var-decl name='bt_elem_size' type-id='b59d7dce' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='192'>
+        <var-decl name='bt_leaf_size' type-id='b59d7dce' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='256'>
+        <var-decl name='bt_leaf_cap' type-id='8f92235e' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='288'>
+        <var-decl name='bt_height' type-id='3ff5601b' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='320'>
+        <var-decl name='bt_num_elems' type-id='9c313c2d' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='384'>
+        <var-decl name='bt_num_nodes' type-id='9c313c2d' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='448'>
+        <var-decl name='bt_root' type-id='4dc107b1' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='512'>
+        <var-decl name='bt_bulk' type-id='a37f572b' visibility='default'/>
+      </data-member>
+    </class-decl>
     <enum-decl name='vdev_prop_t' naming-typedef-id='5aa5c90c' id='1573bec8'>
       <underlying-type type-id='9cac1fee'/>
       <enumerator name='VDEV_PROP_INVAL' value='-1'/>
@@ -6720,6 +6884,69 @@
       <enumerator name='ZPOOL_DDT_PRUNE_PERCENTAGE' value='2'/>
     </enum-decl>
     <typedef-decl name='zpool_ddt_prune_unit_t' type-id='509ae11c' id='02e25ab0'/>
+    <typedef-decl name='zfs_range_tree_ops_t' type-id='7d27f50e' id='eb6668d4'/>
+    <enum-decl name='zfs_range_seg_type' id='08a9143a'>
+      <underlying-type type-id='9cac1fee'/>
+      <enumerator name='ZFS_RANGE_SEG32' value='0'/>
+      <enumerator name='ZFS_RANGE_SEG64' value='1'/>
+      <enumerator name='ZFS_RANGE_SEG_GAP' value='2'/>
+      <enumerator name='ZFS_RANGE_SEG_NUM_TYPES' value='3'/>
+    </enum-decl>
+    <typedef-decl name='zfs_range_seg_type_t' type-id='08a9143a' id='33fc3e35'/>
+    <class-decl name='zfs_range_tree' size-in-bits='5184' is-struct='yes' visibility='default' id='a198f055'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='rt_root' type-id='aa8d6647' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='576'>
+        <var-decl name='rt_space' type-id='9c313c2d' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='640'>
+        <var-decl name='rt_type' type-id='33fc3e35' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='672'>
+        <var-decl name='rt_shift' type-id='b96825af' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='704'>
+        <var-decl name='rt_start' type-id='9c313c2d' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='768'>
+        <var-decl name='rt_ops' type-id='c06d78ca' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='832'>
+        <var-decl name='rt_arg' type-id='eaa32e2f' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='896'>
+        <var-decl name='rt_gap' type-id='9c313c2d' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='960'>
+        <var-decl name='rt_flags' type-id='9c313c2d' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1024'>
+        <var-decl name='rt_name' type-id='80f4b756' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='1088'>
+        <var-decl name='rt_histogram' type-id='ed4ceada' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='zfs_range_tree_t' type-id='a198f055' id='4524ecaf'/>
+    <class-decl name='zfs_range_tree_ops' size-in-bits='320' is-struct='yes' visibility='default' id='7d27f50e'>
+      <data-member access='public' layout-offset-in-bits='0'>
+        <var-decl name='rtop_create' type-id='0fc7f209' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='64'>
+        <var-decl name='rtop_destroy' type-id='0fc7f209' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='128'>
+        <var-decl name='rtop_add' type-id='6ab3b5b5' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='192'>
+        <var-decl name='rtop_remove' type-id='6ab3b5b5' visibility='default'/>
+      </data-member>
+      <data-member access='public' layout-offset-in-bits='256'>
+        <var-decl name='rtop_vacate' type-id='0fc7f209' visibility='default'/>
+      </data-member>
+    </class-decl>
+    <typedef-decl name='zfs_range_tree_func_t' type-id='172c518c' id='ac7d17e8'/>
     <enum-decl name='spa_feature' id='33ecb627'>
       <underlying-type type-id='9cac1fee'/>
       <enumerator name='SPA_FEATURE_NONE' value='-1'/>
@@ -6780,10 +7007,23 @@
     <pointer-type-def type-id='d2816df0' size-in-bits='64' id='3bbfee2e'/>
     <qualified-type-def type-id='b96825af' const='yes' id='2b61797f'/>
     <pointer-type-def type-id='2b61797f' size-in-bits='64' id='9f7200cf'/>
+    <qualified-type-def type-id='eb6668d4' const='yes' id='0375ca64'/>
+    <pointer-type-def type-id='0375ca64' size-in-bits='64' id='c06d78ca'/>
     <pointer-type-def type-id='d6618c78' size-in-bits='64' id='a8425263'/>
     <qualified-type-def type-id='62f7a03d' restrict='yes' id='f1cadedf'/>
     <pointer-type-def type-id='a093cbb8' size-in-bits='64' id='b13f38c3'/>
+    <pointer-type-def type-id='8f92235e' size-in-bits='64' id='90421557'/>
     <pointer-type-def type-id='35acf840' size-in-bits='64' id='17f3480d'/>
+    <pointer-type-def type-id='ab14a565' size-in-bits='64' id='0fc7f209'/>
+    <pointer-type-def type-id='8b7e2651' size-in-bits='64' id='6ab3b5b5'/>
+    <pointer-type-def type-id='2273bcd5' size-in-bits='64' id='d12cb521'/>
+    <pointer-type-def type-id='c2a40bdf' size-in-bits='64' id='0cafbda7'/>
+    <pointer-type-def type-id='336228ae' size-in-bits='64' id='4dc107b1'/>
+    <pointer-type-def type-id='a481467c' size-in-bits='64' id='b79742cf'/>
+    <pointer-type-def type-id='b685aaea' size-in-bits='64' id='a37f572b'/>
+    <pointer-type-def type-id='aa8d6647' size-in-bits='64' id='5c16a66a'/>
+    <pointer-type-def type-id='ac7d17e8' size-in-bits='64' id='defe6363'/>
+    <pointer-type-def type-id='4524ecaf' size-in-bits='64' id='14c7af84'/>
     <pointer-type-def type-id='688c495b' size-in-bits='64' id='cec6f2e4'/>
     <pointer-type-def type-id='d11b7617' size-in-bits='64' id='23432aaa'/>
     <function-decl name='dump_nvlist' visibility='default' binding='global' size-in-bits='64'>
@@ -7020,6 +7260,12 @@
       <parameter type-id='3502e3ff'/>
       <return type-id='95e97e5e'/>
     </function-decl>
+    <function-decl name='nvlist_lookup_uint32' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='22cce67b'/>
+      <parameter type-id='80f4b756'/>
+      <parameter type-id='90421557'/>
+      <return type-id='95e97e5e'/>
+    </function-decl>
     <function-decl name='nvpair_value_nvlist' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='3fa542f0'/>
       <parameter type-id='857bb57e'/>
@@ -7069,6 +7315,46 @@
     <function-decl name='fnvpair_value_string' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='dace003f'/>
       <return type-id='80f4b756'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_create' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='c06d78ca'/>
+      <parameter type-id='33fc3e35'/>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='9c313c2d'/>
+      <parameter type-id='9c313c2d'/>
+      <return type-id='14c7af84'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_destroy' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='14c7af84'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_numsegs' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='14c7af84'/>
+      <return type-id='9c313c2d'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_add' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='9c313c2d'/>
+      <parameter type-id='9c313c2d'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_clear' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='14c7af84'/>
+      <parameter type-id='9c313c2d'/>
+      <parameter type-id='9c313c2d'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_vacate' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='14c7af84'/>
+      <parameter type-id='defe6363'/>
+      <parameter type-id='eaa32e2f'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <function-decl name='zfs_range_tree_walk' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='14c7af84'/>
+      <parameter type-id='defe6363'/>
+      <parameter type-id='eaa32e2f'/>
+      <return type-id='48b5725f'/>
     </function-decl>
     <function-decl name='zfeature_is_supported' mangled-name='zfeature_is_supported' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfeature_is_supported'>
       <parameter type-id='80f4b756'/>
@@ -7642,6 +7928,31 @@
       <parameter type-id='9c313c2d' name='amount'/>
       <return type-id='95e97e5e'/>
     </function-decl>
+    <function-type size-in-bits='64' id='172c518c'>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='9c313c2d'/>
+      <parameter type-id='9c313c2d'/>
+      <return type-id='48b5725f'/>
+    </function-type>
+    <function-type size-in-bits='64' id='ab14a565'>
+      <parameter type-id='14c7af84'/>
+      <parameter type-id='eaa32e2f'/>
+      <return type-id='48b5725f'/>
+    </function-type>
+    <function-type size-in-bits='64' id='8b7e2651'>
+      <parameter type-id='14c7af84'/>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='eaa32e2f'/>
+      <return type-id='48b5725f'/>
+    </function-type>
+    <function-type size-in-bits='64' id='2273bcd5'>
+      <parameter type-id='5c16a66a'/>
+      <parameter type-id='ae3e8ca6'/>
+      <parameter type-id='8f92235e'/>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='b79742cf'/>
+      <return type-id='eaa32e2f'/>
+    </function-type>
   </abi-instr>
   <abi-instr address-size='64' path='lib/libzfs/libzfs_sendrecv.c' language='LANG_C99'>
     <array-type-def dimensions='1' type-id='8901473c' size-in-bits='576' id='f5da478b'>
@@ -8485,6 +8796,16 @@
       <parameter type-id='eaa32e2f'/>
       <return type-id='95e97e5e'/>
     </function-decl>
+    <function-decl name='kmem_alloc' mangled-name='kmem_alloc' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_alloc'>
+      <parameter type-id='b59d7dce'/>
+      <parameter type-id='95e97e5e'/>
+      <return type-id='eaa32e2f'/>
+    </function-decl>
+    <function-decl name='kmem_free' mangled-name='kmem_free' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_free'>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='b59d7dce'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
     <function-decl name='pthread_exit' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='eaa32e2f'/>
       <return type-id='48b5725f'/>
@@ -8879,6 +9200,12 @@
     <function-decl name='zfs_get_underlying_path' mangled-name='zfs_get_underlying_path' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zfs_get_underlying_path'>
       <parameter type-id='80f4b756'/>
       <return type-id='26a90f95'/>
+    </function-decl>
+    <function-decl name='zfs_btree_init' visibility='default' binding='global' size-in-bits='64'>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <function-decl name='zfs_btree_fini' visibility='default' binding='global' size-in-bits='64'>
+      <return type-id='48b5725f'/>
     </function-decl>
     <function-decl name='zpool_prop_unsupported' mangled-name='zpool_prop_unsupported' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='zpool_prop_unsupported'>
       <parameter type-id='80f4b756'/>
@@ -9764,6 +10091,10 @@
       <parameter type-id='80f4b756'/>
       <return type-id='b32bae08'/>
     </function-decl>
+    <function-decl name='udev_device_get_is_initialized' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='b32bae08'/>
+      <return type-id='95e97e5e'/>
+    </function-decl>
     <function-decl name='udev_device_get_devlinks_list_entry' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='b32bae08'/>
       <return type-id='deabd0d3'/>
@@ -9975,6 +10306,17 @@
     </function-decl>
     <function-decl name='spl_pagesize' mangled-name='spl_pagesize' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='spl_pagesize'>
       <return type-id='b59d7dce'/>
+    </function-decl>
+    <function-decl name='kmem_alloc_aligned' mangled-name='kmem_alloc_aligned' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_alloc_aligned'>
+      <parameter type-id='b59d7dce'/>
+      <parameter type-id='b59d7dce'/>
+      <parameter type-id='95e97e5e'/>
+      <return type-id='eaa32e2f'/>
+    </function-decl>
+    <function-decl name='kmem_free_aligned' visibility='default' binding='global' size-in-bits='64'>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='b59d7dce'/>
+      <return type-id='48b5725f'/>
     </function-decl>
     <function-decl name='pthread_mutex_init' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='18c91f9e'/>
@@ -10297,7 +10639,6 @@
     <array-type-def dimensions='1' type-id='b99c00c9' size-in-bits='2624' id='5ce15418'>
       <subrange length='41' type-id='7359adad' id='cb834f44'/>
     </array-type-def>
-    <pointer-type-def type-id='8f92235e' size-in-bits='64' id='90421557'/>
     <function-decl name='nvpair_value_boolean_value' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='dace003f'/>
       <parameter type-id='37e3bd22'/>
@@ -10941,11 +11282,7 @@
     </function-decl>
   </abi-instr>
   <abi-instr address-size='64' path='module/zfs/btree.c' language='LANG_C99'>
-    <typedef-decl name='kmem_cache_t' type-id='2a49bcee' id='5cd0fe54'/>
-    <typedef-decl name='umem_constructor_t' type-id='7e872986' id='da6072ac'/>
-    <typedef-decl name='umem_destructor_t' type-id='c039af2e' id='19c23f45'/>
-    <typedef-decl name='umem_reclaim_t' type-id='c5c76c9c' id='f1a257c7'/>
-    <class-decl name='umem_cache' size-in-bits='768' is-struct='yes' visibility='default' id='e066f130'>
+    <class-decl name='kmem_cache' size-in-bits='768' is-struct='yes' visibility='default' id='a3119fea'>
       <data-member access='public' layout-offset-in-bits='0'>
         <var-decl name='cache_name' type-id='16dc656a' visibility='default'/>
       </data-member>
@@ -10956,13 +11293,13 @@
         <var-decl name='cache_align' type-id='b59d7dce' visibility='default'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='384'>
-        <var-decl name='cache_constructor' type-id='91f51f89' visibility='default'/>
+        <var-decl name='cache_constructor' type-id='eb09ea77' visibility='default'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='448'>
-        <var-decl name='cache_destructor' type-id='9cb5182c' visibility='default'/>
+        <var-decl name='cache_destructor' type-id='395e69ca' visibility='default'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='512'>
-        <var-decl name='cache_reclaim' type-id='fbdc58f8' visibility='default'/>
+        <var-decl name='cache_reclaim' type-id='e1cc7b4e' visibility='default'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='576'>
         <var-decl name='cache_private' type-id='eaa32e2f' visibility='default'/>
@@ -10974,17 +11311,40 @@
         <var-decl name='cache_cflags' type-id='95e97e5e' visibility='default'/>
       </data-member>
     </class-decl>
-    <typedef-decl name='umem_cache_t' type-id='e066f130' id='2a49bcee'/>
+    <typedef-decl name='kmem_constructor_t' type-id='7e872986' id='8c8ebc4a'/>
+    <typedef-decl name='kmem_destructor_t' type-id='c039af2e' id='448f537b'/>
+    <typedef-decl name='kmem_reclaim_t' type-id='c5c76c9c' id='985f33b5'/>
+    <typedef-decl name='kmem_cache_t' type-id='a3119fea' id='5cd0fe54'/>
     <pointer-type-def type-id='5cd0fe54' size-in-bits='64' id='23bd1729'/>
-    <pointer-type-def type-id='da6072ac' size-in-bits='64' id='91f51f89'/>
-    <pointer-type-def type-id='19c23f45' size-in-bits='64' id='9cb5182c'/>
-    <pointer-type-def type-id='f1a257c7' size-in-bits='64' id='fbdc58f8'/>
+    <pointer-type-def type-id='8c8ebc4a' size-in-bits='64' id='eb09ea77'/>
+    <pointer-type-def type-id='448f537b' size-in-bits='64' id='395e69ca'/>
+    <pointer-type-def type-id='985f33b5' size-in-bits='64' id='e1cc7b4e'/>
     <var-decl name='zfs_btree_leaf_cache' type-id='23bd1729' visibility='default'/>
-    <function-decl name='posix_memalign' visibility='default' binding='global' size-in-bits='64'>
-      <parameter type-id='63e171df'/>
+    <function-decl name='kmem_cache_create' mangled-name='kmem_cache_create' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_cache_create'>
+      <parameter type-id='80f4b756'/>
       <parameter type-id='b59d7dce'/>
       <parameter type-id='b59d7dce'/>
-      <return type-id='95e97e5e'/>
+      <parameter type-id='eb09ea77'/>
+      <parameter type-id='395e69ca'/>
+      <parameter type-id='e1cc7b4e'/>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='eaa32e2f'/>
+      <parameter type-id='95e97e5e'/>
+      <return type-id='23bd1729'/>
+    </function-decl>
+    <function-decl name='kmem_cache_destroy' mangled-name='kmem_cache_destroy' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_cache_destroy'>
+      <parameter type-id='23bd1729'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
+    <function-decl name='kmem_cache_alloc' mangled-name='kmem_cache_alloc' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_cache_alloc'>
+      <parameter type-id='23bd1729'/>
+      <parameter type-id='95e97e5e'/>
+      <return type-id='eaa32e2f'/>
+    </function-decl>
+    <function-decl name='kmem_cache_free' mangled-name='kmem_cache_free' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_cache_free'>
+      <parameter type-id='23bd1729'/>
+      <parameter type-id='eaa32e2f'/>
+      <return type-id='48b5725f'/>
     </function-decl>
     <function-type size-in-bits='64' id='7e872986'>
       <parameter type-id='eaa32e2f'/>
@@ -10999,99 +11359,9 @@
     </function-type>
   </abi-instr>
   <abi-instr address-size='64' path='module/zfs/range_tree.c' language='LANG_C99'>
-    <array-type-def dimensions='1' type-id='b96825af' size-in-bits='infinite' id='048fe7bc'>
-      <subrange length='infinite' type-id='7359adad' id='031f2035'/>
-    </array-type-def>
-    <array-type-def dimensions='1' type-id='4dc107b1' size-in-bits='8128' id='017d5779'>
-      <subrange length='127' type-id='7359adad' id='5ed08de5'/>
-    </array-type-def>
-    <class-decl name='zfs_btree_hdr' size-in-bits='128' is-struct='yes' visibility='default' id='fc907d62'>
-      <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='bth_parent' type-id='0cafbda7' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='64'>
-        <var-decl name='bth_first' type-id='8f92235e' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='96'>
-        <var-decl name='bth_count' type-id='8f92235e' visibility='default'/>
-      </data-member>
-    </class-decl>
-    <typedef-decl name='zfs_btree_hdr_t' type-id='fc907d62' id='336228ae'/>
-    <class-decl name='zfs_btree_core' size-in-bits='8256' is-struct='yes' visibility='default' id='c2a40bdf'>
-      <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='btc_hdr' type-id='336228ae' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='128'>
-        <var-decl name='btc_children' type-id='017d5779' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='8256'>
-        <var-decl name='btc_elems' type-id='048fe7bc' visibility='default'/>
-      </data-member>
-    </class-decl>
-    <class-decl name='zfs_btree_leaf' size-in-bits='128' is-struct='yes' visibility='default' id='15b0aea0'>
-      <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='btl_hdr' type-id='336228ae' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='128'>
-        <var-decl name='btl_elems' type-id='048fe7bc' visibility='default'/>
-      </data-member>
-    </class-decl>
-    <typedef-decl name='zfs_btree_leaf_t' type-id='15b0aea0' id='b685aaea'/>
-    <class-decl name='zfs_btree_index' size-in-bits='128' is-struct='yes' visibility='default' id='378b800c'>
-      <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='bti_node' type-id='4dc107b1' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='64'>
-        <var-decl name='bti_offset' type-id='8f92235e' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='96'>
-        <var-decl name='bti_before' type-id='c19b74c3' visibility='default'/>
-      </data-member>
-    </class-decl>
-    <typedef-decl name='zfs_btree_index_t' type-id='378b800c' id='a481467c'/>
-    <typedef-decl name='zfs_btree_t' type-id='a0c8756d' id='aa8d6647'/>
-    <typedef-decl name='bt_find_in_buf_f' type-id='d12cb521' id='f3d91629'/>
-    <class-decl name='btree' size-in-bits='576' is-struct='yes' visibility='default' id='a0c8756d'>
-      <data-member access='public' layout-offset-in-bits='0'>
-        <var-decl name='bt_compar' type-id='585e1de9' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='64'>
-        <var-decl name='bt_find_in_buf' type-id='f3d91629' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='128'>
-        <var-decl name='bt_elem_size' type-id='b59d7dce' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='192'>
-        <var-decl name='bt_leaf_size' type-id='b59d7dce' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='256'>
-        <var-decl name='bt_leaf_cap' type-id='8f92235e' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='288'>
-        <var-decl name='bt_height' type-id='3ff5601b' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='320'>
-        <var-decl name='bt_num_elems' type-id='9c313c2d' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='384'>
-        <var-decl name='bt_num_nodes' type-id='9c313c2d' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='448'>
-        <var-decl name='bt_root' type-id='4dc107b1' visibility='default'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='512'>
-        <var-decl name='bt_bulk' type-id='a37f572b' visibility='default'/>
-      </data-member>
-    </class-decl>
     <qualified-type-def type-id='a481467c' const='yes' id='2e014c8c'/>
     <pointer-type-def type-id='2e014c8c' size-in-bits='64' id='120ba952'/>
-    <pointer-type-def type-id='2273bcd5' size-in-bits='64' id='d12cb521'/>
-    <pointer-type-def type-id='c2a40bdf' size-in-bits='64' id='0cafbda7'/>
-    <pointer-type-def type-id='336228ae' size-in-bits='64' id='4dc107b1'/>
-    <pointer-type-def type-id='a481467c' size-in-bits='64' id='b79742cf'/>
     <pointer-type-def type-id='b79742cf' size-in-bits='64' id='e81e4e7f'/>
-    <pointer-type-def type-id='b685aaea' size-in-bits='64' id='a37f572b'/>
-    <pointer-type-def type-id='aa8d6647' size-in-bits='64' id='5c16a66a'/>
     <function-decl name='zfs_btree_create' visibility='default' binding='global' size-in-bits='64'>
       <parameter type-id='5c16a66a'/>
       <parameter type-id='585e1de9'/>
@@ -11165,13 +11435,14 @@
       <parameter type-id='5c16a66a'/>
       <return type-id='48b5725f'/>
     </function-decl>
-    <function-type size-in-bits='64' id='2273bcd5'>
-      <parameter type-id='5c16a66a'/>
-      <parameter type-id='ae3e8ca6'/>
-      <parameter type-id='8f92235e'/>
-      <parameter type-id='eaa32e2f'/>
-      <parameter type-id='b79742cf'/>
+    <function-decl name='kmem_zalloc' mangled-name='kmem_zalloc' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_zalloc'>
+      <parameter type-id='b59d7dce'/>
+      <parameter type-id='95e97e5e'/>
       <return type-id='eaa32e2f'/>
-    </function-type>
+    </function-decl>
+    <function-decl name='kmem_strfree' mangled-name='kmem_strfree' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='kmem_strfree'>
+      <parameter type-id='26a90f95'/>
+      <return type-id='48b5725f'/>
+    </function-decl>
   </abi-instr>
 </abi-corpus>
