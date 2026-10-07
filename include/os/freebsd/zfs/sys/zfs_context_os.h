@@ -50,8 +50,6 @@
 #define	MODULE_PARAM_MAX 1024
 #endif
 
-#define	fm_panic	panic
-
 extern int zfs_debug_level;
 extern struct mtx zfs_debug_mtx;
 #define	ZFS_LOG(lvl, ...) do {   \
