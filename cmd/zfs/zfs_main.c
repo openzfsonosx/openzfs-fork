@@ -4438,6 +4438,9 @@ zfs_do_rollback(int argc, char **argv)
 	char parentname[ZFS_MAX_DATASET_NAME_LEN];
 	char *delim;
 	uint64_t min_txg = 0;
+#ifdef __APPLE__
+	void *rollback_cl = NULL;
+#endif
 
 	/* check options */
 	while ((c = getopt(argc, argv, "rRf")) != -1) {
@@ -4509,11 +4512,23 @@ zfs_do_rollback(int argc, char **argv)
 	/*
 	 * Rollback parent to the given snapshot.
 	 */
+#ifdef __APPLE__
+	/*
+	 * macOS: unmount any mounted descendant filesystems first, so the
+	 * rollback can't orphan their mounts.  Abort the rollback if one is
+	 * busy (the failing unmount is reported by libzfs).
+	 */
+	if (zfs_rollback_pre_os(zhp, &rollback_cl) != 0) {
+		ret = 1;
+		goto out;
+	}
+#endif
+
 	ret = zfs_rollback(zhp, snap, force);
 
 #ifdef __APPLE__
-	if (ret == 0)
-		zfs_rollback_os(zhp);
+	/* Remount the descendants unmounted above (even if rollback failed). */
+	zfs_rollback_os(zhp, rollback_cl);
 #endif
 
 out:

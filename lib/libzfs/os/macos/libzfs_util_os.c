@@ -446,10 +446,67 @@ execvpe(const char *name, char * const argv[], char * const envp[])
 	return (execvPe(name, path, argv, envp));
 }
 
-void
-zfs_rollback_os(zfs_handle_t *zhp)
+/*
+ * Rolling a filesystem back to a snapshot can remove the directories that
+ * are the mountpoints of its descendant filesystems (and clones) -- any that
+ * were created after the snapshot.  On macOS the kernel resume path then
+ * zfs_rezget()s those now-absent objects, reclaiming the covered vnode and
+ * orphaning the descendant mount: statvfs(2) returns ENOENT and unmount(2)
+ * returns EIO, wedging the mount until reboot.  Unlike illumos/Linux, the
+ * macOS rollback path does not unmount descendants around the rollback.
+ *
+ * So, as the other platforms do via the kernel, handle it in userland: in the
+ * _pre_ hook, gather the mounted descendants and unmount them before the
+ * rollback; in the _post_ hook, remount them afterwards.  changelist_prefix()
+ * leaves a busy descendant mounted and fails, which lets us abort the rollback
+ * with a clear reason (the failing unmount is printed by libzfs) rather than
+ * wedging the mount.  The head dataset itself is intentionally excluded -- the
+ * kernel's zfs_suspend_fs()/zfs_resume_fs() keeps the parent's own mount
+ * consistent across the rollback, so we must not double-handle it here.
+ *
+ * zfs_rollback_pre_os() returns 0 to proceed (with *clp set to an opaque
+ * changelist, or NULL if nothing needed unmounting), or -1 to abort.
+ */
+int
+zfs_rollback_pre_os(zfs_handle_t *zhp, void **clp)
 {
+	prop_changelist_t *cl;
+
+	*clp = NULL;
+
+	if (zhp->zfs_type != ZFS_TYPE_FILESYSTEM)
+		return (0);
+
+	cl = changelist_gather(zhp, ZFS_PROP_NAME, CL_GATHER_ITER_MOUNTED, 0);
+	if (cl == NULL)
+		return (0);
+
+	/* The kernel owns the head dataset's own mount; only touch children. */
+	changelist_remove(cl, zhp->zfs_name);
+
+	if (changelist_prefix(cl) != 0) {
+		/* A descendant was busy; prefix already restored the mounts. */
+		changelist_free(cl);
+		return (-1);
+	}
+
+	*clp = cl;
+	return (0);
+}
+
+void
+zfs_rollback_os(zfs_handle_t *zhp, void *clp)
+{
+	prop_changelist_t *cl = clp;
+
 	(void) zhp;
+
+	if (cl == NULL)
+		return;
+
+	/* Remount the descendants unmounted in zfs_rollback_pre_os(). */
+	(void) changelist_postfix(cl);
+	changelist_free(cl);
 }
 
 struct pipe2file {

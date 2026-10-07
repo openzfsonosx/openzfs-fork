@@ -51,7 +51,8 @@ typedef struct spa_iokit spa_iokit_t;
 
 struct zfs_handle;
 
-extern void zfs_rollback_os(struct zfs_handle *zhp);
+extern int zfs_rollback_pre_os(struct zfs_handle *zhp, void **clp);
+extern void zfs_rollback_os(struct zfs_handle *zhp, void *clp);
 extern void libzfs_macos_wrapfd(int *srcfd, boolean_t send);
 extern void libzfs_macos_wrapclose(void);
 extern int  libzfs_macos_pipefd(int *read_fd, int *write_fd);
