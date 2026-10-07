@@ -40,6 +40,13 @@ fdatasync(int fd)
 #define	_SC_PHYS_PAGES 200
 #endif
 
+/*
+ * The macOS 27 SDK declares pipe2() in <sys/unistd.h>, so define this
+ * shim only on older SDKs that lack it; otherwise the static inline
+ * conflicts with the SDK's non-static declaration.
+ */
+#if !defined(MAC_OS_VERSION_27_0) || \
+	(MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_VERSION_27_0)
 static inline int
 pipe2(int fildes[2], int flags)
 {
@@ -67,6 +74,7 @@ pipe2(int fildes[2], int flags)
 	}
 	return (0);
 }
+#endif
 
 #if !defined(MAC_OS_X_VERSION_10_12) || \
 	(MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12)
