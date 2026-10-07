@@ -359,8 +359,9 @@ constrain_path() {
 	elif [ "$UNAME" = "FreeBSD" ] ; then
 		ln -fs /usr/local/bin/ksh93 "$STF_PATH/ksh"
 	elif [ "$UNAME" = "Darwin" ] ; then
-		[ -f "/usr/local/bin/gdd" ] && ln -fs /usr/local/bin/gdd "$STF_PATH/dd"
-		[ -f "/usr/local/bin/gsed" ] && ln -fs /usr/local/bin/gsed "$STF_PATH/gsed"
+		# locate GNU dd/sed wherever installed (homebrew/macports/usr-local)
+		_gdd=$(command -v gdd 2>/dev/null); [ -n "$_gdd" ] && ln -fs "$_gdd" "$STF_PATH/dd"
+		_gsed=$(command -v gsed 2>/dev/null); [ -n "$_gsed" ] && ln -fs "$_gsed" "$STF_PATH/gsed"
 		ln -fs /bin/ksh "$STF_PATH/ksh"
 		ln -fs /sbin/fsck_hfs "$STF_PATH/fsck"
 		ln -fs /sbin/newfs_hfs "$STF_PATH/newfs_hfs"
