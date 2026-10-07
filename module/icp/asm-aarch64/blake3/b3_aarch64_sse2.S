@@ -22,7 +22,10 @@
  * see: https://github.com/mcmilk/BLAKE3-tests/blob/master/contrib/simde.sh
  */
 
-#if defined(__aarch64__)
+/* macOS arm64 uses the C blake3 impl (blake3_impl.c undefs __aarch64__
+ * on __APPLE__), so this SIMDe-converted asm is dead here — and Xcode 27's
+ * clang crashes assembling it. Exclude it on Apple to match the dispatch. */
+#if defined(__aarch64__) && !defined(__APPLE__)
 
 /* check for .cfi_negate_ra_state assembler support */
 #if defined(HAVE_AS_CFI_PSEUDO_OP)
