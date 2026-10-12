@@ -1768,7 +1768,7 @@ function destroy_pool #pool
 			# to succeed.
 			log_must_busy zpool destroy -f $pool
 
-			[[ -d $mtpt ]] && \
+			[[ -d $mtpt && ! "$mtpt" -ef / ]] && \
 				rm -f $mtpt
 		else
 			log_note "Pool does not exist. ($pool)"
