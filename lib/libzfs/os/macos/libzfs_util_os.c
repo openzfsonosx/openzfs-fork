@@ -417,9 +417,11 @@ pipe_io_relay(void *arg)
 		if (red < 0 && errno != EWOULDBLOCK)
 			break;
 
+		/* a partial write goes on from where it stopped */
+		unsigned char *p = buffer;
 		while (red > 0) {
 
-			sent = write(writefd, buffer, red);
+			sent = write(writefd, p, red);
 
 #ifdef VERBOSE_WRAPFD
 			fprintf(stderr, "%s: write(%d): %d (errno %d)\r\n",
@@ -436,6 +438,7 @@ pipe_io_relay(void *arg)
 			}
 
 			total += sent;
+			p += sent;
 			red -= sent;
 		}
 	}
