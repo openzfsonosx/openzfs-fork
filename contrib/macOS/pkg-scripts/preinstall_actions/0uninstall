@@ -236,6 +236,10 @@ rm -rfv /System/Library/Filesystems/zfs.fs
 # ZetaWatch's privileged helper is installed by the running app itself via
 # SMJobBless() on first launch, not by the pkg payload, so it has to be torn
 # down explicitly here rather than just via pkgutil's own file list.
+#
+# Quit a running ZetaWatch first, so the old app does not linger on from a
+# deleted bundle; postinstall starts the new one.
+pkill -f '/Applications/ZetaWatch.app/Contents/MacOS/ZetaWatch' 2>/dev/null || true
 launchctl unload /Library/LaunchDaemons/org.openzfsonosx.ZetaAuthorizationHelper.plist 2>/dev/null || true
 rm -fv /Library/LaunchDaemons/org.openzfsonosx.ZetaAuthorizationHelper.plist
 rm -fv /Library/PrivilegedHelperTools/org.openzfsonosx.ZetaAuthorizationHelper
