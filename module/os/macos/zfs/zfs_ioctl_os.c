@@ -194,7 +194,10 @@ zfsdev_ioctl(dev_t dev, ulong_t cmd, caddr_t arg,  __unused int xflag,
 		goto out;
 	}
 
+	/* Regular files start at, and hand back, userland's offset */
+	zfs_file_offset_set(&zc->zc_fd_offset);
 	error = zfsdev_ioctl_common(vecnum, zc, 0);
+	zfs_file_offset_set(NULL);
 
 	rc = copyout(zc, uaddr, sizeof (*zc));
 
@@ -421,6 +424,7 @@ zfsdev_attach(void)
 		goto openzfs_os_failed;
 
 	tsd_create(&zfsdev_private_tsd, NULL);
+	zfs_file_offset_init();
 
 	sysctl_os_init();
 
@@ -441,6 +445,7 @@ zfsdev_detach(void)
 {
 	sysctl_os_fini();
 
+	zfs_file_offset_fini();
 	tsd_destroy(&zfsdev_private_tsd);
 
 	openzfs_fini_os();

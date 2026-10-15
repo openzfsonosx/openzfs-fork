@@ -104,6 +104,11 @@ typedef	int	fstrans_cookie_t;
 
 #ifdef _KERNEL
 
+/* Keep a regular file's offset in step with zc_fd_offset, zfs_file_os.c */
+extern void zfs_file_offset_set(uint64_t *offp);
+extern void zfs_file_offset_init(void);
+extern void zfs_file_offset_fini(void);
+
 struct hlist_node {
 	struct hlist_node *next, **pprev;
 };

@@ -460,6 +460,26 @@ zfs_file_unlink(const char *path)
 }
 
 /*
+ * XNU gives us no way to reach a userland fd's file offset, so getf()
+ * starts every fd at 0. That is fine for a pipe, but "zfs send > file"
+ * and "zfs recv < file" share one regular file between userland and the
+ * kernel: userland has already written (or read) the stream header, and
+ * a -R stream is several kernel sends back to back.
+ *
+ * So libzfs_core passes the fd's offset in zc_fd_offset, the ioctl
+ * points zfs_file_offset_set() at it while it runs, zfs_file_get() starts
+ * a regular file there, and zfs_file_put() hands back where the kernel
+ * stopped, for userland to lseek() to.
+ */
+static uint_t zfs_file_offset_tsd = 0;
+
+static boolean_t
+zfs_file_is_regular(zfs_file_t *fp)
+{
+	return (fp->f_vnode != NULL && vnode_isreg(fp->f_vnode));
+}
+
+/*
  * Get reference to file pointer
  *
  * fd - input file descriptor
@@ -469,7 +489,13 @@ zfs_file_unlink(const char *path)
 zfs_file_t *
 zfs_file_get(int fd)
 {
-	return (getf(fd));
+	zfs_file_t *fp = getf(fd);
+	uint64_t *offp = tsd_get(zfs_file_offset_tsd);
+
+	if (fp != NULL && offp != NULL && zfs_file_is_regular(fp))
+		fp->f_offset = *offp;
+
+	return (fp);
 }
 
 /*
@@ -480,5 +506,28 @@ zfs_file_get(int fd)
 void
 zfs_file_put(zfs_file_t *fp)
 {
+	uint64_t *offp = tsd_get(zfs_file_offset_tsd);
+
+	if (offp != NULL && zfs_file_is_regular(fp))
+		*offp = fp->f_offset;
+
 	releasefp(fp);
+}
+
+void
+zfs_file_offset_set(uint64_t *offp)
+{
+	(void) tsd_set(zfs_file_offset_tsd, offp);
+}
+
+void
+zfs_file_offset_init(void)
+{
+	tsd_create(&zfs_file_offset_tsd, NULL);
+}
+
+void
+zfs_file_offset_fini(void)
+{
+	tsd_destroy(&zfs_file_offset_tsd);
 }
