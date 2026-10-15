@@ -1,0 +1,26 @@
+#!/bin/bash
+# SPDX-License-Identifier: CDDL-1.0
+date '+%s' >> /tmp/o3x.log
+echo $0 >> /tmp/o3x.log
+
+# Start ZetaWatch for whoever is logged in at the console, so it runs right
+# away instead of waiting to be found in /Applications. Once running, its
+# "Start at Login" setting brings it back after each login. Never fail the
+# install over it.
+
+APP=/Applications/ZetaWatch.app
+
+# Only when installing onto the running system, and the pkg had ZetaWatch.
+[ "$3" = "/" ] || exit 0
+[ -d "$APP" ] || exit 0
+
+user=$(/usr/bin/stat -f %Su /dev/console 2>/dev/null)
+case "$user" in
+	""|root|loginwindow|_mbsetupuser) exit 0 ;;
+esac
+uid=$(/usr/bin/id -u "$user" 2>/dev/null) || exit 0
+
+/bin/launchctl asuser "$uid" /usr/bin/sudo -u "$user" \
+	/usr/bin/open -g "$APP" 2>/dev/null || true
+
+exit 0
