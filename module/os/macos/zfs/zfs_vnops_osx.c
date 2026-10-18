@@ -3782,6 +3782,7 @@ zfs_vnop_pathconf(struct vnop_pathconf_args *ap)
 	case _PC_FILESIZEBITS:
 		*valp = 64;
 		break;
+#ifdef _PC_MIN_HOLE_SIZE
 	case _PC_MIN_HOLE_SIZE:
 	{
 		/*
@@ -3813,6 +3814,7 @@ zfs_vnop_pathconf(struct vnop_pathconf_args *ap)
 		}
 		break;
 	}
+#endif
 	default:
 		printf("ZFS: unknown pathconf %d called.\n", ap->a_name);
 		error = EINVAL;
