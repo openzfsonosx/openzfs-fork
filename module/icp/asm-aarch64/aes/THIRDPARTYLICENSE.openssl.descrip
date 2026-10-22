@@ -1,0 +1,10 @@
+AES-128-GCM EOR3 kernels in ghashv8-armx.S
+
+Derived from OpenSSL 3.6.3:
+https://github.com/openssl/openssl/blob/openssl-3.6.3/crypto/modes/asm/aes-gcm-armv8-unroll8_64.pl
+
+Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
+Written by Xiaokang Qian for the OpenSSL project, derived from
+ARM-software/AArch64cryptolib, originally authored by Samuel Lee.
+Adapted to the OpenZFS context layout and encoded for older Apple
+assembler toolchains. The instruction schedule is retained.

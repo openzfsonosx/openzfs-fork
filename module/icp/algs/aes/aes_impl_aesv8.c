@@ -41,6 +41,11 @@ extern ASMABI int aes_v8_set_decrypt_key(const uint32_t rk[],
 /* nround $10 (128), $12 (192), $14 (256) */
 extern ASMABI void aes_v8_encrypt(const uint32_t pt[4],
     const uint32_t ct[4], const uint32_t rk[], const unsigned int nround);
+extern ASMABI void aes_v8_ctr32_encrypt_blocks_zfs(const uint8_t *in,
+    uint8_t *out, size_t blocks, const uint32_t rk[], unsigned int nround,
+    const uint8_t counter[16]);
+extern ASMABI void aes_v8_cbc_encrypt_zfs(const uint8_t *in, uint8_t *out,
+    size_t length, const uint32_t rk[], uint8_t iv[16], unsigned int nround);
 extern ASMABI void aes_v8_decrypt(const uint32_t ct[4],
     const uint32_t pt[4], const uint32_t rk[], const unsigned int nround);
 
@@ -94,6 +99,24 @@ aes_aesv8_encrypt(const uint32_t rk[], int Nr, const uint32_t pt[4],
 	kfpu_end();
 }
 
+static void
+aes_aesv8_ctr32(const uint8_t *in, uint8_t *out, size_t blocks,
+    const uint32_t rk[], int Nr, const uint8_t counter[16])
+{
+	kfpu_begin();
+	aes_v8_ctr32_encrypt_blocks_zfs(in, out, blocks, rk, Nr, counter);
+	kfpu_end();
+}
+
+static void
+aes_aesv8_cbc(const uint8_t *in, uint8_t *out, size_t length,
+    const uint32_t rk[], uint8_t iv[16], int Nr)
+{
+	kfpu_begin();
+	aes_v8_cbc_encrypt_zfs(in, out, length, rk, iv, Nr);
+	kfpu_end();
+}
+
 /*
  * Decrypt one block of data. The block is assumed to be an array
  * of four uint32_t values, so copy for alignment (and byte-order
@@ -134,6 +157,8 @@ aes_aesv8_will_work(void)
 const aes_impl_ops_t aes_aesv8_impl = {
 	.generate = &aes_aesv8_generate,
 	.encrypt = &aes_aesv8_encrypt,
+	.ctr32 = &aes_aesv8_ctr32,
+	.cbc = &aes_aesv8_cbc,
 	.decrypt = &aes_aesv8_decrypt,
 	.is_supported = &aes_aesv8_will_work,
 	.needs_byteswap = B_FALSE,

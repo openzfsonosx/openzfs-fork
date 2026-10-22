@@ -209,18 +209,25 @@ typedef struct aes_ctx {
 extern int ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *, char *, size_t,
     crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
+    int (*cbc_mac)(const void *, const uint8_t *, size_t, uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *, char *, size_t,
     crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *, char *, size_t,
     crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
@@ -241,11 +248,21 @@ int gcm_encrypt_final(gcm_ctx_t *, crypto_data_t *, size_t,
 
 extern int ccm_decrypt_final(ccm_ctx_t *, crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*cbc_mac)(const void *, const uint8_t *, size_t, uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int gcm_decrypt_final(gcm_ctx_t *, crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
+extern int gcm_decrypt_atomic_contiguous(gcm_ctx_t *, const uint8_t *,
+    size_t, const uint8_t *, uint8_t *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int ccm_init_ctx(ccm_ctx_t *, char *, int, boolean_t, size_t,
