@@ -41,7 +41,7 @@ zed_LDADD = \
 	libnvpair.la
 
 if !BUILD_MACOS
-zed_LDADD += -lrt $(LIBATOMIC_LIBS) $(LIBUDEV_LIBS) $(LIBUUID_LIBS)
+zed_LDADD += -lrt $(LIBUDEV_LIBS) $(LIBUUID_LIBS)
 endif
 
 dist_noinst_DATA += %D%/agents/README.md
