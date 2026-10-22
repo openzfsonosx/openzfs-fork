@@ -1107,6 +1107,16 @@ Lecb_done:
 Lecb_Final_abort:
 	ret
 
+ENTRY_ALIGN(aes_v8_cbc_encrypt_zfs, 32)
+	stp	x29,x30,[sp,#-16]!
+	add	x29,sp,#0
+	subs	x2,x2,#16
+	mov	x8,#16
+	b.lo	Lcbc_abort
+	csel	x8,xzr,x8,eq
+	cmp	w5,#0			// nround is non-zero: encrypt
+	b	Lcbc_rounds_ready
+
 ENTRY_ALIGN(aes_v8_cbc_encrypt, 32)
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
 	stp	x29,x30,[sp,#-16]!
@@ -1118,6 +1128,8 @@ ENTRY_ALIGN(aes_v8_cbc_encrypt, 32)
 
 	cmp	w5,#0			// en- or decrypting?
 	ldr	w5,[x3,#240]
+
+Lcbc_rounds_ready:
 	and	x2,x2,#-16
 	ld1	{v6.16b},[x4]
 	ld1	{v0.16b},[x0],x8
@@ -1154,7 +1166,9 @@ ENTRY_ALIGN(aes_v8_cbc_encrypt, 32)
 Loop_cbc_enc:
 	aese	v0.16b,v16.16b
 	aesmc	v0.16b,v0.16b
+	cbz	x1,Lcbc_enc_no_store
 	st1	{v6.16b},[x1],#16
+Lcbc_enc_no_store:
 Lenter_cbc_enc:
 	aese	v0.16b,v17.16b
 	aesmc	v0.16b,v0.16b
@@ -1199,7 +1213,9 @@ Lcbc_enc192:
 	eor	v6.16b,v0.16b,v7.16b
 	b.hs	Loop_cbc_enc
 
+	cbz	x1,Lcbc_enc_done
 	st1	{v6.16b},[x1],#16
+Lcbc_enc_done:
 	b	Lcbc_done
 
 .balign	32
@@ -1211,7 +1227,9 @@ Lcbc_enc128:
 Loop_cbc_enc128:
 	aese	v0.16b,v16.16b
 	aesmc	v0.16b,v0.16b
+	cbz	x1,Lcbc_enc128_no_store
 	st1	{v6.16b},[x1],#16
+Lcbc_enc128_no_store:
 Lenter_cbc_enc128:
 	aese	v0.16b,v17.16b
 	aesmc	v0.16b,v0.16b
@@ -1237,7 +1255,9 @@ Lenter_cbc_enc128:
 	eor	v6.16b,v0.16b,v7.16b
 	b.hs	Loop_cbc_enc128
 
+	cbz	x1,Lcbc_enc128_done
 	st1	{v6.16b},[x1],#16
+Lcbc_enc128_done:
 	b	Lcbc_done
 .balign	32
 Lcbc_dec:
@@ -1580,12 +1600,21 @@ Lcbc_abort:
 	ldr	x29,[sp],#16
 	ret
 
+ENTRY_ALIGN(aes_v8_ctr32_encrypt_blocks_zfs, 32)
+	stp	x29,x30,[sp,#-16]!
+	add	x29,sp,#0
+	mov	w6,w4
+	mov	x4,x5
+	mov	w5,w6
+	b	Lctr32_entry
+
 ENTRY_ALIGN(aes_v8_ctr32_encrypt_blocks, 32)
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
 	stp	x29,x30,[sp,#-16]!
 	add	x29,sp,#0
 	ldr	w5,[x3,#240]
 
+Lctr32_entry:
 	ldr	w8, [x4, #12]
 #ifdef __AARCH64EB__
 	ld1	{v0.16b},[x4]
