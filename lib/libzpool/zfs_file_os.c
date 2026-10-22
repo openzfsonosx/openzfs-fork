@@ -18,8 +18,6 @@
 
 #include <sys/zfs_context.h>
 #include <sys/zfs_file.h>
-#include <libzpool.h>
-#include <libzutil.h>
 
 #ifdef __APPLE__
 /* The macOS SDK's <sys/kernel_types.h> already typedefs file_t. */
@@ -75,7 +73,8 @@ zfs_file_open(const char *path, int flags, int mode, cred_t *cr,
 
 	if (vn_dumpdir != NULL) {
 		char *dumppath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-		const char *inpath = zfs_basename(path);
+		const char *bn = strrchr(path, '/');
+		const char *inpath = (bn ? bn + 1 : path);
 
 		(void) snprintf(dumppath, MAXPATHLEN,
 		    "%s/%s", vn_dumpdir, inpath);
