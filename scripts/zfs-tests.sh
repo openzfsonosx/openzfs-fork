@@ -1043,11 +1043,9 @@ RESULT=$?
 
 if [ "$RESULT" -eq "2" ] && [ -n "$RERUN" ]; then
 	MAYBES="$($ZTS_REPORT --list-maybes)"
-	TEMP_RESULTS_FILE=$(mktemp_file zts-results-tmp)
 	TEST_LIST=$(mktemp_file test-list)
-	grep "^Test:.*\[FAIL\]" "$RESULTS_FILE" >"$TEMP_RESULTS_FILE"
 	for test_name in $MAYBES; do
-		grep "$test_name " "$TEMP_RESULTS_FILE" >>"$TEST_LIST"
+		grep -F "$test_name " "$RESULTS_FILE" >>"$TEST_LIST"
 	done
 	{ PATH=$STF_PATH \
 	    ${TEST_RUNNER} \
@@ -1076,7 +1074,7 @@ if [ -d "$RESULTS_DIR" ]; then
 	cat "$RESULTS_FILE" "$REPORT_FILE" >"$RESULTS_DIR/results"
 fi
 
-rm -f "$RESULTS_FILE" "$REPORT_FILE" "$TEST_LIST" "$TEMP_RESULTS_FILE"
+rm -f "$RESULTS_FILE" "$REPORT_FILE" "$TEST_LIST"
 
 if [ -n "$SINGLETEST" ]; then
 	rm -f "$RUNFILES" >/dev/null 2>&1
