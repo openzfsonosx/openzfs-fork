@@ -13,6 +13,9 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <IOKit/IOLib.h>
+#include <libkern/OSKextLib.h>
+
 #include <sys/atomic.h>
 
 #include <sys/vmem.h>
@@ -76,7 +79,6 @@
  * Copyright (c) 2014 Brendon Humphrey (brendon.humphrey@mac.com)
  */
 
-
 #ifdef _KERNEL
 #define	XNU_KERNEL_PRIVATE
 #include <mach/vm_types.h>
@@ -94,22 +96,7 @@ typedef uint8_t vm_tag_t;
  *
  * (VM_KERN_MEMORY_KEXT - mach_vm_statistics.h)
  */
-#define	SPL_TAG 6
-
-
-
-
-/*
- * In kernel lowlevel form of malloc.
- */
-void *IOMalloc(vm_size_t size);
-void *IOMallocAligned(vm_size_t size, vm_offset_t alignment);
-
-/*
- * Free memory
- */
-void IOFree(const void *address, vm_size_t size);
-void IOFreeAligned(const void *address, vm_size_t size);
+#define	SPL_TAG	6
 
 #endif /* _KERNEL */
 
@@ -129,7 +116,6 @@ vmem_t *abd_arena;
 vmem_t *abd_subpage_arena;
 
 #ifdef _KERNEL
-extern uint64_t total_memory;
 uint64_t stat_osif_malloc_success = 0;
 uint64_t stat_osif_malloc_fail = 0;
 uint64_t stat_osif_free = 0;
@@ -149,9 +135,6 @@ osif_malloc(uint64_t size)
 	// vm_offset_t tr = NULL;
 	void *tr = NULL;
 	kern_return_t kr = -1;
-
-	// kern_return_t kr = kmem_alloc(kernel_map, &tr, size);
-	// tr = IOMalloc(size);
 
 	if (size < PAGESIZE)
 		atomic_inc_64(&stat_osif_malloc_subpage);
@@ -179,6 +162,7 @@ osif_malloc(uint64_t size)
 	if (kr == KERN_SUCCESS) {
 		atomic_inc_64(&stat_osif_malloc_success);
 		atomic_add_64(&segkmem_total_mem_allocated, size);
+		atomic_add_64(&spl_shared_mem_allocated, size);
 		atomic_add_64(&stat_osif_malloc_bytes, size);
 		return ((void *)tr);
 	} else {
@@ -206,9 +190,10 @@ void
 osif_free(const void *buf, uint64_t size)
 {
 #ifdef _KERNEL
-	IOFreeAligned(buf, size);
+	IOFreeAligned((void *)buf, size);
 	atomic_inc_64(&stat_osif_free);
 	atomic_sub_64(&segkmem_total_mem_allocated, size);
+	atomic_sub_64(&spl_shared_mem_allocated, size);
 	atomic_add_64(&stat_osif_free_bytes, size);
 #else
 	free(buf);
@@ -264,8 +249,144 @@ segkmem_free(vmem_t *vmp, const void *inaddr, size_t size)
  * fallback to using the kmem_default arena same
  * as all the other caches.
  */
+
 // smd: we nevertheless plumb in an arena with heap as parent, so that
 // we can track stats and maintain the VM_ / qc settings differently
+
+/*
+ * The smallest exchange with IOMallocData must be bigger
+ * than KHEAP_MAX_SIZE (32k on Apple Silicon, 16k on X86_64)
+ * in order to avoid being channeled into a zone:
+ *
+ * osfmk/vm/vm_kern_xnu.h (kalloc and wrappers like IOMalloc* are backed by
+ * zone memory for sizes below KHEAP_MAX_SIZE)
+ *
+ * osfmk/kern/kalloc.c ("Allocations of size greater than KHEAP_MAX_SIZE, are
+ * allocated from the VM.")
+ *
+ * The trade-off here is between lots of IOMallocData/IOFreeData calls and abd
+ * chunks pinning an ABD_DATA_MIN_IMPORT amount of memory when only occupying
+ * a ~PAGESIZE fraction.
+ *
+ * VMEM allocations smaller than ABD_DATA_MIN_IMPORT will use parent
+ * spl_vmem_heap.
+ */
+#define	ABD_DATA_ZONE_MAX	(32 * 1024)	/* >= KHEAP_MAX_SIZE */
+#define	ABD_DATA_MIN_IMPORT	(2 * 32 * 1024)	/* bigger => fewer kallocs */
+
+extern vmem_t *spl_heap_arena;
+
+/*
+ * we have kstats for these even if the mechanism is compiled out.
+ */
+uint64_t spl_abd_data_throttles = 0;
+uint64_t spl_abd_data_throttle_timeouts = 0;
+
+#ifdef SPL_HAVE_IOMALLOCDATA
+
+/*
+ * Imports to this arena are driven by ARC growth, and at present the main
+ * check on importing up to ABD_DATA_THROTTLE_PCT is arc_no_grow() and
+ * spl_free_set_pressure_additive().
+ *
+ * Above ABD_DATA_THROTTLE_PCT VM_SLEEP imports trigger pressure and then go
+ * for a series of brief sleeps, giving the ARC reclaim thread and reaping up
+ * to a second to free ABD chunk spans.  This is deliberately simpler than the
+ * xnu_alloc_throttled() mechanism for the bucket arenas, principally because
+ * it is a backstop that is only very rarely if ever used (it would take a
+ * very full ABD chunk cache, including cache fragmentation, and probably also
+ * a large burst of dirty or transient data demanding ABD chunks).
+ */
+
+#define	ABD_DATA_THROTTLE_PCT		110ULL
+#define	ABD_DATA_THROTTLE_SLEEP_MS	10ULL
+#define	ABD_DATA_THROTTLE_MAX_LOOPS	100ULL
+
+static void
+abd_data_throttle(size_t size, int vmflag)
+{
+	if ((vmflag & (VM_NOSLEEP | VM_PUSHPAGE | VM_PANIC)) != 0)
+		return;
+
+	const uint64_t ceiling = (spl_data_private_memory *
+	    ABD_DATA_THROTTLE_PCT) / 100ULL;
+
+	if (spl_private_mem_allocated + size <= ceiling)
+		return;
+
+	atomic_inc_64(&spl_abd_data_throttles);
+
+	for (int i = 0; i < ABD_DATA_THROTTLE_MAX_LOOPS; i++) {
+		const uint64_t want = spl_private_mem_allocated + size;
+		if (want <= ceiling)
+			return;
+		spl_set_arc_no_grow(B_TRUE);
+		spl_free_set_pressure_additive((int64_t)(want - ceiling));
+		IOSleepWithLeeway(ABD_DATA_THROTTLE_SLEEP_MS, 1);
+	}
+
+	atomic_inc_64(&spl_abd_data_throttle_timeouts);
+}
+
+static void *
+abd_data_import(vmem_t *vmp, size_t size, int vmflag)
+{
+	const boolean_t usedata = spl_use_iomallocdata();
+	boolean_t oom = B_FALSE;
+
+	if (usedata && size > ABD_DATA_ZONE_MAX) {
+		/*
+		 * stop ARC growth if we will cross the
+		 * limit of what kext private data
+		 * we should allocate
+		 */
+		if (spl_private_mem_allocated + size >
+		    spl_data_private_memory) {
+			oom = B_TRUE;
+			spl_set_arc_no_grow(B_TRUE);
+			spl_free_set_pressure_additive(size);
+		}
+
+		/*
+		 * honour vmflag, fail if we would cross the limit,
+		 * rather than sleep as below
+		 */
+		if ((vmflag & (VM_NOSLEEP | VM_ABORT)) != 0 && oom) {
+			return (NULL);
+		}
+
+		abd_data_throttle(size, vmflag);
+
+		void *p = IOMallocData(size);
+		if (p != NULL) {
+			atomic_add_64(&segkmem_total_mem_allocated, size);
+			atomic_add_64(&spl_private_mem_allocated, size);
+		}
+		return (p);
+	}
+	return (vmem_alloc_impl(spl_heap_arena, size, vmflag));
+}
+
+static void
+abd_data_release(vmem_t *vmp, const void *p, size_t size)
+{
+	const boolean_t usedata = spl_use_iomallocdata();
+
+	if (usedata && size > ABD_DATA_ZONE_MAX) {
+		if (spl_private_mem_allocated >
+		    spl_data_private_memory + size) {
+			spl_free_set_pressure_additive(size);
+		}
+		IOFreeData((void *)p, size);
+		atomic_sub_64(&segkmem_total_mem_allocated, size);
+		atomic_sub_64(&spl_private_mem_allocated, size);
+		return;
+	}
+	vmem_free_impl(spl_heap_arena, p, size);
+}
+
+#endif
+
 void
 segkmem_abd_init()
 {
@@ -275,31 +396,70 @@ segkmem_abd_init()
 	 * between the kmem cache and it's parent.  XNU absorbs this with a a
 	 * large minimum request to the parent vmem_caches on large-memory
 	 * MacOS systems.
+	 *
+	 * Additionally, on modern macOS, ABD chunks are segregated into the
+	 * kext's private wired map, rather than the kernel's shared wired map.
 	 */
 
 	extern vmem_t *spl_heap_arena;
 
+#if defined(__arm64__)
+#define	BIG_SLAB (PAGESIZE * 4)
+#else
 #define	BIG_SLAB (PAGESIZE * 16)
+#endif
 
 #define	SMALL_RAM_MACHINE (4ULL * 1024ULL * 1024ULL * 1024ULL)
 
-	if (total_memory >= SMALL_RAM_MACHINE) {
-		abd_arena = vmem_create("abd_cache", NULL, 0,
-		    sizeof (void *),
-		    vmem_alloc_impl, vmem_free_impl, spl_heap_arena,
-		    BIG_SLAB, VM_SLEEP | VMC_NO_QCACHE);
+	const boolean_t usedata = spl_use_iomallocdata();
+	vmem_alloc_t *importer;
+	vmem_free_t *releaser;
+	size_t span_size;
+
+	if (spl_total_memory >= SMALL_RAM_MACHINE)
+		span_size = MAX(BIG_SLAB, ABD_DATA_MIN_IMPORT);
+	else
+		span_size = MAX(PAGESIZE, ABD_DATA_MIN_IMPORT);
+
+	if (usedata) {
+#ifdef	SPL_HAVE_IOMALLOCDATA
+		importer = abd_data_import;
+		releaser = abd_data_release;
+#else
+		importer = vmem_alloc_impl;
+		releaser = vmem_free_impl;
+#endif
 	} else {
-		abd_arena = vmem_create("abd_cache", NULL, 0,
-		    sizeof (void *),
-		    vmem_alloc_impl, vmem_free_impl, spl_heap_arena,
-		    PAGESIZE, VM_SLEEP | VMC_NO_QCACHE);
+		importer = vmem_alloc_impl;
+		releaser = vmem_free_impl;
 	}
+
+	abd_arena = vmem_create("abd_cache", NULL, 0,
+	    sizeof (void *),
+	    importer, releaser,
+	    spl_heap_arena,
+	    span_size,
+	    VM_SLEEP | VMC_NO_QCACHE);
 
 	VERIFY3P(abd_arena, !=, NULL);
 
+	if (usedata) {
+#ifdef SPL_HAVE_IOMALLOCDATA
+		/*
+		 * If we are using abd_data_import / abd_data_release,
+		 * make self self's parent, as with the bucket arenas'
+		 * b->vm_source = b;
+		 *
+		 * spl_heap_arena was just a nominal parent at create time.
+		 */
+
+		abd_arena->vm_source = abd_arena;
+#endif
+	}
+
 	/*
-	 * We also have a sub-arena for sub-page allocations, so as to avoid
-	 * memory waste, while segregating ABDs for visibility and
+	 * We also have a child arena for sub-page allocations, so as to avoid
+	 * memory waste, while segregating small ABDs for visibility and
 	 * fragmentation control.
 	 *
 	 * This approach presently assumes SPA_MINBLOCKSIZE is 512 and that
@@ -307,18 +467,11 @@ segkmem_abd_init()
 	 * This will be _Static_assert-ed in abd_os.c.
 	 */
 
-	if (total_memory >= SMALL_RAM_MACHINE) {
-		abd_subpage_arena = vmem_create("abd_subpage_cache", NULL, 0,
-		    sizeof (void *),
-		    vmem_alloc_impl, vmem_free_impl,
-		    spl_heap_arena,
-		    BIG_SLAB, VM_SLEEP | VMC_NO_QCACHE);
-	} else {
-		abd_subpage_arena = vmem_create("abd_subpage_cache", NULL, 0,
-		    sizeof (void *),
-		    vmem_alloc_impl, vmem_free_impl, abd_arena,
-		    PAGESIZE, VM_SLEEP | VMC_NO_QCACHE);
-	}
+	abd_subpage_arena = vmem_create("abd_subpage_cache", NULL, 0,
+	    sizeof (void *),
+	    vmem_alloc_impl, vmem_free_impl,
+	    abd_arena,
+	    PAGESIZE, VM_SLEEP | VMC_NO_QCACHE);
 
 	VERIFY3P(abd_subpage_arena, !=, NULL);
 }

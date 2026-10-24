@@ -34,7 +34,16 @@ extern "C" {
 #endif
 
 // XNU total amount of memory
-extern uint64_t physmem;
+extern uint64_t physmem; // in PAGESIZE
+extern uint64_t spl_real_total_memory; // in bytes,	actual system memory
+extern uint64_t spl_total_memory; // in bytes, 80% of shared + all private
+extern uint64_t spl_data_private_memory; // bytes we can use via IOMallocData()
+extern uint64_t spl_data_shared_memory; // IOMallocAligned() bytes we can use
+extern uint64_t segkmem_total_mem_allocated; // all memory held
+extern uint64_t spl_shared_mem_allocated; // IOMallocAligned() held
+extern uint64_t spl_private_mem_allocated; // IOMallocData() held
+extern uint64_t spl_abd_data_throttles;
+extern uint64_t spl_abd_data_throttle_timeouts;
 
 #define	KM_SLEEP	0x0000	/* can block for memory; success guaranteed */
 #define	KM_NOSLEEP	0x0001	/* cannot block for memory; may fail */
@@ -81,6 +90,8 @@ boolean_t spl_free_fast_pressure_wrapper(void);
 void spl_free_set_pressure(int64_t);
 void spl_free_set_fast_pressure(boolean_t);
 uint64_t spl_free_last_pressure_wrapper(void);
+extern void spl_free_set_pressure_additive(int64_t);
+extern void spl_set_arc_no_grow(int);
 
 #define	KMC_NOTOUCH	0x00010000
 #define	KMC_NODEBUG	0x00020000
@@ -138,6 +149,7 @@ extern int kmem_scnprintf(char *str, size_t size,
 	const char *fmt, ...);
 
 boolean_t spl_arc_no_grow(size_t, boolean_t, kmem_cache_t **);
+boolean_t spl_should_arc_no_grow(void);
 
 extern uint64_t spl_kmem_cache_inuse(kmem_cache_t *cache);
 extern uint64_t spl_kmem_cache_entry_size(kmem_cache_t *cache);

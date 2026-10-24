@@ -42,8 +42,12 @@ static utsname_t utsname_static = { { 0 } };
 unsigned int max_ncpus = 0;
 unsigned int boot_ncpus = 0;
 unsigned int num_ecores = 0;
-uint64_t  total_memory = 0;
-uint64_t  real_total_memory = 0;
+uint64_t spl_total_memory = 0;
+uint64_t spl_real_total_memory = 0;
+uint64_t spl_data_private_memory = 0;
+uint64_t spl_data_shared_memory = 0;
+uint64_t spl_private_mem_allocated = 0;
+uint64_t spl_shared_mem_allocated = 0;
 
 // Size in bytes of the memory allocated in seg_kmem
 extern uint64_t		segkmem_total_mem_allocated;
@@ -459,6 +463,72 @@ ddi_copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
 	return (ret);
 }
 
+/*
+ * If the kext can use IOMallocData(), return true.
+ *
+ * This will put ABD chunks into this kext's private wired memory which is
+ * instrumented in "/usr/bin/zprint org.openzfsonosx.zfs", rather than in the
+ * kernel's shared wired map, where memory backed by IOMallocAligned() is
+ * found.  ABD chunks are by far the largest consumer of memory by this kext
+ * so long as abd_scatter_enabled is true (default) and abd_scatter_min_size
+ * is sensible (see module/os/macos/abd_os.c).
+ *
+ * The shared wired map *must* be used for data that will be exported from the
+ * kext via a remapping, which is any memory we pass to IOKit objects, the
+ * uio*() and UPL functions, and so forth. The private wired map is only
+ * reliably safe when the data is (from our kext's persepective) a blob whose
+ * contents don't depend on any memory address versus whether memory addresses
+ * (pointers, mutexes, etc) might in the allocated data.  ABD chunks are
+ * paradigmatic of "blob" data that is never shared, since chunk ABD are
+ * copied into (shared-map) linear ABDs before "export" from our private map
+ * (see e.g. the use of abd_borrow_buf_copy() and abd_borrow_buf() in
+ * module/os/macos/zfs/vdev_disk.c*).
+ *
+ * Most allocations are backed by IOMallocAligned(), which allocates in the
+ * shared wired map.  On small-memory machines we run the risk of being out of
+ * memory, signalled by a NULL from IOMallocAligned().  While we can deal with
+ * that, other kexts and kernel consumers can freak out leading to panics and
+ * other unexpected behaviours.  Consequently, there are several mechanisms in
+ * the kext to avoid using too much system memory.
+ *
+ * Small IOMallocData allocations (generally less than 32KiB) will go
+ * to the kernel-global zones allocator, which is counterproductive for our
+ * vmem and kmem allocators, as it adds unnecessary work by the zones
+ * infrastructure, and because we have to be careful not to run any zone out
+ * of memory.  Those are better backed by kmem+vmem+IOMallocAligned(), and
+ * this is implemented in spl-seg_kmem.c
+ *
+ * The return value of spl_use_iomallocdata(), which much be invariant from
+ * kext start time, influences the amount of memory the kext will try to use.
+ * If B_FALSE, we should use less than 80% of 1/7 of the total physical system
+ * memory. Even if there is ample wire-able space available, the constraint is
+ * the size of the kernel shared map. Controlling the maximum ARC size is the
+ * principal mechanism to respect this, so we can be a good neighbour to other
+ * parts of the kernel and other kexts.
+ *
+ * If B_TRUE, then most kext data is in the kernel private map space, which
+ * is a different ~ 1/7 of total system memory. In general we must assume that
+ * it is shared with other kexts, but practically all consumers of this space
+ * will wait for memory to become available, so we can let ABD chunks occupy a
+ * large fraction this memory space. Controlling the size of the ABD chunk
+ * arena then becomes the principal mechanism, however we do that within the
+ * context of a ceiling on the ARC size.
+ *
+ * B_TRUE therefore allows for a larger ARC size (as ARC mainly holds
+ * references to ABD chunks) while nearly eliminating risk of exhausting the
+ * kernel shared map's VA map or its memory size.
+ *
+ */
+boolean_t
+spl_use_iomallocdata(void)
+{
+#ifdef SPL_HAVE_IOMALLOCDATA
+	return (B_TRUE);
+#else
+	return (B_FALSE);
+#endif
+}
+
 kern_return_t
 spl_start(kmod_info_t *ki, void *d)
 {
@@ -488,9 +558,10 @@ spl_start(kmod_info_t *ki, void *d)
 	spl_mtx_grp = lck_grp_alloc_init("spl-mutex", spl_mtx_grp_attr);
 
 	while (1) {
-		len = sizeof (total_memory);
-		sysctlbyname("hw.memsize", &total_memory, &len, NULL, 0);
-		if (total_memory != 0) break;
+		len = sizeof (spl_real_total_memory);
+		sysctlbyname("hw.memsize", &spl_real_total_memory, &len,
+		    NULL, 0);
+		if (spl_real_total_memory != 0) break;
 
 		printf("SPL: waiting for sysctl...\n");
 		delay(hz>>1);
@@ -508,47 +579,90 @@ spl_start(kmod_info_t *ki, void *d)
 #endif
 
 	/*
-	 * Setting the total memory to physmem * 50% here, since kmem is
-	 * not in charge of all memory and we need to leave some room for
-	 * the OS X allocator. We internally add pressure if we step over it
+	 * set up kext's notions of RAM availability
 	 */
-	real_total_memory = total_memory;
-	total_memory = total_memory * 50ULL / 100ULL;
-	physmem = total_memory / PAGE_SIZE;
+
+	if (spl_use_iomallocdata()) {
+		/*
+		 * This is a modern macOS where we expect to have ABD chunks
+		 * in the kext's private map, which is shared with other maps
+		 */
+
+		/*
+		 * kernel private wired memory and kernel shared wire memory
+		 * are each 2/7 of physical memory, but we want to be good
+		 * neighbours and only use 1/7 of each
+		 */
+		spl_data_private_memory = spl_real_total_memory / 7;
+		spl_data_shared_memory = spl_real_total_memory / 7;
+	} else {
+		spl_data_private_memory = 0;
+		spl_data_shared_memory = spl_real_total_memory / 7;
+
+		/*
+		 * Small pre-macOS-15 Macs are constrained by physical RAM
+		 * rather than the shared VA map space.  The kernel's memory
+		 * pressure signals are sufficient to control for this case.
+		 * Consequently, use more of the shared map than the half
+		 * we otherwise take.
+		 */
+
+#define	SPL_SMALL_RAM	(16ULL * 1024ULL * 1024ULL * 1024ULL)
+
+		if (spl_real_total_memory <= SPL_SMALL_RAM)
+			spl_data_shared_memory =
+			    spl_real_total_memory / 5; // instead of /7
+	}
+
+	spl_total_memory = (spl_data_shared_memory * 80ULL / 100ULL) +
+	    spl_data_private_memory;
+
+	physmem = spl_total_memory / PAGE_SIZE;
 
 #if defined(__arm64__)
+
 	/*
-	 * 128GiB Studio Ultras with 12.6.1 and earlier will panic, usually in
-	 * another kernel subsystem (hfs, hardware video encoding/decoding),
-	 * after we allocate more than around 30GiB of memory through
-	 * IOMallocAligned().
+	 * Large Apple Silicon, such as full-of-RAM Mac Studios, typically
+	 * will run out of kernel virtual address map space before running out
+	 * of wireable memory.  Since there is plenty of wireable memory and
+	 * other memory available, we will not see memory pressure signalled
+	 * by the kernel.  If we keep allocating naively until we see pressure,
+	 * we will reach the point at which we deprive other consumers of kernel
+	 * memory allocations, triggering undesired behaviour like subsystem
+	 * aborts or system panics.
 	 *
-	 * So far this has not been observed on other hw platforms and has not
-	 * been tested in 13.x (Ventura) on these systems.  However, few other
-	 * macOS hw platforms have more than 64 GiB of RAM.  96 GiB of RAM is
-	 * likely to be the lower limit for running into this problem, since
-	 * smaller systems either [a] will not have total_memory >= 32 GiB,
-	 * [b] will have kernel pressure signals driven by memory use in
-	 * userland and the HFS/APFS buffer cache, or [c] both [a]and[b].
+	 * There are two VA maps of interest, each of which is sized to
+	 * approximately 2/7 of physical RAM: the kernel shared map and the
+	 * kext private map, which is a further 2/7 of physical RAM but
+	 * shared among many consumers such as other kexts.
 	 *
-	 * For safety, on ARM we default to having a dynamic memory cap of 26
-	 * GiB any ARM with more than 64GiB of RAM.  This will prevent ARC
-	 * growth from climbing much above 20 GiB, consequently limiting the
-	 * various other ZFS caches and overheads. Total consumption will not
-	 * reach the panic-inviting levels around/above 32 GiB, since the ARC
-	 * will be shrunk when approaching the dynamic memory cap.
+	 * We need to avoid using more than about half of each of these two
+	 * maps in order to be good neighbours.
 	 *
-	 * This has proven safe enough, and can be overridden dynamically by a
-	 * sysctl or zsysctl.conf by setting
-	 * kstat.spl.misc.spl_misc.spl_osif_dynamic_memory_cap to some other
-	 * byte count, including 0 (which will allow growth until
-	 * IOMallocAligned() returns a NULL).
+	 * Empirically, on a 512GiB M3 Mac Studio, we can safely use about
+	 * 60 GiB of the shared memory map, while on a 128 GiB M1 Mac Studio,
+	 * we can safely use about 26 GiB of the shared memory map.  These
+	 * are not hard and fast data to clamp on, however, and a smaller
+	 * ARC on a smaller-RAM machine is tolerable.
+	 *
+	 * Here is a dynamic memory cap set to spl_total_memory that
+	 * will be used to avoid growing our memory consumption above that
+	 * threshold.   For the moment it only controls the total memory use,
+	 * rather than specifically the shared memory map.  In future, there
+	 * should be a cap for each of these two memory maps on systems with
+	 * IOMallocData().
+	 *
+	 * The initial setting for the dynamic memory cap is presently
+	 * strictly tautologous, but attracts the eyeballs.  Presently it can
+	 * be set to this point and smaller by an administrator using sysctl,
+	 * and the value is subject to automatic deflation.
 	 */
 
 	extern _Atomic uint64_t spl_dynamic_memory_cap;
 
-	if (real_total_memory >= 64LL*1024LL*1024LL*1024LL)
-		spl_dynamic_memory_cap = 26LL*1024LL*1024LL*1024LL;
+	if (spl_real_total_memory >= 64LL*1024LL*1024LL*1024LL)
+		spl_dynamic_memory_cap = spl_total_memory;
+
 #endif
 
 	len = sizeof (utsname_static.sysname);
@@ -576,7 +690,7 @@ spl_start(kmod_info_t *ki, void *d)
 	    sizeof (utsname_static.nodename));
 
 	spl_mutex_subsystem_init();
-	spl_kmem_init(total_memory);
+	spl_kmem_init(spl_total_memory);
 	spl_vnode_init();
 	spl_kmem_thread_init();
 	spl_kmem_mp_init();
