@@ -438,7 +438,7 @@ uint64_t spl_frag_walk_cnt = 0;
 
 extern void spl_free_set_emergency_pressure(int64_t p);
 extern uint64_t segkmem_total_mem_allocated;
-extern uint64_t total_memory;
+extern uint64_t spl_total_memory;
 
 extern uint64_t spl_enforce_memory_caps;
 extern _Atomic uint64_t spl_dynamic_memory_cap;
@@ -1297,8 +1297,8 @@ spl_vmem_xnu_useful_bytes_free(void)
 	extern _Atomic uint32_t spl_vm_pressure_level;
 
 	/* carve out a small reserve for unconditional allocs */
-	const uint64_t reserve = total_memory >> 9ULL;
-	const uint64_t total_minus_reserve = total_memory - reserve;
+	const uint64_t reserve = spl_total_memory >> 9ULL;
+	const uint64_t total_minus_reserve = spl_total_memory - reserve;
 
 	/*
 	 * pages are wanted *and* we are in our reserve area,
@@ -2826,8 +2826,8 @@ xnu_alloc_throttled(vmem_t *bvmp, size_t size, int vmflag)
 	fail_at = segkmem_total_mem_allocated - size;
 
 	/*
-	 * adjust dynamic memory cap downwards by 1/32 (~ 3%) of total_memory
-	 * but do not drop below 1/8 of total_memory..
+	 * adjust dynamic memory cap downwards by 1/32 (~ 3%) of
+	 * spl_total_memory but do not drop below 1/8 of spl_total_memory..
 	 *
 	 * see also spl-kmem.c:spl_reduce_dynamic_cap(), which is
 	 * triggered by ARC or other clients inquiring about spl_free()
@@ -2838,12 +2838,12 @@ xnu_alloc_throttled(vmem_t *bvmp, size_t size, int vmflag)
 		mutex_enter(&spl_dynamic_memory_cap_lock);
 
 		spl_dynamic_memory_cap_last_downward_adjust = gethrtime();
-		const int64_t thresh = total_memory >> 3;
-		const int64_t below_fail_at = fail_at - (total_memory >> 5);
+		const int64_t thresh = spl_total_memory >> 3;
+		const int64_t below_fail_at = fail_at - (spl_total_memory >> 5);
 		const int64_t reduced = MAX(below_fail_at, thresh);
 
 		if (spl_dynamic_memory_cap == 0 ||
-		    spl_dynamic_memory_cap >= total_memory) {
+		    spl_dynamic_memory_cap >= spl_total_memory) {
 			spl_dynamic_memory_cap = reduced;
 			atomic_inc_64(&spl_dynamic_memory_cap_reductions);
 		} else if (thresh > spl_dynamic_memory_cap) {
@@ -2861,7 +2861,7 @@ xnu_alloc_throttled(vmem_t *bvmp, size_t size, int vmflag)
 
 	extern void spl_set_arc_no_grow(int);
 	spl_set_arc_no_grow(B_TRUE);
-	spl_free_set_emergency_pressure(total_memory >> 7LL);
+	spl_free_set_emergency_pressure(spl_total_memory >> 7LL);
 	atomic_inc_64(&spl_xat_pressured);
 	if ((vmflag & (VM_NOSLEEP | VM_PANIC | VM_ABORT)) > 0)
 		return (NULL);
@@ -2883,7 +2883,7 @@ xnu_alloc_throttled(vmem_t *bvmp, size_t size, int vmflag)
 		if (fail_at > x)
 			fail_at = x;
 		spl_set_arc_no_grow(B_TRUE);
-		spl_free_set_emergency_pressure(total_memory >> 7LL);
+		spl_free_set_emergency_pressure(spl_total_memory >> 7LL);
 		atomic_inc_64(&spl_xat_pressured);
 		/* after ten seconds, just return NULL */
 		if (loop_for_mem > 100)
@@ -2987,7 +2987,7 @@ vmem_bucket_alloc(vmem_t *null_vmp, size_t size, const int vmflags)
 		if (spl_vmem_xnu_useful_bytes_free() < (MAX(size,
 		    16ULL*1024ULL*1024ULL))) {
 			spl_free_set_emergency_pressure(
-			    total_memory >> 7LL);
+			    spl_total_memory >> 7LL);
 			IOSleepWithLeeway(2, 1);
 			if (!vmem_canalloc_atomic(bvmp, size) &&
 			    (spl_vmem_xnu_useful_bytes_free() < (MAX(size,
@@ -3158,9 +3158,8 @@ vmem_bucket_alloc(vmem_t *null_vmp, size_t size, const int vmflags)
 			uint64_t n = zfs_lbolt();
 			if (n > loop_timeout) {
 				timedout |= 2;
-				extern uint64_t real_total_memory;
 				spl_free_set_emergency_pressure(
-				    total_memory >> 7LL);
+				    spl_total_memory >> 7LL);
 				// flush the current thread in xat() out of
 				// xat()'s for() loop and into xat_bail()
 				cv_broadcast(&bvmp->vm_cv);
@@ -3548,8 +3547,7 @@ vmem_init(const char *heap_name,
 
 	// create arenas for the VMEM_BUCKETS, id 2 - id 14
 
-	extern uint64_t real_total_memory;
-	VERIFY3U(real_total_memory, >=, 1024ULL*1024ULL*1024ULL);
+	VERIFY3U(spl_real_total_memory, >=, 1024ULL*1024ULL*1024ULL);
 
 	/*
 	 * Minimum bucket span size, which is what we ask IOMallocAligned for.
@@ -3561,7 +3559,7 @@ vmem_init(const char *heap_name,
 	    128ULL * 1024UL;
 
 	dprintf("SPL: %s: real_total_memory %llu, large spans %llu, small "
-	    "spans %llu\n", __func__, real_total_memory,
+	    "spans %llu\n", __func__, spl_real_total_memory,
 	    spl_bucket_tunable_large_span, spl_bucket_tunable_small_span);
 
 	char *buf;
@@ -4126,13 +4124,47 @@ vmem_bucket_number_arc_no_grow(const size_t size)
 boolean_t
 spl_arc_no_grow(size_t size, boolean_t buf_is_metadata, kmem_cache_t **zp)
 {
+	bool rv = false;
+
+	if (spl_should_arc_no_grow())
+		return ((boolean_t)true);
+
 	const uint16_t b = vmem_bucket_number_arc_no_grow(size);
 
-	const bool rv = spl_arc_no_grow_impl(b, size, buf_is_metadata, zp);
+	if (!(rv == true))
+		rv = spl_arc_no_grow_impl(b, size, buf_is_metadata, zp);
 
-	if (rv) {
+	if (rv == true) {
 		atomic_inc_64(&spl_arc_no_grow_count);
 	}
+
+	return ((boolean_t)rv);
+}
+
+boolean_t
+spl_should_arc_no_grow(void)
+{
+	bool rv = false;
+
+	if (spl_use_iomallocdata()) {
+		const uint64_t threshold =
+		    spl_data_private_memory * 95ULL / 100ULL;
+		if (spl_private_mem_allocated >= threshold)
+			rv = true;
+		if (abd_arena_total_size() >= threshold)
+			rv = true;
+	}
+
+	if (!(rv == true) && segkmem_total_mem_allocated >=
+	    (spl_total_memory * 90ULL / 100ULL))
+		rv = true;
+
+	if (!(rv == true) && spl_shared_mem_allocated >=
+	    (spl_data_shared_memory * 80ULL / 100ULL))
+		rv = true;
+
+	if (rv == true)
+		atomic_inc_64(&spl_arc_no_grow_count);
 
 	return ((boolean_t)rv);
 }

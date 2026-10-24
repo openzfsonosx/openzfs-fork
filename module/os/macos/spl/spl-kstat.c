@@ -252,7 +252,7 @@ sbuf_vprintf(struct sbuf *s, const char *fmt, va_list ap)
 		va_end(ap_copy);
 	} while (len > SBUF_FREESPACE(s) &&
 	    sbuf_extend(s, len - SBUF_FREESPACE(s)) == 0);
-	s->s_len += min(len, SBUF_FREESPACE(s));
+	s->s_len += MIN(len, SBUF_FREESPACE(s));
 	if (!SBUF_HASROOM(s) && !SBUF_CANEXTEND(s)) {
 		SBUF_SETFLAG(s, SBUF_OVERFLOWED);
 	}

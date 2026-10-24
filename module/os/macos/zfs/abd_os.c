@@ -146,12 +146,8 @@ static char *abd_zero_buf = NULL;
  * half of each page).  Using linear ABD's for small allocations means that
  * they will be put on slabs which contain many allocations.
  *
- * Linear ABDs for multi-page allocations are easier to use, and in some cases
- * it allows to avoid buffer copying.  But allocation and especially free
- * of multi-page linear ABDs are expensive operations due to KVA mapping and
- * unmapping, and with time they cause KVA fragmentations.
  */
-static size_t zfs_abd_scatter_min_size = ABD_PGSIZE + 1;
+static uint64_t zfs_abd_scatter_min_size = ABD_PGSIZE;
 
 kmem_cache_t *abd_chunk_cache;
 static kstat_t *abd_ksp;
@@ -349,7 +345,7 @@ void
 abd_init(void)
 {
 	abd_chunk_cache = kmem_cache_create("abd_chunk", ABD_PGSIZE, 0,
-	    NULL, NULL, NULL, NULL, 0, KMC_NODEBUG | KMC_RECLAIMABLE);
+	    NULL, NULL, NULL, NULL, abd_arena, KMC_NODEBUG | KMC_RECLAIMABLE);
 
 	wmsum_init(&abd_sums.abdstat_struct_size, 0);
 	wmsum_init(&abd_sums.abdstat_scatter_cnt, 0);
@@ -706,9 +702,7 @@ abd_return_buf_copy(abd_t *abd, void *buf, size_t n)
 }
 
 /* Tunable Parameters */
-module_param(zfs_abd_scatter_enabled, int, 0644);
-MODULE_PARM_DESC(zfs_abd_scatter_enabled,
+ZFS_MODULE_PARAM(zfs, zfs_, abd_scatter_enabled, INT, ZMOD_RW,
 	"Toggle whether ABD allocations must be linear.");
-module_param(zfs_abd_scatter_min_size, int, 0644);
-MODULE_PARM_DESC(zfs_abd_scatter_min_size,
+ZFS_MODULE_PARAM(zfs, zfs_, abd_scatter_min_size, U64, ZMOD_RW,
 	"Minimum size of scatter allocations.");

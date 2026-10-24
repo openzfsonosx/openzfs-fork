@@ -142,10 +142,6 @@ extern uint64_t		zfs_threads;
 extern uint64_t		zfs_active_mutex;
 extern uint64_t		zfs_active_rwlock;
 
-// Half and full amount of RAM bytes in machine
-extern uint64_t		total_memory;
-extern uint64_t		real_total_memory;
-
 #define	MULT 1
 
 static const char *KMEM_VA_PREFIX = "kmem_va";
@@ -317,6 +313,15 @@ static uint32_t kmem_reaping_idspace;
  * kmem tunables
  */
 static struct timespec kmem_reap_interval = {15, 0};
+/*
+ * Every kmem_reap_interval, return idle depot magazines even if there is no
+ * memory pressure. (0 == disabled).  Idle means they have been out of the
+ * working set for the entire previous interval.
+ *
+ * Default enabled, however, on small-RAM machines seeing plenty of memory
+ * pressure, this can be turned off for a modest CPU savings.
+ */
+uint64_t kmem_depot_reap_idle_magazines = 1;
 int kmem_depot_contention = 3;	/* max failed tryenters per real interval */
 pgcnt_t kmem_reapahead = 0;	/* start reaping N pages before pageout */
 int kmem_panic = 1;		/* whether to panic on error */
@@ -524,6 +529,13 @@ extern unsigned int spl_split_stack_below;
 
 typedef struct spl_stats {
 	kstat_named_t spl_os_alloc;
+	kstat_named_t spl_shared_alloc;
+	kstat_named_t spl_private_alloc;
+	kstat_named_t spl_abd_data_throttles;
+	kstat_named_t spl_abd_data_throttle_timeouts;
+	kstat_named_t spl_all_mem_max;
+	kstat_named_t spl_shared_mem_max;
+	kstat_named_t spl_private_mem_max;
 	kstat_named_t spl_active_threads;
 	kstat_named_t spl_active_mutex;
 	kstat_named_t spl_active_rwlock;
@@ -563,7 +575,6 @@ typedef struct spl_stats {
 	kstat_named_t spl_vmem_conditional_alloc_deny_bytes;
 
 	kstat_named_t spl_xat_pressured;
-	kstat_named_t spl_xat_bailed;
 	kstat_named_t spl_xat_lastalloc;
 	kstat_named_t spl_xat_lastfree;
 	kstat_named_t spl_xat_sleep;
@@ -601,10 +612,18 @@ typedef struct spl_stats {
 	kstat_named_t spl_lowest_vdev_disk_stack_remaining;
 	kstat_named_t spl_lowest_zvol_stack_remaining;
 	kstat_named_t spl_split_stack_below;
+	kstat_named_t kmem_depot_reap_idle_magazines;
 } spl_stats_t;
 
 static spl_stats_t spl_stats = {
 	{"os_mem_alloc", KSTAT_DATA_UINT64},
+	{"os_mem_shared_alloc", KSTAT_DATA_UINT64},
+	{"os_mem_private_alloc", KSTAT_DATA_UINT64},
+	{"abd_data_throttles", KSTAT_DATA_UINT64},
+	{"abd_data_throttle_timeouts", KSTAT_DATA_UINT64},
+	{"os_max_mem", KSTAT_DATA_UINT64},
+	{"os_max_shared_mem", KSTAT_DATA_UINT64},
+	{"os_max_private_mem", KSTAT_DATA_UINT64},
 	{"active_threads", KSTAT_DATA_UINT64},
 	{"active_mutex", KSTAT_DATA_UINT64},
 	{"active_rwlock", KSTAT_DATA_UINT64},
@@ -681,6 +700,7 @@ static spl_stats_t spl_stats = {
 	{"lowest_vdev_disk_stack_remaining", KSTAT_DATA_UINT64},
 	{"lowest_zvol_stack_remaining", KSTAT_DATA_UINT64},
 	{"split_stack_below", KSTAT_DATA_UINT64},
+	{"kmem_depot_reap_idle_magazines", KSTAT_DATA_UINT64},
 };
 
 static kstat_t *spl_ksp = 0;
@@ -3165,10 +3185,36 @@ kmem_cache_update(kmem_cache_t *cp)
 		(void) taskq_dispatch(kmem_taskq,
 		    (task_func_t *)kmem_hash_rescale, cp, TQ_NOSLEEP);
 
-	if (need_magazine_resize)
+	if (need_magazine_resize) {
 		(void) taskq_dispatch(kmem_taskq,
 		    (task_func_t *)kmem_cache_magazine_resize,
 		    cp, TQ_NOSLEEP);
+	} else if (kmem_depot_reap_idle_magazines) {
+		/*
+		 * On large-memory macOS 15+ (or on very large-RAM machines
+		 * running earlier OS X), we might never see pressure events
+		 * that reap kmem caches, and so magazines outside the working
+		 * set simply accumulate, which occupies more of
+		 * spl_data_shared_memory than we want.
+		 *
+		 * At this point, there may be outside-of-working-set
+		 * magazines in this kmem cache, which this will free back to
+		 * vmem (which may free back to the kernel), rather than
+		 * having them linger.
+		 *
+		 * This fires periodically, independently of memory pressure,
+		 * and does practically no work on busy caches whose magazines
+		 * are all in the working set.
+		 *
+		 * This also covers all our caches, not just the ones
+		 * arc_kmem_reap_soon() knows about. This also does not rely
+		 * on arc's count of total memory, which ARC may never reach
+		 * even as gigabytes of idle magazines accumulate.
+		 */
+		(void) taskq_dispatch(kmem_taskq,
+		    (task_func_t *)kmem_depot_ws_reap,
+		    cp, TQ_NOSLEEP);
+	}
 
 	// smd : the following if is only true for the dnode cache
 	if (cp->cache_defrag != NULL)
@@ -3399,7 +3445,7 @@ spl_minimal_physmem_p(void)
 size_t
 kmem_maxavail(void)
 {
-	return (total_memory);
+	return (spl_total_memory);
 }
 
 /*
@@ -4340,7 +4386,7 @@ kmem_cache_fini()
 
 /*
  * Reduce dynamic memory cap by a set amount ("reduction"), unless the cap is
- * already 1/8 of total_memory or lower.  unlike the logic in
+ * already 1/8 of spl_total_memory or lower.  unlike the logic in
  * spl-vmem.c:xnu_alloc_throttled(), we likely have not observed xnu being
  * ready to deny us memory, so we drop half the cap half as much.
  *
@@ -4357,9 +4403,9 @@ spl_reduce_dynamic_cap(void)
 	 */
 	const uint64_t cap_in = spl_dynamic_memory_cap;
 
-	const uint64_t reduce_amount = total_memory >> 8;
+	const uint64_t reduce_amount = spl_total_memory >> 8;
 
-	const int64_t thresh = total_memory >> 3;
+	const int64_t thresh = spl_total_memory >> 3;
 
 	const int64_t reduction = (int64_t)(cap_in - reduce_amount);
 
@@ -4378,9 +4424,10 @@ spl_reduce_dynamic_cap(void)
 	    SEC2NSEC(60)) {
 
 		if (spl_dynamic_memory_cap == 0 ||
-		    spl_dynamic_memory_cap > total_memory) {
+		    spl_dynamic_memory_cap > spl_total_memory) {
 			spl_dynamic_memory_cap_last_downward_adjust = now;
-			spl_dynamic_memory_cap = total_memory - reduce_amount;
+			spl_dynamic_memory_cap =
+			    spl_total_memory - reduce_amount;
 			atomic_inc_64(&spl_dynamic_memory_cap_reductions);
 		} else if (spl_dynamic_memory_cap > reduced) {
 			spl_dynamic_memory_cap_last_downward_adjust = now;
@@ -4434,7 +4481,7 @@ spl_free_wrapper(void)
 			atomic_inc_64(&spl_memory_cap_enforcements);
 			const int64_t dec = spl_manual_memory_cap -
 			    segkmem_total_mem_allocated;
-			const int64_t giveback = -(total_memory >> 10);
+			const int64_t giveback = -(spl_total_memory >> 10);
 			if (dec > giveback) {
 				spl_free = giveback;
 				return (giveback);
@@ -4620,7 +4667,7 @@ spl_maybe_send_large_pressure(uint64_t now, uint64_t minutes, boolean_t full)
 	spl_last_large_pressure = now;
 
 	const int64_t sixteenth_total_memory =
-	    (int64_t)real_total_memory / 16LL;
+	    (int64_t)spl_total_memory / 16LL;
 	const int64_t sixtyfourth_total_memory =
 	    sixteenth_total_memory / 4LL;
 	int64_t howmuch = sixteenth_total_memory;
@@ -4648,10 +4695,10 @@ spl_free_thread(void *notused)
 
 	/* initialize with a reasonably large amount of memory */
 	spl_free = MAX(4*1024*1024*1024,
-	    total_memory * 75ULL / 100ULL);
+	    spl_total_memory * 75ULL / 100ULL);
 
 	if (spl_dynamic_memory_cap == 0)
-		spl_dynamic_memory_cap = total_memory;
+		spl_dynamic_memory_cap = spl_total_memory;
 
 	mutex_enter(&spl_free_thread_lock);
 
@@ -4679,7 +4726,7 @@ spl_free_thread(void *notused)
 		if (time_now > hz)
 			time_now_seconds = time_now / hz;
 
-		new_spl_free = total_memory -
+		new_spl_free = spl_total_memory -
 		    segkmem_total_mem_allocated;
 
 		/* Ask Mach about pressure */
@@ -4783,10 +4830,10 @@ spl_free_thread(void *notused)
 			}
 			/*
 			 * Cap, bearing in mind that we deflate
-			 * total_memory by 50% at initialization
+			 * spl_total_memory by 50% at initialization
 			 */
-			if (new_spl_free > total_memory)
-				new_spl_free = total_memory;
+			if (new_spl_free > spl_total_memory)
+				new_spl_free = spl_total_memory;
 		}
 
 		/*
@@ -5044,12 +5091,12 @@ spl_free_thread(void *notused)
 			int64_t total_mem_used = (int64_t)
 			    segkmem_total_mem_allocated;
 			if ((segkmem_total_mem_allocated * 100LL /
-			    real_total_memory) > 70) {
-				new_spl_free -= total_mem_used / 64;
-			} else if ((segkmem_total_mem_allocated * 100LL /
-			    real_total_memory) > 75) {
+			    spl_total_memory) > 75) {
 				new_spl_free -= total_mem_used / 32;
 				lowmem = true;
+			} else if ((segkmem_total_mem_allocated * 100LL /
+			    spl_total_memory) > 70) {
+				new_spl_free -= total_mem_used / 64;
 			}
 		}
 
@@ -5084,7 +5131,7 @@ spl_free_thread(void *notused)
 		 */
 		const int64_t spamaxblksz = 16LL * 1024LL;
 		if ((4LL * spamaxblksz) >
-		    (total_memory - segkmem_total_mem_allocated)) {
+		    (spl_total_memory - segkmem_total_mem_allocated)) {
 			if (new_spl_free > 2LL * spamaxblksz)
 				new_spl_free = 2LL * spamaxblksz;
 		}
@@ -5221,9 +5268,9 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		    spl_manual_memory_cap) {
 			uint64_t v =
 			    ks->spl_manual_memory_cap.value.ui64;
-			if (v < total_memory >> 3)
-				v = total_memory >> 3;
-			else if (v > total_memory)
+			if (v < spl_total_memory >> 3)
+				v = spl_total_memory >> 3;
+			else if (v > spl_total_memory)
 				v = 0;
 			spl_manual_memory_cap = v;
 		}
@@ -5233,16 +5280,35 @@ spl_kstat_update(kstat_t *ksp, int rw)
 			uint64_t v =
 			    ks->spl_dynamic_memory_cap.value.ui64;
 			if (v == 0)
-				v = total_memory;
-			else if (v < total_memory >> 3)
-				v = total_memory >> 3;
-			else if (v > total_memory)
-				v = total_memory;
+				v = spl_total_memory;
+			else if (v < spl_total_memory >> 3)
+				v = spl_total_memory >> 3;
+			else if (v > spl_total_memory)
+				v = spl_total_memory;
 			spl_dynamic_memory_cap = v;
+		}
+
+		if (ks->kmem_depot_reap_idle_magazines.value.ui64 !=
+		    kmem_depot_reap_idle_magazines) {
+			kmem_depot_reap_idle_magazines =
+			    ks->kmem_depot_reap_idle_magazines.value.ui64;
 		}
 
 	} else {
 		ks->spl_os_alloc.value.ui64 = segkmem_total_mem_allocated;
+		ks->spl_shared_alloc.value.ui64 =
+		    spl_shared_mem_allocated;
+		ks->spl_private_alloc.value.ui64 =
+		    spl_private_mem_allocated;
+		ks->spl_abd_data_throttles.value.ui64 =
+		    spl_abd_data_throttles;
+		ks->spl_abd_data_throttle_timeouts.value.ui64 =
+		    spl_abd_data_throttle_timeouts;
+		ks->spl_all_mem_max.value.ui64 = spl_total_memory;
+		ks->spl_shared_mem_max.value.ui64 =
+		    spl_data_shared_memory;
+		ks->spl_private_mem_max.value.ui64 =
+		    spl_data_private_memory;
 		ks->spl_active_threads.value.ui64 = zfs_threads;
 		ks->spl_active_mutex.value.ui64 = zfs_active_mutex;
 		ks->spl_active_rwlock.value.ui64 = zfs_active_rwlock;
@@ -5361,6 +5427,8 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		    spl_lowest_zvol_stack_remaining;
 		ks->spl_split_stack_below.value.ui64 =
 		    spl_split_stack_below;
+		ks->kmem_depot_reap_idle_magazines.value.ui64 =
+		    kmem_depot_reap_idle_magazines;
 	}
 
 	return (0);
@@ -6587,7 +6655,7 @@ kmem_cache_scan(kmem_cache_t *cp)
 size_t
 kmem_size(void)
 {
-	return (total_memory); // smd
+	return (spl_total_memory); // smd
 }
 
 // this is used in arc_reclaim_needed.  if 1, reclaim is needed.
@@ -6788,7 +6856,7 @@ spl_arc_reclaim_needed(const size_t bytes, kmem_cache_t **zp)
 
 	extern uint64_t vmem_xnu_useful_bytes_free(void);
 	const uint64_t min_threshold = 64ULL*1024ULL*1024ULL;
-	const uint64_t pm_pct = real_total_memory >> 8;
+	const uint64_t pm_pct = spl_total_memory >> 8;
 	const uint64_t high_threshold = MAX(min_threshold, (uint64_t)pm_pct);
 	const uint64_t low_threshold = bytes;
 
