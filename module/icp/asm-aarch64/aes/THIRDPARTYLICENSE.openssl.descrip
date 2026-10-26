@@ -6,5 +6,5 @@ https://github.com/openssl/openssl/blob/openssl-3.6.3/crypto/modes/asm/aes-gcm-a
 Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
 Written by Xiaokang Qian for the OpenSSL project, derived from
 ARM-software/AArch64cryptolib, originally authored by Samuel Lee.
-Adapted to the OpenZFS context layout and encoded for older Apple
-assembler toolchains. The instruction schedule is retained.
+Adapted to the OpenZFS context layout for Apple arm64.
+The instruction schedule is retained.
