@@ -20,6 +20,7 @@
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <kern/clock.h>
+#include <sys/systm.h>
 
 /*
  * gethrtime() provides high-resolution timestamps with
@@ -126,4 +127,25 @@ hrt2ts(hrtime_t hrt, struct timespec *tsp)
 	}
 	tsp->tv_sec = (time_t)sec;
 	tsp->tv_nsec = nsec;
+}
+
+/*
+ * ZOL semantics: sleep for at least min_us microseconds,
+ * with max_us permitted slack. MacOS doesn't do this slack.
+ */
+void
+spl_usleep_range(uint64_t min_us, uint64_t max_us)
+{
+	struct timespec ts;
+	int chan;
+
+	(void) max_us;
+
+	if (min_us == 0)
+		return;  // msleep would never time out
+
+	ts.tv_sec = min_us / 1000000ULL;
+	ts.tv_nsec = (min_us % 1000000ULL) * 1000ULL;
+
+	(void) msleep(&chan, NULL, PWAIT, "usleep_range", &ts);
 }

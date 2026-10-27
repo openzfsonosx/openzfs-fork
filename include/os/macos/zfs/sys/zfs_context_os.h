@@ -24,8 +24,8 @@
 		ldi_buf_t	zm_buf; \
 	} macos;
 
-
-#define	MSEC_TO_TICK(msec)		((msec) / (MILLISEC / hz))
+#define	MSEC_TO_TICK(msec)	\
+	(((msec) + (MILLISEC / hz) - 1) / (MILLISEC / hz))
 
 #define	KMALLOC_MAX_SIZE		MAXPHYS
 
