@@ -66,7 +66,8 @@ extern time_t gethrestime_sec(void);
 extern void hrt2ts(hrtime_t hrt, struct timespec *tsp);
 
 #define	SEC_TO_TICK(sec)	((sec) * hz)
-#define	NSEC_TO_TICK(nsec)	((nsec) / (NANOSEC / hz))
+#define	NSEC_TO_TICK(nsec)	\
+	(((nsec) + (NANOSEC / hz) - 1) / (NANOSEC / hz))
 
 #define	MSEC2NSEC(m)	((hrtime_t)(m) * (NANOSEC / MILLISEC))
 #define	NSEC2MSEC(n)	((n) / (NANOSEC / MILLISEC))
