@@ -139,6 +139,49 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 	return (CRYPTO_SUCCESS);
 }
 
+int
+aes_ctr32_crypt(const void *ks, const uint8_t *in, uint8_t *out,
+    size_t blocks, const uint8_t counter[16])
+{
+	aes_key_t *ksch = (aes_key_t *)ks;
+	const aes_impl_ops_t *ops = ksch->ops;
+
+	if (ops->ctr32 != NULL && !ops->needs_byteswap) {
+		ops->ctr32(in, out, blocks, &ksch->encr_ks.ks32[0], ksch->nr,
+		    counter);
+	} else {
+		uint8_t cb[16], stream[16];
+		uint32_t n;
+
+		memcpy(cb, counter, sizeof (cb));
+		for (size_t i = 0; i < blocks; i++) {
+			(void) aes_encrypt_block(ks, cb, stream);
+			for (size_t j = 0; j < sizeof (stream); j++)
+				out[i * 16 + j] = in[i * 16 + j] ^ stream[j];
+			memcpy(&n, &cb[12], sizeof (n));
+			n = htonl(ntohl(n) + 1);
+			memcpy(&cb[12], &n, sizeof (n));
+		}
+	}
+	return (CRYPTO_SUCCESS);
+}
+
+int
+aes_cbc_mac(const void *ks, const uint8_t *in, size_t length,
+    uint8_t mac[16])
+{
+	aes_key_t *ksch = (aes_key_t *)ks;
+	const aes_impl_ops_t *ops = ksch->ops;
+
+	ASSERT0(length % AES_BLOCK_LEN);
+	if (ops->cbc == NULL || ops->needs_byteswap)
+		return (CRYPTO_ARGUMENTS_BAD);
+
+	ops->cbc(in, NULL, length, &ksch->encr_ks.ks32[0], mac,
+	    ksch->nr);
+	return (CRYPTO_SUCCESS);
+}
+
 
 /*
  * Decrypt one block using AES.

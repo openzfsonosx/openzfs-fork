@@ -87,3 +87,7 @@ jobs:
         zpool status
 
         echo "Built ZFS successfully on ARM"
+    - name: Crypto regression tests
+      run: |
+        tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_gcm_test.txt
+        tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_ccm_test.txt

@@ -302,6 +302,71 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
 	saved_offset = plaintext->cd_offset;
 	saved_length = plaintext->cd_length;
 
+#if defined(__aarch64__) && defined(HAVE_AESV8)
+	/*
+	 * Atomic RAW GCM requests already provide stable contiguous input and
+	 * output buffers.  Authenticate ciphertext in place and only decrypt to
+	 * the final output after the tag succeeds.
+	 */
+	if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE &&
+	    ciphertext->cd_format == CRYPTO_DATA_RAW &&
+	    plaintext->cd_format == CRYPTO_DATA_RAW) {
+		if (ciphertext->cd_offset + ciphertext->cd_length >
+		    ciphertext->cd_raw.iov_len ||
+		    plaintext->cd_offset + length_needed >
+		    plaintext->cd_raw.iov_len) {
+			ret = CRYPTO_DATA_LEN_RANGE;
+			goto out;
+		}
+
+		const uint8_t *in = (const uint8_t *)
+		    ciphertext->cd_raw.iov_base + ciphertext->cd_offset;
+		uint8_t *outp = (uint8_t *)plaintext->cd_raw.iov_base +
+		    plaintext->cd_offset;
+		ret = gcm_decrypt_atomic_contiguous((gcm_ctx_t *)&aes_ctx,
+		    in, length_needed, in + length_needed, outp, AES_BLOCK_LEN,
+		    aes_encrypt_block, aes_ctr32_crypt, aes_xor_block);
+		plaintext->cd_length =
+		    (ret == CRYPTO_SUCCESS) ? length_needed : saved_length;
+		plaintext->cd_offset = saved_offset;
+		goto out;
+	}
+
+	/*
+	 * ZFS normal records use one plaintext iovec and two ciphertext iovecs:
+	 * ciphertext followed by the separately stored authentication tag.
+	 * This is the UIO equivalent of the contiguous RAW fast path above.
+	 */
+	if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE &&
+	    ciphertext->cd_format == CRYPTO_DATA_UIO &&
+	    plaintext->cd_format == CRYPTO_DATA_UIO &&
+	    ciphertext->cd_offset == 0 && plaintext->cd_offset == 0) {
+		zfs_uio_t *cuio = ciphertext->cd_uio;
+		zfs_uio_t *puio = plaintext->cd_uio;
+		size_t tag_len = aes_ctx.ac_tag_len;
+
+		if (zfs_uio_segflg(cuio) == UIO_SYSSPACE &&
+		    zfs_uio_segflg(puio) == UIO_SYSSPACE &&
+		    zfs_uio_iovcnt(cuio) == 2 &&
+		    zfs_uio_iovcnt(puio) == 1 &&
+		    zfs_uio_iovlen(cuio, 0) == length_needed &&
+		    zfs_uio_iovlen(cuio, 1) >= tag_len &&
+		    zfs_uio_iovlen(puio, 0) >= length_needed) {
+			ret = gcm_decrypt_atomic_contiguous(
+			    (gcm_ctx_t *)&aes_ctx,
+			    zfs_uio_iovbase(cuio, 0), length_needed,
+			    zfs_uio_iovbase(cuio, 1),
+			    zfs_uio_iovbase(puio, 0), AES_BLOCK_LEN,
+			    aes_encrypt_block, aes_ctr32_crypt, aes_xor_block);
+			plaintext->cd_length =
+			    (ret == CRYPTO_SUCCESS) ?
+			    length_needed : saved_length;
+			plaintext->cd_offset = saved_offset;
+			goto out;
+		}
+	}
+#endif
+
 	/*
 	 * Do an update on the specified input data.
 	 */
@@ -326,7 +391,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
 			    == aes_ctx.ac_mac_len);
 			ret = ccm_decrypt_final((ccm_ctx_t *)&aes_ctx,
 			    plaintext, AES_BLOCK_LEN, aes_encrypt_block,
-			    aes_copy_block, aes_xor_block);
+			    aes_cbc_mac, aes_copy_block, aes_xor_block);
 			ASSERT0(aes_ctx.ac_remainder_len);
 			if ((ret == CRYPTO_SUCCESS) &&
 			    (ciphertext != plaintext)) {
@@ -338,6 +403,7 @@ aes_decrypt_atomic(crypto_mechanism_t *mechanism,
 		} else if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE) {
 			ret = gcm_decrypt_final((gcm_ctx_t *)&aes_ctx,
 			    plaintext, AES_BLOCK_LEN, aes_encrypt_block,
+			    aes_ctr32_crypt,
 			    aes_xor_block);
 			ASSERT0(aes_ctx.ac_remainder_len);
 			if ((ret == CRYPTO_SUCCESS) &&

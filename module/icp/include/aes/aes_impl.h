@@ -119,6 +119,10 @@ extern void *aes_alloc_keysched(size_t *size, int kmflag);
 extern void aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits,
 	void *keysched);
 extern int aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct);
+extern int aes_ctr32_crypt(const void *ks, const uint8_t *in, uint8_t *out,
+    size_t blocks, const uint8_t counter[16]);
+extern int aes_cbc_mac(const void *ks, const uint8_t *in, size_t length,
+    uint8_t mac[16]);
 extern int aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt);
 
 /*
@@ -157,6 +161,10 @@ typedef enum aes_mech_type {
 typedef void 		(*aes_generate_f)(aes_key_t *, const uint32_t *, int);
 typedef void		(*aes_encrypt_f)(const uint32_t[], int,
     const uint32_t[4], uint32_t[4]);
+typedef void		(*aes_ctr32_f)(const uint8_t *, uint8_t *, size_t,
+    const uint32_t[], int, const uint8_t[16]);
+typedef void		(*aes_cbc_f)(const uint8_t *, uint8_t *, size_t,
+    const uint32_t[], uint8_t[16], int);
 typedef void		(*aes_decrypt_f)(const uint32_t[], int,
     const uint32_t[4], uint32_t[4]);
 typedef boolean_t	(*aes_will_work_f)(void);
@@ -166,6 +174,8 @@ typedef boolean_t	(*aes_will_work_f)(void);
 struct aes_impl_ops {
 	aes_generate_f generate;
 	aes_encrypt_f encrypt;
+	aes_ctr32_f ctr32;
+	aes_cbc_f cbc;
 	aes_decrypt_f decrypt;
 	aes_will_work_f is_supported;
 	boolean_t needs_byteswap;

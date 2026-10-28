@@ -82,6 +82,31 @@ extern void ASMABI gcm_gmult_v8(uint64_t Xi[2], const uint64_t Htable[16*2]);
 extern void ASMABI gcm_ghash_v8(uint64_t Xi[2], const uint64_t Htable[16*2],
 	const uint8_t *input, size_t len);
 
+#if defined(__APPLE__)
+#define	GCM_EOR3_MIN_LEN	1024
+
+typedef struct gcm_eor3_ctx {
+	uint64_t xi[2];
+	uint64_t reserved[2];
+	uint64_t htable[32];
+} __attribute__((aligned(16))) gcm_eor3_ctx_t;
+
+extern void ASMABI aes_gcm_enc_128_eor3_zfs(const uint8_t *, uint64_t,
+	uint8_t *, uint64_t *, uint8_t *, const uint32_t *);
+extern void ASMABI aes_gcm_dec_128_eor3_zfs(const uint8_t *, uint64_t,
+	uint8_t *, uint64_t *, uint8_t *, const uint32_t *);
+#endif
+
+static void
+gcm_init_v8_htab(uint64_t *Htable, const uint64_t H[2])
+{
+	/* gcm_init_v8() follows OpenSSL's host-order H calling convention. */
+	uint64_t host_H[2] = { ntohll(H[0]), ntohll(H[1]) };
+
+	gcm_init_v8(Htable, host_H);
+	memset(host_H, 0, sizeof (host_H));
+}
+
 static boolean_t
 gcm_ghashv8_will_work(void)
 {
@@ -102,19 +127,20 @@ const gcm_impl_ops_t gcm_ghashv8_impl = {
 	.name = "ghashv8",
 	.needs_htable = B_TRUE,
 	.ghash = &gcm_ghash_v8,
-	.ghash_init = &gcm_init_v8, // or gcm_init_htab(), not NULL!
+	.ghash_init = &gcm_init_v8_htab,
 	.is_supported = &gcm_ghashv8_will_work
 };
 
 // Turbo up the GHASH
 #undef GHASH
 #define	GHASH(c, d, t, o) do { \
-		xor_block((uint8_t *)(d), (uint8_t *)(c)->gcm_ghash); \
 		if ((o)->ghash != NULL) { \
 			(o)->ghash((uint64_t *)(c)->gcm_ghash, \
 				(const uint64_t *)(c)->gcm_Htable, \
-				(const uint8_t *)(t), 16); \
+				(const uint8_t *)(d), 16); \
 		} else { \
+			xor_block((uint8_t *)(d), \
+			    (uint8_t *)(c)->gcm_ghash); \
 			(o)->mul((uint64_t *)(c)->gcm_ghash, (c)->gcm_H, \
 				(uint64_t *)(t)); \
 		} \
@@ -127,6 +153,58 @@ const gcm_impl_ops_t gcm_ghashv8_impl = {
 // would be a larger change, up where we decide to call contiguous.
 
 #endif /* defined (__aarch64__) && defined(HAVE_AESV8) */
+
+static inline void
+gcm_advance_counter(gcm_ctx_t *ctx, size_t blocks)
+{
+	uint64_t counter;
+	uint64_t counter_mask = ntohll(0x00000000ffffffffULL);
+
+	counter = ntohll(ctx->gcm_cb[1] & counter_mask);
+	counter = htonll(counter + blocks);
+	counter &= counter_mask;
+	ctx->gcm_cb[1] = (ctx->gcm_cb[1] & ~counter_mask) | counter;
+}
+
+#if defined(__aarch64__) && defined(HAVE_AESV8) && defined(__APPLE__)
+static boolean_t
+gcm_eor3_can_use(gcm_ctx_t *ctx, const gcm_impl_ops_t *gops, size_t length)
+{
+	aes_key_t *key = (aes_key_t *)ctx->gcm_keysched;
+
+	/* Every arm64 Mac is Apple Silicon and implements SHA3/EOR3. */
+	return (length >= GCM_EOR3_MIN_LEN && length <= UINT64_MAX / 8 &&
+	    ctx->gcm_Htable != NULL && key != NULL && key->nr == 10 &&
+	    key->ops != NULL &&
+	    key->ops->ctr32 == aes_aesv8_impl.ctr32 &&
+	    gops->ghash == gcm_ghash_v8);
+}
+
+static void
+gcm_eor3_ctx_load(gcm_eor3_ctx_t *fused, const gcm_ctx_t *ctx)
+{
+	memcpy(fused->xi, ctx->gcm_ghash, sizeof (fused->xi));
+	memset(fused->reserved, 0, sizeof (fused->reserved));
+	memcpy(fused->htable, ctx->gcm_Htable, sizeof (fused->htable));
+}
+
+static void
+gcm_eor3_ctx_store(gcm_ctx_t *ctx, const gcm_eor3_ctx_t *fused)
+{
+	memcpy(ctx->gcm_ghash, fused->xi, sizeof (fused->xi));
+}
+
+static void
+gcm_rewind_counter_one(gcm_ctx_t *ctx)
+{
+	uint32_t counter;
+	uint8_t *cb = (uint8_t *)ctx->gcm_cb;
+
+	memcpy(&counter, cb + 12, sizeof (counter));
+	counter = htonl(ntohl(counter) - 1);
+	memcpy(cb + 12, &counter, sizeof (counter));
+}
+#endif
 
 /*
  * Generic ghash_init function
@@ -164,6 +242,8 @@ int
 gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
     crypto_data_t *out, size_t block_size,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *))
 {
@@ -202,6 +282,65 @@ gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 	crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	gops = gcm_impl_get_ops();
+
+	/*
+	 * Process a complete contiguous request with the multi-block CTR and
+	 * aggregated GHASH implementations.  Besides avoiding a pair of calls
+	 * per 16-byte block, this lets gcm_ghash_v8 use its 4-way PMULL path.
+	 */
+	if (ctx->gcm_remainder_len == 0 && length != 0 &&
+	    length % block_size == 0 && gops->ghash != NULL &&
+	    ctr32_crypt != NULL) {
+		void *fast_iov = iov_or_mp;
+		offset_t fast_offset = offset;
+		uint8_t *fast_out = NULL, *fast_out_2 = NULL;
+		size_t fast_out_len = 0;
+		size_t blocks = length / block_size;
+
+		crypto_get_ptrs(out, &fast_iov, &fast_offset, &fast_out,
+		    &fast_out_len, &fast_out_2, length);
+		if (fast_out != NULL && fast_out_len == length &&
+		    fast_out_2 == NULL) {
+#if defined(__aarch64__) && defined(HAVE_AESV8) && defined(__APPLE__)
+			if (gcm_eor3_can_use(ctx, gops, length)) {
+				aes_key_t *key = (aes_key_t *)ctx->gcm_keysched;
+				gcm_eor3_ctx_t fused;
+
+				gcm_eor3_ctx_load(&fused, ctx);
+				gcm_advance_counter(ctx, 1);
+				aes_gcm_enc_128_eor3_zfs(datap,
+				    CRYPTO_BYTES2BITS(length), fast_out,
+				    fused.xi,
+				    (uint8_t *)ctx->gcm_cb,
+				    &key->encr_ks.ks32[0]);
+				/*
+				 * The fused kernel leaves cb at the next
+				 * counter.
+				 */
+				gcm_rewind_counter_one(ctx);
+				gcm_eor3_ctx_store(ctx, &fused);
+				memset(&fused, 0, sizeof (fused));
+				ctx->gcm_processed_data_len += length;
+				ctx->gcm_copy_to = NULL;
+				out->cd_offset += length;
+				return (CRYPTO_SUCCESS);
+			}
+#endif
+			gcm_advance_counter(ctx, 1);
+			(void) ctr32_crypt(ctx->gcm_keysched, datap, fast_out,
+			    blocks, (uint8_t *)ctx->gcm_cb);
+			if (blocks > 1)
+				gcm_advance_counter(ctx, blocks - 1);
+			gops->ghash(ctx->gcm_ghash,
+			    (const uint64_t *)ctx->gcm_Htable, fast_out,
+			    length);
+			ctx->gcm_processed_data_len += length;
+			ctx->gcm_copy_to = NULL;
+			out->cd_offset += length;
+			return (CRYPTO_SUCCESS);
+		}
+	}
+
 	do {
 		/* Unprocessed data from last call. */
 		if (ctx->gcm_remainder_len > 0) {
@@ -450,6 +589,8 @@ gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *ctx, char *data, size_t length,
 int
 gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
     void (*xor_block)(uint8_t *, uint8_t *))
 {
 #ifdef CAN_USE_GCM_ASM
@@ -474,6 +615,22 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	ghash = (uint8_t *)ctx->gcm_ghash;
 	blockp = ctx->gcm_pt_buf;
 	remainder = pt_len;
+	if (gops->ghash != NULL && ctr32_crypt != NULL &&
+	    remainder >= block_size) {
+		size_t blocks = remainder / block_size;
+		size_t bytes = blocks * block_size;
+
+		gops->ghash(ctx->gcm_ghash,
+		    (const uint64_t *)ctx->gcm_Htable, blockp, bytes);
+		gcm_advance_counter(ctx, 1);
+		(void) ctr32_crypt(ctx->gcm_keysched, blockp, blockp, blocks,
+		    (uint8_t *)ctx->gcm_cb);
+		if (blocks > 1)
+			gcm_advance_counter(ctx, blocks - 1);
+		processed += bytes;
+		blockp += bytes;
+		remainder -= bytes;
+	}
 	while (remainder > 0) {
 		/* Incomplete last block */
 		if (remainder < block_size) {
@@ -527,6 +684,114 @@ out:
 			return (rv);
 		out->cd_offset += pt_len;
 	}
+	return (CRYPTO_SUCCESS);
+}
+
+/*
+ * Fast path for one-shot GCM decryption with contiguous input and output.
+ * Authenticate the original ciphertext before writing any plaintext, then
+ * decrypt directly to the caller's output.  Fused decryption stages its
+ * output privately until the authentication tag has been verified.
+ */
+int
+gcm_decrypt_atomic_contiguous(gcm_ctx_t *ctx, const uint8_t *ciphertext,
+    size_t plaintext_len, const uint8_t *tag, uint8_t *plaintext,
+    size_t block_size,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
+    void (*xor_block)(uint8_t *, uint8_t *))
+{
+	const gcm_impl_ops_t *gops = gcm_impl_get_ops();
+	size_t full_len = plaintext_len - (plaintext_len % block_size);
+	size_t blocks = full_len / block_size;
+	size_t tail_len = plaintext_len - full_len;
+	uint8_t *ghash = (uint8_t *)ctx->gcm_ghash;
+	uint8_t *tmp = (uint8_t *)ctx->gcm_tmp;
+	boolean_t fused_decrypt = B_FALSE;
+#if defined(__aarch64__) && defined(HAVE_AESV8) && defined(__APPLE__)
+	uint8_t *fused_plaintext = NULL;
+
+	if (tail_len == 0 && gcm_eor3_can_use(ctx, gops, full_len)) {
+		aes_key_t *key = (aes_key_t *)ctx->gcm_keysched;
+		gcm_eor3_ctx_t fused;
+
+		fused_plaintext = kmem_alloc(full_len, KM_SLEEP);
+		if (fused_plaintext != NULL) {
+			gcm_eor3_ctx_load(&fused, ctx);
+			gcm_advance_counter(ctx, 1);
+			aes_gcm_dec_128_eor3_zfs(ciphertext,
+			    CRYPTO_BYTES2BITS(full_len), fused_plaintext,
+			    fused.xi, (uint8_t *)ctx->gcm_cb,
+			    &key->encr_ks.ks32[0]);
+			gcm_rewind_counter_one(ctx);
+			gcm_eor3_ctx_store(ctx, &fused);
+			memset(&fused, 0, sizeof (fused));
+			fused_decrypt = B_TRUE;
+		}
+	}
+#endif
+
+	if (full_len != 0 && !fused_decrypt) {
+		if (gops->ghash != NULL) {
+			gops->ghash(ctx->gcm_ghash,
+			    (const uint64_t *)ctx->gcm_Htable, ciphertext,
+			    full_len);
+		} else {
+			for (size_t offset = 0; offset < full_len;
+			    offset += block_size) {
+				GHASH(ctx, ciphertext + offset, ghash, gops);
+			}
+		}
+	}
+
+	if (tail_len != 0) {
+		memset(ctx->gcm_remainder, 0, block_size);
+		memcpy(ctx->gcm_remainder, ciphertext + full_len, tail_len);
+		GHASH(ctx, ctx->gcm_remainder, ghash, gops);
+	}
+
+	ctx->gcm_len_a_len_c[1] =
+	    htonll(CRYPTO_BYTES2BITS(plaintext_len));
+	GHASH(ctx, ctx->gcm_len_a_len_c, ghash, gops);
+	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_J0, tmp);
+	for (size_t i = 0; i < ctx->gcm_tag_len; i++)
+		tmp[i] ^= ghash[i];
+	if (memcmp(tag, tmp, ctx->gcm_tag_len) != 0) {
+#if defined(__aarch64__) && defined(HAVE_AESV8) && defined(__APPLE__)
+		if (fused_plaintext != NULL) {
+			memset(fused_plaintext, 0, full_len);
+			kmem_free(fused_plaintext, full_len);
+		}
+#endif
+		return (CRYPTO_INVALID_MAC);
+	}
+
+#if defined(__aarch64__) && defined(HAVE_AESV8) && defined(__APPLE__)
+	if (fused_decrypt) {
+		memcpy(plaintext, fused_plaintext, full_len);
+		memset(fused_plaintext, 0, full_len);
+		kmem_free(fused_plaintext, full_len);
+		return (CRYPTO_SUCCESS);
+	}
+#endif
+
+	if (blocks != 0) {
+		gcm_advance_counter(ctx, 1);
+		(void) ctr32_crypt(ctx->gcm_keysched, ciphertext, plaintext,
+		    blocks, (uint8_t *)ctx->gcm_cb);
+		if (blocks > 1)
+			gcm_advance_counter(ctx, blocks - 1);
+	}
+
+	if (tail_len != 0) {
+		gcm_advance_counter(ctx, 1);
+		encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_cb, tmp);
+		for (size_t i = 0; i < tail_len; i++)
+			plaintext[full_len + i] =
+			    ciphertext[full_len + i] ^ tmp[i];
+	}
+
 	return (CRYPTO_SUCCESS);
 }
 
@@ -600,7 +865,8 @@ gcm_format_initial_blocks(const uint8_t *iv, ulong_t iv_len,
 
 		len_a_len_c[0] = 0;
 		len_a_len_c[1] = htonll(CRYPTO_BYTES2BITS(iv_len));
-		GHASH(ctx, len_a_len_c, ctx->gcm_J0, gops);
+		GHASH(ctx, len_a_len_c, ghash, gops);
+		copy_block(ghash, (uint8_t *)ctx->gcm_J0);
 
 		/* J0 will be used again in the final */
 		copy_block((uint8_t *)ctx->gcm_J0, (uint8_t *)cb);
@@ -623,10 +889,19 @@ gcm_init(gcm_ctx_t *ctx, const uint8_t *iv, size_t iv_len,
 	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_H,
 	    (uint8_t *)ctx->gcm_H);
 
+	gops = gcm_impl_get_ops();
+	if (gops->needs_htable) {
+		/*
+		 * H is only available after encrypting the zero block.  The
+		 * precomputed table must be initialized before hashing a
+		 * non-standard IV or any AAD below.
+		 */
+		gops->ghash_init(ctx->gcm_Htable, ctx->gcm_H);
+	}
+
 	gcm_format_initial_blocks(iv, iv_len, ctx, block_size,
 	    copy_block, xor_block);
 
-	gops = gcm_impl_get_ops();
 	authp = (uint8_t *)ctx->gcm_tmp;
 	ghash = (uint8_t *)ctx->gcm_ghash;
 	memset(authp, 0, block_size);
@@ -711,13 +986,6 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
 		gcm_ctx->gcm_htab_len = 32 * sizeof (uint64_t);
 		gcm_ctx->gcm_Htable =
 		    kmem_alloc(gcm_ctx->gcm_htab_len, KM_SLEEP);
-
-		/*
-		 * We assume ghash_init is set to at least
-		 * gcm_init_htab() (generic), since this only
-		 * applies to new code with .needs_htable set.
-		 */
-		gops->ghash_init(gcm_ctx->gcm_Htable, gcm_ctx->gcm_H);
 	}
 
 #ifdef CAN_USE_GCM_ASM
@@ -895,7 +1163,7 @@ gcm_impl_init(void)
 	 * Set the fastest implementation given the assumption that the
 	 * hardware accelerated version is the fastest.
 	 */
-#if defined(__aarch64__) && HAVE_SIMD(ARMV8)
+#if defined(__aarch64__) && defined(HAVE_AESV8)
 	if (gcm_ghashv8_impl.is_supported()) {
 		memcpy(&gcm_fastest_impl, &gcm_ghashv8_impl,
 		    sizeof (gcm_fastest_impl));

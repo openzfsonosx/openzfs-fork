@@ -27,3 +27,8 @@ jobs:
     - name: Unit tests
       run: |
         make -j$(nproc) unit
+    - name: Crypto regression tests
+      run: |
+        make -j$(nproc) tests/zfs-tests/cmd/crypto_test
+        tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_gcm_test.txt
+        tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_ccm_test.txt

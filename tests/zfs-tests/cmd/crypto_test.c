@@ -515,6 +515,7 @@ err:
  * valid combinations.
  */
 static const char *aes_impl[] = {
+	"fastest",
 	"generic",
 	"x86_64",
 	"aesni",
@@ -522,6 +523,9 @@ static const char *aes_impl[] = {
 };
 
 static const char *aes_gcm_impl[][2] = {
+	{ "fastest", "fastest" },
+	{ "fastest", "ghashv8" },
+	{ "aesv8",   "fastest" },
 	{ "generic", "generic" },
 	{ "x86_64",  "generic" },
 	{ "aesni",   "generic" },
@@ -545,8 +549,11 @@ static void
 foreach_aes_ccm(alg_cb_t cb, void *arg, crypto_test_outmode_t outmode)
 {
 	char alginfo[64];
+	const char *only_aes = getenv("CRYPTO_TEST_AES_IMPL");
 
 	for (int i = 0; i < ARRAY_SIZE(aes_impl); i++) {
+		if (only_aes != NULL && strcmp(only_aes, aes_impl[i]) != 0)
+			continue;
 		snprintf(alginfo, sizeof (alginfo), "AES-CCM [%s]",
 		    aes_impl[i]);
 
@@ -564,10 +571,16 @@ static void
 foreach_aes_gcm(alg_cb_t cb, void *arg, crypto_test_outmode_t outmode)
 {
 	char alginfo[64];
+	const char *only_aes = getenv("CRYPTO_TEST_AES_IMPL");
+	const char *only_gcm = getenv("CRYPTO_TEST_GCM_IMPL");
 
 	for (int i = 0; i < ARRAY_SIZE(aes_gcm_impl); i++) {
 		const char *aes_impl = aes_gcm_impl[i][0];
 		const char *gcm_impl = aes_gcm_impl[i][1];
+		if (only_aes != NULL && strcmp(only_aes, aes_impl) != 0)
+			continue;
+		if (only_gcm != NULL && strcmp(only_gcm, gcm_impl) != 0)
+			continue;
 
 		snprintf(alginfo, sizeof (alginfo), "AES-GCM [%s+%s]",
 		    aes_impl, gcm_impl);
@@ -719,34 +732,58 @@ decrypt_one(crypto_mechanism_t *mech,
     uint8_t *out, size_t outlen,
     uint64_t *usecp)
 {
-	uint8_t inbuf[1024];
+	boolean_t use_uio = getenv("CRYPTO_TEST_DECRYPT_UIO") != NULL;
+	uint8_t *inbuf = NULL;
+	if (!use_uio) {
+		inbuf = malloc(ctlen + taglen);
+		VERIFY3P(inbuf, !=, NULL);
+		memcpy(inbuf, ct, ctlen);
+		memcpy(inbuf + ctlen, tag, taglen);
+	}
 
 	crypto_key_t k = {
 		.ck_data = (uint8_t *)key,
 		.ck_length = keylen << 3,
 	};
 
-	memcpy(inbuf, ct, ctlen);
-	memcpy(inbuf + ctlen, tag, taglen);
+	iovec_t input_iov[2] = {
+		{ .iov_base = (void *)ct, .iov_len = ctlen },
+		{ .iov_base = (void *)tag, .iov_len = taglen },
+	};
+	iovec_t output_iov = { .iov_base = out, .iov_len = outlen };
+	zfs_uio_t input_uio = {
+		.uio_iov = input_iov,
+		.uio_iovcnt = 2,
+		.uio_segflg = UIO_SYSSPACE,
+	};
+	zfs_uio_t output_uio = {
+		.uio_iov = &output_iov,
+		.uio_iovcnt = 1,
+		.uio_segflg = UIO_SYSSPACE,
+	};
 	crypto_data_t i = {
-		.cd_format = CRYPTO_DATA_RAW,
+		.cd_format = use_uio ? CRYPTO_DATA_UIO : CRYPTO_DATA_RAW,
 		.cd_offset = 0,
 		.cd_length = ctlen + taglen,
-		.cd_raw = {
-			.iov_base = (char *)inbuf,
-			.iov_len = ctlen + taglen,
-		},
 	};
+	if (use_uio)
+		i.cd_uio = &input_uio;
+	else {
+		i.cd_raw.iov_base = (char *)inbuf;
+		i.cd_raw.iov_len = ctlen + taglen;
+	}
 
 	crypto_data_t o = {
-		.cd_format = CRYPTO_DATA_RAW,
+		.cd_format = use_uio ? CRYPTO_DATA_UIO : CRYPTO_DATA_RAW,
 		.cd_offset = 0,
 		.cd_length = outlen,
-		.cd_raw = {
-			.iov_base = (char *)out,
-			.iov_len = outlen
-		},
 	};
+	if (use_uio)
+		o.cd_uio = &output_uio;
+	else {
+		o.cd_raw.iov_base = (char *)out;
+		o.cd_raw.iov_len = outlen;
+	}
 
 	struct timeval start, end, diff;
 	if (usecp != NULL)
@@ -756,10 +793,11 @@ decrypt_one(crypto_mechanism_t *mech,
 
 	if (usecp != NULL) {
 		gettimeofday(&end, NULL);
-		timersub(&start, &end, &diff);
+		timersub(&end, &start, &diff);
 		*usecp =
 		    ((uint64_t)diff.tv_sec) * 1000000 + (uint64_t)diff.tv_usec;
 	}
+	free(inbuf);
 
 	return (rv);
 }
@@ -802,7 +840,8 @@ hexdump(const char *str, const uint8_t *src, uint_t len)
  */
 static boolean_t
 test_result(const crypto_test_t *test, int encrypt_rv, uint8_t *encrypt_buf,
-    int decrypt_rv, uint8_t *decrypt_buf, crypto_test_outmode_t outmode)
+    int decrypt_rv, uint8_t *decrypt_buf, boolean_t decrypt_untouched,
+    crypto_test_outmode_t outmode)
 {
 	boolean_t ct_match = B_FALSE, tag_match = B_FALSE, msg_match = B_FALSE;
 	boolean_t encrypt_pass = B_FALSE, decrypt_pass = B_FALSE;
@@ -855,7 +894,7 @@ test_result(const crypto_test_t *test, int encrypt_rv, uint8_t *encrypt_buf,
 		 */
 		if (encrypt_rv != CRYPTO_SUCCESS || !tag_match)
 			encrypt_pass = B_TRUE;
-		if (decrypt_rv != CRYPTO_SUCCESS)
+		if (decrypt_rv != CRYPTO_SUCCESS && decrypt_untouched)
 			decrypt_pass = B_TRUE;
 	}
 
@@ -915,6 +954,9 @@ test_result(const crypto_test_t *test, int encrypt_rv, uint8_t *encrypt_buf,
 		printf("  decrypt rv = 0x%02x [%s]\n", decrypt_rv,
 		    crypto_errstr[decrypt_rv] ?
 		    crypto_errstr[decrypt_rv] : "???");
+		if (decrypt_rv != CRYPTO_SUCCESS && !decrypt_untouched)
+			printf("  decrypt modified output after "
+			    "authentication failure\n");
 
 		/* print mismatched plaintext */
 		if (!msg_match) {
@@ -955,13 +997,15 @@ run_tests(const char *alginfo, const crypto_test_t *tests,
 	} params = {};
 	mech.cm_param = (caddr_t)&params;
 
-	/* space for encrypt/decrypt output */
-	uint8_t encrypt_buf[1024];
-	uint8_t decrypt_buf[1024];
-
 	for (const crypto_test_t *test = tests; test != NULL;
 	    test = test->next) {
 		ntests++;
+		size_t encrypt_len = test->msg.len + test->tag.len;
+		size_t decrypt_len = test->ct.len;
+		uint8_t *encrypt_buf = malloc(MAX(encrypt_len, 1));
+		uint8_t *decrypt_buf = malloc(MAX(decrypt_len, 1));
+		VERIFY3P(encrypt_buf, !=, NULL);
+		VERIFY3P(decrypt_buf, !=, NULL);
 
 		/* setup mechanism description for encrypt, then encrypt */
 		init_mech(&mech, test->alg, test->iv.val, test->iv.len,
@@ -970,22 +1014,34 @@ run_tests(const char *alginfo, const crypto_test_t *tests,
 		int encrypt_rv = encrypt_one(&mech,
 		    test->key.val, test->key.len,
 		    test->msg.val, test->msg.len,
-		    encrypt_buf, test->msg.len + test->tag.len, NULL);
+		    encrypt_buf, encrypt_len, NULL);
 
 		/* setup mechanism description for decrypt, then decrypt */
 		init_mech(&mech, test->alg, test->iv.val, test->iv.len,
 		    test->aad.val, test->aad.len, test->msg.len, test->tag.len,
 		    B_TRUE);
+		memset(decrypt_buf, 0xa5, MAX(decrypt_len, 1));
 		int decrypt_rv = decrypt_one(&mech,
 		    test->key.val, test->key.len,
 		    test->ct.val, test->ct.len,
 		    test->tag.val, test->tag.len,
 		    decrypt_buf, test->ct.len, NULL);
+		boolean_t decrypt_untouched = B_TRUE;
+		if (decrypt_rv != CRYPTO_SUCCESS) {
+			for (size_t i = 0; i < test->ct.len; i++) {
+				if (decrypt_buf[i] != 0xa5) {
+					decrypt_untouched = B_FALSE;
+					break;
+				}
+			}
+		}
 
 		/* consider results and if it passed, count it */
 		if (test_result(test, encrypt_rv, encrypt_buf,
-		    decrypt_rv, decrypt_buf, outmode))
+		    decrypt_rv, decrypt_buf, decrypt_untouched, outmode))
 			npass++;
+		free(decrypt_buf);
+		free(encrypt_buf);
 	}
 
 	printf("%s: tests=%d: passed=%d failed=%d\n",
@@ -1079,6 +1135,7 @@ typedef struct {
 	uint8_t			*msg;
 	uint8_t			*out;
 	uint8_t			key[32];
+	size_t			key_len;
 	uint8_t			iv[12];
 } perf_alg_args_t;
 
@@ -1118,22 +1175,56 @@ perf_alg_cb(const char *alginfo, void *arg)
 		    val_empty, 0, sz, 16, B_FALSE);
 
 		/* run N rounds and accumulate total time */
-		uint64_t total = 0;
+		struct timeval start, end, diff;
+		gettimeofday(&start, NULL);
 		for (int round = 0; round < PERF_ROUNDS; round++) {
-			uint64_t usec;
-			encrypt_one(&mech, args->key, sizeof (args->key),
-			    args->msg, sz, args->out, sz+16, &usec);
-			total += usec;
+			encrypt_one(&mech, args->key, args->key_len,
+			    args->msg, sz, args->out, sz+16, NULL);
 		}
+		gettimeofday(&end, NULL);
+		timersub(&end, &start, &diff);
+		uint64_t total = (uint64_t)diff.tv_sec * 1000000 + diff.tv_usec;
 
 		/*
 		 * print avg time per round. zfs_nicetime expects nanoseconds,
 		 * so we multiply first
 		 */
-		zfs_nicetime((total*1000)/PERF_ROUNDS, buf, sizeof (buf));
+		double gbps = ((double)sz * PERF_ROUNDS) / total / 1000.0;
+		(void) snprintf(buf, sizeof (buf), "%.2fG", gbps);
 		printf("  %5s", buf);
 	}
 
+	printf("\n");
+
+	char label[64];
+	(void) snprintf(label, sizeof (label), "%s decrypt", alginfo);
+	printf("%-28s", label);
+	uint8_t *decrypted = malloc(1 << PERF_MSG_SHIFT_MAX);
+	VERIFY3P(decrypted, !=, NULL);
+	for (int i = PERF_MSG_SHIFT_MIN; i <= PERF_MSG_SHIFT_MAX; i++) {
+		size_t sz = 1 << i;
+		init_mech(&mech, args->alg, args->iv, sizeof (args->iv),
+		    val_empty, 0, sz, 16, B_FALSE);
+		VERIFY0(encrypt_one(&mech, args->key, args->key_len,
+		    args->msg, sz, args->out, sz + 16, NULL));
+		init_mech(&mech, args->alg, args->iv, sizeof (args->iv),
+		    val_empty, 0, sz, 16, B_TRUE);
+
+		struct timeval start, end, diff;
+		gettimeofday(&start, NULL);
+		for (int round = 0; round < PERF_ROUNDS; round++) {
+			VERIFY0(decrypt_one(&mech, args->key, args->key_len,
+			    args->out, sz, args->out + sz, 16, decrypted, sz,
+			    NULL));
+		}
+		gettimeofday(&end, NULL);
+		timersub(&end, &start, &diff);
+		uint64_t total = (uint64_t)diff.tv_sec * 1000000 + diff.tv_usec;
+		double gbps = ((double)sz * PERF_ROUNDS) / total / 1000.0;
+		(void) snprintf(buf, sizeof (buf), "%.2fG", gbps);
+		printf("  %5s", buf);
+	}
+	free(decrypted);
 	printf("\n");
 }
 
@@ -1173,12 +1264,27 @@ perf_main(const char *algname, crypto_test_outmode_t outmode)
 	/* fill key and iv */
 	VERIFY0(fill_random(args.key, sizeof (args.key)));
 	VERIFY0(fill_random(args.iv, sizeof (args.iv)));
+	args.key_len = 16;
+	const char *key_bits = getenv("CRYPTO_TEST_KEY_BITS");
+	if (key_bits != NULL) {
+		if (strcmp(key_bits, "128") == 0)
+			args.key_len = 16;
+		else if (strcmp(key_bits, "192") == 0)
+			args.key_len = 24;
+		else if (strcmp(key_bits, "256") == 0)
+			args.key_len = 32;
+		else {
+			fprintf(stderr, "E: CRYPTO_TEST_KEY_BITS must be "
+			    "128, 192, or 256\n");
+			return (1);
+		}
+	}
 
 	icp_init();
 
 	/* print header */
 	char buf[10];
-	printf("avg encrypt (%4d rounds)   ", PERF_ROUNDS);
+	printf("throughput (%4d rounds)    ", PERF_ROUNDS);
 	for (int i = PERF_MSG_SHIFT_MIN; i <= PERF_MSG_SHIFT_MAX; i++) {
 		zfs_nicebytes(1<<i, buf, sizeof (buf));
 		printf("  %5s", buf);

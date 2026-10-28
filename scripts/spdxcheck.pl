@@ -315,6 +315,8 @@ my %override_file_license_tags = (
 	'OpenSSL-standalone' => [qw(
 		module/icp/asm-x86_64/aes/aes_aesni.S
 		module/icp/asm-aarch64/aes/aesv8-armx.S
+	)],
+	'OpenSSL-standalone AND Apache-2.0' => [qw(
 		module/icp/asm-aarch64/aes/ghashv8-armx.S
 	)],
 	'CDDL-1.0 OR MPL-2.0' => [qw(

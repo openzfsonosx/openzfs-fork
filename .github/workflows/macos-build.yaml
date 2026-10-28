@@ -32,6 +32,10 @@ jobs:
       - name: build
         run: |
           make -j $(($(sysctl -n hw.ncpu)+1))
+      - name: Crypto regression tests
+        run: |
+          tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_gcm_test.txt
+          tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_ccm_test.txt
       #- name: install
       #  run: |
       #    sudo make install DESTDIR=///

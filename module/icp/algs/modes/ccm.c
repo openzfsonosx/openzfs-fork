@@ -24,6 +24,21 @@
 #define	UNALIGNED_POINTERS_PERMITTED
 #endif
 
+static void
+ccm_advance_counter(ccm_ctx_t *ctx, size_t blocks)
+{
+	uint64_t counter;
+
+#ifdef _ZFS_LITTLE_ENDIAN
+	counter = ntohll(ctx->ccm_cb[1] & ctx->ccm_counter_mask);
+	counter = htonll(counter + blocks);
+#else
+	counter = (ctx->ccm_cb[1] & ctx->ccm_counter_mask) + blocks;
+#endif
+	counter &= ctx->ccm_counter_mask;
+	ctx->ccm_cb[1] = (ctx->ccm_cb[1] & ~ctx->ccm_counter_mask) | counter;
+}
+
 /*
  * Encrypt multiple blocks of data in CCM mode.  Decrypt for CCM mode
  * is done in another function.
@@ -32,6 +47,9 @@ int
 ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
     crypto_data_t *out, size_t block_size,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
+    int (*cbc_mac)(const void *, const uint8_t *, size_t, uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *))
 {
@@ -61,6 +79,34 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 	crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	mac_buf = (uint8_t *)ctx->ccm_mac_buf;
+
+	/*
+	 * Fast path for a complete, contiguous run.  CCM's CBC-MAC remains
+	 * serial, but the independent CTR half can use the existing ARMv8
+	 * multi-block implementation instead of one AES call per block.
+	 */
+	if (ctx->ccm_remainder_len == 0 && length != 0 &&
+	    length % block_size == 0) {
+		void *fast_iov = iov_or_mp;
+		offset_t fast_offset = offset;
+		uint8_t *fast_out = NULL, *fast_out_2 = NULL;
+		size_t fast_out_len = 0;
+
+		crypto_get_ptrs(out, &fast_iov, &fast_offset, &fast_out,
+		    &fast_out_len, &fast_out_2, length);
+		if (fast_out != NULL && fast_out_len == length &&
+		    fast_out_2 == NULL &&
+		    cbc_mac(ctx->ccm_keysched, datap, length,
+		    mac_buf) == CRYPTO_SUCCESS) {
+			(void) ctr32_crypt(ctx->ccm_keysched, datap, fast_out,
+			    length / block_size, (uint8_t *)ctx->ccm_cb);
+			ccm_advance_counter(ctx, length / block_size);
+			ctx->ccm_processed_data_len += length;
+			ctx->ccm_copy_to = NULL;
+			out->cd_offset += length;
+			return (CRYPTO_SUCCESS);
+		}
+	}
 
 	do {
 		/* Unprocessed data from last call. */
@@ -334,6 +380,8 @@ int
 ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
     crypto_data_t *out, size_t block_size,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*ctr32_crypt)(const void *, const uint8_t *, uint8_t *, size_t,
+    const uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *))
 {
@@ -422,6 +470,19 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		return (CRYPTO_SUCCESS);
 	}
 
+	if (ctx->ccm_remainder_len == 0 && length != 0 &&
+	    length % block_size == 0) {
+		resultp = (uint8_t *)ctx->ccm_pt_buf +
+		    ctx->ccm_processed_data_len;
+		(void) ctr32_crypt(ctx->ccm_keysched, datap, resultp,
+		    length / block_size, (uint8_t *)ctx->ccm_cb);
+		ccm_advance_counter(ctx, length / block_size);
+		ctx->ccm_processed_data_len += length;
+		ctx->ccm_lastp = datap + length - block_size;
+		ctx->ccm_copy_to = NULL;
+		return (CRYPTO_SUCCESS);
+	}
+
 	do {
 		/* Unprocessed data from last call. */
 		if (ctx->ccm_remainder_len > 0) {
@@ -507,6 +568,7 @@ out:
 int
 ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    int (*cbc_mac)(const void *, const uint8_t *, size_t, uint8_t[16]),
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *))
 {
@@ -527,20 +589,30 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 
 	macp = (uint8_t *)ctx->ccm_tmp;
 
-	while (mac_remain > 0) {
-		if (mac_remain < block_size) {
-			memset(macp, 0, block_size);
-			memcpy(macp, pt, mac_remain);
-			mac_remain = 0;
-		} else {
-			copy_block(pt, macp);
-			mac_remain -= block_size;
-			pt += block_size;
+	boolean_t fast_mac = B_FALSE;
+	if (pt_len != 0 && pt_len % block_size == 0) {
+		if (cbc_mac(ctx->ccm_keysched, pt, pt_len,
+		    mac_buf) == CRYPTO_SUCCESS) {
+			fast_mac = B_TRUE;
 		}
+	}
 
-		/* calculate the CBC MAC */
-		xor_block(macp, mac_buf);
-		encrypt_block(ctx->ccm_keysched, mac_buf, mac_buf);
+	if (!fast_mac) {
+		while (mac_remain > 0) {
+			if (mac_remain < block_size) {
+				memset(macp, 0, block_size);
+				memcpy(macp, pt, mac_remain);
+				mac_remain = 0;
+			} else {
+				copy_block(pt, macp);
+				mac_remain -= block_size;
+				pt += block_size;
+			}
+
+			/* calculate the CBC MAC */
+			xor_block(macp, mac_buf);
+			encrypt_block(ctx->ccm_keysched, mac_buf, mac_buf);
+		}
 	}
 
 	/* Calculate the CCM MAC */
