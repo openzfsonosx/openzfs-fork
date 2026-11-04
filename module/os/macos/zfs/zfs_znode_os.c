@@ -565,6 +565,9 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_finder_parentid = 0;
 	zp->z_finder_hardlink = FALSE;
 	zp->z_skip_truncate_undo_decmpfs = B_FALSE;
+	zp->z_suspended = B_FALSE;
+	zp->z_document_id = 0;
+	zp->z_write_gencount = 0;
 
 	taskq_init_ent(&zp->z_attach_taskq);
 
@@ -1306,6 +1309,7 @@ zfs_rezget(znode_t *zp)
 	rw_exit(&zp->z_xattr_lock);
 
 	zp->z_xattr_dir_absent = B_FALSE;
+	zp->z_document_id = 0;
 
 	ASSERT(zp->z_sa_hdl == NULL);
 	err = sa_buf_hold(zfsvfs->z_os, obj_num, NULL, &db);
