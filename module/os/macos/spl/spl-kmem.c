@@ -34,6 +34,7 @@
 #include <sys/thread.h>
 #include <sys/taskq.h>
 #include <sys/kmem_impl.h>
+#include <sys/processor.h>
 #include <sys/vmem_impl.h>
 #include <kern/sched_prim.h>
 #include <sys/callb.h>
@@ -882,6 +883,10 @@ typedef struct spl_stats {
 	kstat_named_t kmem_va_census_runs;
 	kstat_named_t kmem_va_census_last_ns;
 	kstat_named_t kmem_va_routes_unmatched;
+	kstat_named_t spl_max_ncpus;
+	kstat_named_t spl_num_ecores;
+	kstat_named_t spl_boot_ncpus;
+	kstat_named_t spl_cpuid_from_dt;
 } spl_stats_t;
 
 static spl_stats_t spl_stats = {
@@ -974,6 +979,10 @@ static spl_stats_t spl_stats = {
 	{"kmem_va_census_runs", KSTAT_DATA_UINT64},
 	{"kmem_va_census_last_ns", KSTAT_DATA_UINT64},
 	{"kmem_va_routes_unmatched", KSTAT_DATA_UINT64},
+	{"spl_max_ncpus", KSTAT_DATA_UINT64},
+	{"spl_num_ecores", KSTAT_DATA_UINT64},
+	{"spl_boot_ncpus", KSTAT_DATA_UINT64},
+	{"spl_cpuid_from_dt", KSTAT_DATA_UINT64},
 };
 
 static kstat_t *spl_ksp = 0;
@@ -6103,6 +6112,11 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		ks->kmem_va_census_last_ns.value.ui64 = kmem_va_census_last_ns;
 		ks->kmem_va_routes_unmatched.value.ui64 =
 		    kmem_va_routes_unmatched();
+
+		ks->spl_max_ncpus.value.ui64 = max_ncpus;
+		ks->spl_num_ecores.value.ui64 = num_ecores;
+		ks->spl_boot_ncpus.value.ui64 = boot_ncpus;
+		ks->spl_cpuid_from_dt.value.ui64 = spl_cpuid_source();
 	}
 
 	return (0);
