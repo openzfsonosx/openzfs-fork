@@ -40,6 +40,8 @@ libspl_la_CPPFLAGS+=-arch arm64e -arch x86_64
 libspl_la_LDFLAGS+=-arch arm64e -arch x86_64
 endif
 
+libspl_la_CXXFLAGS = -std=gnu++11
+
 libspl_la_LIBS = -lnone
 
 # If we don't set this to nothing, it adds "-lz -liconv"
@@ -50,6 +52,7 @@ noinst_LTLIBRARIES = libspl.la
 libspl_la_SOURCES = 	\
 	spl-atomic.c \
 	spl-condvar.c \
+	spl-cpus.cpp \
 	spl-cred.c \
 	spl-debug.c \
 	spl-ddi.c \
