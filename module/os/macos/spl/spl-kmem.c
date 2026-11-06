@@ -879,6 +879,9 @@ typedef struct spl_stats {
 	kstat_named_t spl_lowest_zvol_stack_remaining;
 	kstat_named_t spl_split_stack_below;
 	kstat_named_t kmem_depot_reap_idle_magazines;
+	kstat_named_t kmem_reclaim_max_slabs;
+	kstat_named_t kmem_reclaim_scan_range;
+	kstat_named_t kmem_move_fulltilt;
 	kstat_named_t kmem_va_census;
 	kstat_named_t kmem_va_census_runs;
 	kstat_named_t kmem_va_census_last_ns;
@@ -975,6 +978,9 @@ static spl_stats_t spl_stats = {
 	{"lowest_zvol_stack_remaining", KSTAT_DATA_UINT64},
 	{"split_stack_below", KSTAT_DATA_UINT64},
 	{"kmem_depot_reap_idle_magazines", KSTAT_DATA_UINT64},
+	{"kmem_reclaim_max_slabs", KSTAT_DATA_UINT64},
+	{"kmem_reclaim_scan_range", KSTAT_DATA_UINT64},
+	{"kmem_move_fulltilt", KSTAT_DATA_UINT64},
 	{"kmem_va_census", KSTAT_DATA_UINT64},
 	{"kmem_va_census_runs", KSTAT_DATA_UINT64},
 	{"kmem_va_census_last_ns", KSTAT_DATA_UINT64},
@@ -5965,6 +5971,29 @@ spl_kstat_update(kstat_t *ksp, int rw)
 			    ks->kmem_depot_reap_idle_magazines.value.ui64;
 		}
 
+		/*
+		 * Slab consolidator rate.  kmem_move_buffers() treats 0 as
+		 * "no limit" for both counts, so clamp them to at least 1;
+		 * kmem_move_fulltilt (any non-zero value) is the way to ask
+		 * for no limit.
+		 */
+		if (ks->kmem_reclaim_max_slabs.value.ui64 !=
+		    kmem_reclaim_max_slabs) {
+			uint64_t v = ks->kmem_reclaim_max_slabs.value.ui64;
+			kmem_reclaim_max_slabs = (size_t)MAX(v, 1);
+		}
+		if (ks->kmem_reclaim_scan_range.value.ui64 !=
+		    kmem_reclaim_scan_range) {
+			uint64_t v = ks->kmem_reclaim_scan_range.value.ui64;
+			kmem_reclaim_scan_range = (size_t)MAX(v, 1);
+		}
+		if ((ks->kmem_move_fulltilt.value.ui64 != 0) !=
+		    (kmem_move_fulltilt != B_FALSE)) {
+			kmem_move_fulltilt =
+			    (ks->kmem_move_fulltilt.value.ui64 != 0) ?
+			    B_TRUE : B_FALSE;
+		}
+
 		/* reads as 0; writing any non-zero value requests a census */
 		if (ks->kmem_va_census.value.ui64 != 0) {
 			ks->kmem_va_census.value.ui64 = 0;
@@ -6106,6 +6135,13 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		    spl_split_stack_below;
 		ks->kmem_depot_reap_idle_magazines.value.ui64 =
 		    kmem_depot_reap_idle_magazines;
+
+		ks->kmem_reclaim_max_slabs.value.ui64 =
+		    kmem_reclaim_max_slabs;
+		ks->kmem_reclaim_scan_range.value.ui64 =
+		    kmem_reclaim_scan_range;
+		ks->kmem_move_fulltilt.value.ui64 =
+		    (kmem_move_fulltilt != B_FALSE) ? 1 : 0;
 
 		ks->kmem_va_census.value.ui64 = 0;
 		ks->kmem_va_census_runs.value.ui64 = kmem_va_census_runs;
