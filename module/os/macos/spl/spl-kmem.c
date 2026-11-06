@@ -354,6 +354,40 @@ static struct timespec kmem_reap_interval = {15, 0};
  * pressure, this can be turned off for a modest CPU savings.
  */
 uint64_t kmem_depot_reap_idle_magazines = 1;
+/*
+ * Seconds a cache must go without allocations or frees before its per-CPU
+ * magazines are emptied back into its slabs (0 == disabled).  The depot
+ * reap above never touches the magazines loaded on each CPU, and after a
+ * mass free (vnode eviction, unmount) those can hold more buffers than the
+ * cache has in use, each keeping a slab -- and the slab's VA chunk -- alive.
+ * They also hide from the slab consolidator: a buffer in a magazine is
+ * free to its client, so the move callback answers "don't know".
+ */
+uint64_t kmem_magazine_idle_flush = 60;
+uint64_t kmem_magazine_idle_flushes = 0;
+/*
+ * "Idle" allows this many allocations plus frees per kmem_reap_interval
+ * (15s): a trickle of use (a shell prompt stat()ing a ZFS home directory,
+ * txg housekeeping) otherwise keeps dmu_buf_impl_t and dnode_t from ever
+ * being idle while their magazines hold buffers freed by an eviction.
+ * Such a cache is flushed again at most once per
+ * kmem_magazine_surplus_interval.  0 == strictly idle.
+ */
+uint64_t kmem_magazine_idle_ops = 256;
+/*
+ * A cache that is never idle for that long (dmu_buf_impl_t on a machine
+ * with background I/O) is also flushed when its magazines hold at least
+ * kmem_magazine_surplus_min buffers and at least kmem_magazine_surplus_pct
+ * percent as many as it has in use -- after a mass free, not in steady
+ * state, where magazines hold a small fraction -- at most once every
+ * kmem_magazine_surplus_interval seconds (pct 0 == disabled).  Writing
+ * kmem_magazine_flush_now flushes every cache once, for testing.
+ */
+uint64_t kmem_magazine_surplus_pct = 50;
+uint64_t kmem_magazine_surplus_min = 256;
+uint64_t kmem_magazine_surplus_interval = 300;
+uint64_t kmem_magazine_surplus_flushes = 0;
+uint64_t kmem_magazine_manual_flushes = 0;
 int kmem_depot_contention = 3;	/* max failed tryenters per real interval */
 pgcnt_t kmem_reapahead = 0;	/* start reaping N pages before pageout */
 int kmem_panic = 1;		/* whether to panic on error */
@@ -882,6 +916,15 @@ typedef struct spl_stats {
 	kstat_named_t kmem_reclaim_max_slabs;
 	kstat_named_t kmem_reclaim_scan_range;
 	kstat_named_t kmem_move_fulltilt;
+	kstat_named_t kmem_magazine_idle_flush;
+	kstat_named_t kmem_magazine_idle_flushes;
+	kstat_named_t kmem_magazine_idle_ops;
+	kstat_named_t kmem_magazine_surplus_pct;
+	kstat_named_t kmem_magazine_surplus_min;
+	kstat_named_t kmem_magazine_surplus_interval;
+	kstat_named_t kmem_magazine_surplus_flushes;
+	kstat_named_t kmem_magazine_flush_now;
+	kstat_named_t kmem_magazine_manual_flushes;
 	kstat_named_t kmem_va_census;
 	kstat_named_t kmem_va_census_runs;
 	kstat_named_t kmem_va_census_last_ns;
@@ -981,6 +1024,15 @@ static spl_stats_t spl_stats = {
 	{"kmem_reclaim_max_slabs", KSTAT_DATA_UINT64},
 	{"kmem_reclaim_scan_range", KSTAT_DATA_UINT64},
 	{"kmem_move_fulltilt", KSTAT_DATA_UINT64},
+	{"kmem_magazine_idle_flush", KSTAT_DATA_UINT64},
+	{"kmem_magazine_idle_flushes", KSTAT_DATA_UINT64},
+	{"kmem_magazine_idle_ops", KSTAT_DATA_UINT64},
+	{"kmem_magazine_surplus_pct", KSTAT_DATA_UINT64},
+	{"kmem_magazine_surplus_min", KSTAT_DATA_UINT64},
+	{"kmem_magazine_surplus_interval", KSTAT_DATA_UINT64},
+	{"kmem_magazine_surplus_flushes", KSTAT_DATA_UINT64},
+	{"kmem_magazine_flush_now", KSTAT_DATA_UINT64},
+	{"kmem_magazine_manual_flushes", KSTAT_DATA_UINT64},
 	{"kmem_va_census", KSTAT_DATA_UINT64},
 	{"kmem_va_census_runs", KSTAT_DATA_UINT64},
 	{"kmem_va_census_last_ns", KSTAT_DATA_UINT64},
@@ -3429,6 +3481,131 @@ kmem_hash_rescale(kmem_cache_t *cp)
  * Perform periodic maintenance on a cache: hash rescaling, depot working-set
  * update, magazine resizing, and slab consolidation.
  */
+/*
+ * Empty a cache's per-CPU magazines into its slabs, then let the CPUs
+ * load magazines again (as kmem_cache_magazine_resize() does).
+ * Allocations in between go to the slab layer.  Runs on kmem_taskq.
+ */
+static void
+kmem_cache_magazine_flush_one(kmem_cache_t *cp)
+{
+	kmem_cache_magazine_purge(cp);
+	kmem_cache_magazine_enable(cp);
+}
+
+/* the quantum caches fronting vmp, if any */
+static void
+kmem_arena_qcache_flush(vmem_t *vmp)
+{
+	int i, nqc;
+
+	if (vmp == NULL || vmp->vm_qcache_max == 0)
+		return;
+	nqc = MIN(vmp->vm_qcache_max >> vmp->vm_qshift, VMEM_NQCACHE_MAX);
+	for (i = 0; i < nqc; i++)
+		if (vmp->vm_qcache[i] != NULL)
+			kmem_cache_magazine_flush_one(vmp->vm_qcache[i]);
+}
+
+/*
+ * Flushing an object cache returns buffers to its slabs, and the slabs
+ * it can then destroy go back through its arena to the quantum cache in
+ * front of the VA arena (kmem_<class>_va_16384 and so on) -- into that
+ * cache's magazines, where the segments still count as allocated and the
+ * 128K chunks stay partly used.  So flush those quantum caches after the
+ * object cache, whether or not they are idle themselves.
+ */
+static void
+kmem_cache_magazine_flush(kmem_cache_t *cp)
+{
+	ASSERT(taskq_member(kmem_taskq, curthread));
+
+	kmem_cache_magazine_flush_one(cp);
+	if (!(cp->cache_cflags & KMC_QCACHE)) {
+		kmem_arena_qcache_flush(cp->cache_arena);
+		kmem_arena_qcache_flush(cp->cache_arena->vm_source);
+	}
+}
+
+/*
+ * Called every kmem_reap_interval from kmem_cache_update(), the only
+ * place the cache_flush_* fields are touched.  Flushes a cache's
+ * magazines
+ *
+ *  - once it has gone kmem_magazine_idle_flush seconds with no more than
+ *    kmem_magazine_idle_ops allocations and frees per interval, and not
+ *    again until it has been busier than that or
+ *    kmem_magazine_surplus_interval has passed; or
+ *  - when its magazines hold a surplus (kmem_magazine_surplus_*), at
+ *    most once every kmem_magazine_surplus_interval seconds.
+ *
+ * The counters are read without their locks; a stale value only delays
+ * or brings forward a flush by one interval.
+ */
+static void
+kmem_cache_flush_check(kmem_cache_t *cp)
+{
+	uint64_t activity, delta, rounds = 0, inuse, depot;
+	uint64_t pct = kmem_magazine_surplus_pct;
+	boolean_t idle_flush = B_FALSE;
+	hrtime_t now;
+	int cpu_seqid;
+
+	if (cp->cache_flags & KMF_NOMAGAZINE)
+		return;
+
+	activity = cp->cache_slab_alloc + cp->cache_slab_free;
+	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++) {
+		kmem_cpu_cache_t *ccp = &cp->cache_cpu[cpu_seqid];
+
+		activity += ccp->cc_alloc + ccp->cc_free;
+		if (ccp->cc_rounds > 0)
+			rounds += ccp->cc_rounds;
+		if (ccp->cc_prounds > 0)
+			rounds += ccp->cc_prounds;
+	}
+
+	now = gethrtime();
+	delta = activity - cp->cache_flush_activity;
+	cp->cache_flush_activity = activity;
+	if (delta > kmem_magazine_idle_ops) {
+		/* busy since last time (a big flush itself counts) */
+		cp->cache_flush_idle_since = now;
+		cp->cache_flush_done = B_FALSE;
+	} else if (kmem_magazine_idle_flush != 0 && rounds > 0 &&
+	    now - cp->cache_flush_idle_since >=
+	    SEC2NSEC(kmem_magazine_idle_flush) &&
+	    (!cp->cache_flush_done ||
+	    now - cp->cache_flush_last >=
+	    SEC2NSEC(kmem_magazine_surplus_interval))) {
+		idle_flush = B_TRUE;
+	}
+
+	if (idle_flush) {
+		atomic_inc_64(&kmem_magazine_idle_flushes);
+	} else {
+		if (pct == 0 || rounds < MAX(kmem_magazine_surplus_min, 1) ||
+		    (cp->cache_flush_last != 0 &&
+		    now - cp->cache_flush_last <
+		    SEC2NSEC(kmem_magazine_surplus_interval)))
+			return;
+
+		/* as the buf_inuse kstat: total less every free buffer */
+		depot = cp->cache_full.ml_total *
+		    cp->cache_magtype->mt_magsize;
+		inuse = cp->cache_buftotal;
+		inuse -= MIN(inuse, cp->cache_bufslab + depot + rounds);
+		if (rounds * 100 < inuse * pct)
+			return;
+		atomic_inc_64(&kmem_magazine_surplus_flushes);
+	}
+
+	cp->cache_flush_done = B_TRUE;
+	cp->cache_flush_last = now;
+	(void) taskq_dispatch(kmem_taskq,
+	    (task_func_t *)kmem_cache_magazine_flush, cp, TQ_NOSLEEP);
+}
+
 static void
 kmem_cache_update(kmem_cache_t *cp)
 {
@@ -3503,6 +3680,8 @@ kmem_cache_update(kmem_cache_t *cp)
 		    (task_func_t *)kmem_depot_ws_reap,
 		    cp, TQ_NOSLEEP);
 	}
+
+	kmem_cache_flush_check(cp);
 
 	// smd : the following if is only true for the dnode cache
 	if (cp->cache_defrag != NULL)
@@ -5993,6 +6172,33 @@ spl_kstat_update(kstat_t *ksp, int rw)
 			    (ks->kmem_move_fulltilt.value.ui64 != 0) ?
 			    B_TRUE : B_FALSE;
 		}
+		if (ks->kmem_magazine_idle_flush.value.ui64 !=
+		    kmem_magazine_idle_flush)
+			kmem_magazine_idle_flush =
+			    ks->kmem_magazine_idle_flush.value.ui64;
+		if (ks->kmem_magazine_idle_ops.value.ui64 !=
+		    kmem_magazine_idle_ops)
+			kmem_magazine_idle_ops =
+			    ks->kmem_magazine_idle_ops.value.ui64;
+		if (ks->kmem_magazine_surplus_pct.value.ui64 !=
+		    kmem_magazine_surplus_pct)
+			kmem_magazine_surplus_pct =
+			    ks->kmem_magazine_surplus_pct.value.ui64;
+		if (ks->kmem_magazine_surplus_min.value.ui64 !=
+		    kmem_magazine_surplus_min)
+			kmem_magazine_surplus_min =
+			    ks->kmem_magazine_surplus_min.value.ui64;
+		if (ks->kmem_magazine_surplus_interval.value.ui64 !=
+		    kmem_magazine_surplus_interval)
+			kmem_magazine_surplus_interval =
+			    ks->kmem_magazine_surplus_interval.value.ui64;
+		/* reads as 0; writing any non-zero value flushes every cache */
+		if (ks->kmem_magazine_flush_now.value.ui64 != 0) {
+			ks->kmem_magazine_flush_now.value.ui64 = 0;
+			atomic_inc_64(&kmem_magazine_manual_flushes);
+			kmem_cache_applyall(kmem_cache_magazine_flush,
+			    kmem_taskq, TQ_NOSLEEP);
+		}
 
 		/* reads as 0; writing any non-zero value requests a census */
 		if (ks->kmem_va_census.value.ui64 != 0) {
@@ -6142,6 +6348,23 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		    kmem_reclaim_scan_range;
 		ks->kmem_move_fulltilt.value.ui64 =
 		    (kmem_move_fulltilt != B_FALSE) ? 1 : 0;
+		ks->kmem_magazine_idle_flush.value.ui64 =
+		    kmem_magazine_idle_flush;
+		ks->kmem_magazine_idle_flushes.value.ui64 =
+		    kmem_magazine_idle_flushes;
+		ks->kmem_magazine_idle_ops.value.ui64 =
+		    kmem_magazine_idle_ops;
+		ks->kmem_magazine_surplus_pct.value.ui64 =
+		    kmem_magazine_surplus_pct;
+		ks->kmem_magazine_surplus_min.value.ui64 =
+		    kmem_magazine_surplus_min;
+		ks->kmem_magazine_surplus_interval.value.ui64 =
+		    kmem_magazine_surplus_interval;
+		ks->kmem_magazine_surplus_flushes.value.ui64 =
+		    kmem_magazine_surplus_flushes;
+		ks->kmem_magazine_flush_now.value.ui64 = 0;
+		ks->kmem_magazine_manual_flushes.value.ui64 =
+		    kmem_magazine_manual_flushes;
 
 		ks->kmem_va_census.value.ui64 = 0;
 		ks->kmem_va_census_runs.value.ui64 = kmem_va_census_runs;
