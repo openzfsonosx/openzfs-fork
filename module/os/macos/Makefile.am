@@ -5,6 +5,7 @@
 spl_SRCS = 	\
 	%D%/spl/spl-atomic.c \
 	%D%/spl/spl-condvar.c \
+	%D%/spl/spl-cpus.cpp \
 	%D%/spl/spl-cred.c \
 	%D%/spl/spl-debug.c \
 	%D%/spl/spl-ddi.c \

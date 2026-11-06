@@ -529,6 +529,75 @@ spl_use_iomallocdata(void)
 #endif
 }
 
+#if defined(__arm64__)
+/*
+ * Count the cores we do not want to size thread pools against.
+ *
+ * macOS 12+ publishes the CPU clusters as hw.perflevelN, N = 0 being
+ * the fastest.  Up to M4 that was "Performance" + "Efficiency".  From
+ * M5 Apple calls the old P-cores "Super" and reuses "Performance" for a
+ * new mid-tier core; M5 Pro/Max/Ultra have Super + Performance and no
+ * Efficiency cores at all.  So match on the name, not the position:
+ * only "Efficiency" levels are subtracted.
+ *
+ * Ordering (xnu kern_mib.c cpu_type_for_perflevel): P ("Super" on
+ * M5+), then M ("Performance" on M5+), then E -- so Efficiency is
+ * always the last level.  xnu only registers hw.perflevel0 and
+ * hw.perflevel1 nodes, so on a chip with all three types
+ * hw.nperflevels is 3 but hw.perflevel2.* does not exist.  Any CPUs
+ * not accounted for by the levels we can read are therefore counted
+ * as Efficiency.
+ *
+ * macOS 11 has no perflevel sysctls; fall back to the old guess.
+ */
+static unsigned int
+spl_count_ecores(unsigned int ncpus)
+{
+	int nlevels = 0;
+	size_t len = sizeof (nlevels);
+
+	if (sysctlbyname("hw.nperflevels", &nlevels, &len, NULL, 0) != 0 ||
+	    nlevels < 1) {
+		unsigned int e = (ncpus > 4) ? 4 : 0;
+		e += (ncpus > 16) ? 4 : 0;
+		return (e);
+	}
+
+	unsigned int ecores = 0, seen = 0;
+	for (int i = 0; i < nlevels; i++) {
+		char oid[48], name[32] = "";
+		int n = 0;
+
+		(void) snprintf(oid, sizeof (oid), "hw.perflevel%d.name", i);
+		len = sizeof (name) - 1;
+		if (sysctlbyname(oid, name, &len, NULL, 0) != 0)
+			continue;
+
+		(void) snprintf(oid, sizeof (oid),
+		    "hw.perflevel%d.logicalcpu_max", i);
+		len = sizeof (n);
+		if (sysctlbyname(oid, &n, &len, NULL, 0) != 0 || n < 0)
+			continue;
+
+		printf("SPL: perflevel%d \"%s\": %d cpus\n", i, name, n);
+
+		seen += n;
+		if (strcmp(name, "Efficiency") == 0)
+			ecores += n;
+	}
+
+	if (seen < ncpus) {
+		printf("SPL: %u cpus in unreadable perflevels, "
+		    "counting as Efficiency\n", ncpus - seen);
+		ecores += ncpus - seen;
+	}
+
+	if (ecores >= ncpus)	/* paranoia */
+		ecores = 0;
+	return (ecores);
+}
+#endif
+
 kern_return_t
 spl_start(kmod_info_t *ki, void *d)
 {
@@ -571,9 +640,13 @@ spl_start(kmod_info_t *ki, void *d)
 	if (!max_ncpus) max_ncpus = 1;
 
 #if defined(__arm64__)
-	num_ecores = (max_ncpus > 4) ? 4 : 0;
-	num_ecores += (max_ncpus > 16) ? 4 : 0;
+	num_ecores = spl_count_ecores(max_ncpus);
 	boot_ncpus = MAX(1, (int)max_ncpus - (int)num_ecores);
+	printf("SPL: %u cpus, %u efficiency, boot_ncpus %u\n",
+	    max_ncpus, num_ecores, boot_ncpus);
+
+	/* before kmem: getcpuid() indexes per-CPU caches */
+	spl_cpuid_init();
 #else
 	boot_ncpus = max_ncpus;
 #endif

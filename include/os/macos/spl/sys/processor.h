@@ -22,6 +22,11 @@
 #include <sys/types.h>
 
 extern uint32_t getcpuid(void);
+extern uint64_t spl_cpuid_source(void);
+#if defined(__aarch64__)
+extern void spl_cpuid_init(void);
+extern int spl_cpuid_dt_add(uint32_t, uint32_t, char);
+#endif
 
 #if defined(__amd64__) || defined(__i386__)
 
