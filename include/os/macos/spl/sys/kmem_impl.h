@@ -452,6 +452,12 @@ struct kmem_cache {
 
 	kmem_census_t	cache_census;		/* last kmem_va_census() */
 
+	/* kmem_cache_flush_check(), touched only by kmem_cache_update() */
+	uint64_t	cache_flush_activity;	/* alloc+free count, last update */
+	hrtime_t	cache_flush_idle_since;	/* when that count last moved */
+	boolean_t	cache_flush_done;	/* flushed since it last moved */
+	hrtime_t	cache_flush_last;	/* last idle or surplus flush */
+
 	/*
 	 * Per CPU structures
 	 */
