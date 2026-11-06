@@ -237,6 +237,9 @@ org_openzfsonosx_zfs_zvol::start(IOService *provider)
 	/* Start ZFS itself */
 	zfs_kmod_init();
 
+	/* All ZFS kmem caches exist now; report stale VA class routes */
+	spl_kmem_va_routes_check();
+
 	/* Register fs with XNU */
 	zfs_vfsops_init();
 

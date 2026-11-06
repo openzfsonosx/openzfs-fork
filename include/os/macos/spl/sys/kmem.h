@@ -73,6 +73,7 @@ void zfs_kmem_free(const void *buf, size_t size);
 
 void spl_kmem_init(uint64_t);
 void spl_kmem_thread_init(void);
+void spl_kmem_va_routes_check(void);
 void spl_kmem_mp_init(void);
 void spl_kmem_thread_fini(void);
 void spl_kmem_fini(void);

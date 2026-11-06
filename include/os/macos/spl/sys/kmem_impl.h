@@ -344,6 +344,28 @@ typedef void (*destructor_fn_t)(void*, void*);
 typedef void (*reclaim_fn_t)(void*);
 
 /*
+ * Results of the most recent kmem VA census (see kmem_va_census() in
+ * spl-kmem.c) for one kmem cache whose slabs come from kmem_default or
+ * one of the other lifetime-class arenas (kmem_<class>).  Exported as
+ * census_* in the cache's kstat.
+ */
+#define	KMEM_CENSUS_AGE_BUCKETS	5	/* <1m, <10m, <1h, <1d, >=1d */
+
+typedef struct kmem_census {
+	uint64_t kc_time;	/* gethrtime() of the census, 0 = never */
+	uint64_t kc_arena;	/* lifetime class + 1; 0 = not censused */
+	uint64_t kc_slabs;	/* slabs examined */
+	uint64_t kc_age[KMEM_CENSUS_AGE_BUCKETS]; /* slab age histogram */
+	uint64_t kc_unqcached;	/* slabs too big for the VA quantum caches */
+	uint64_t kc_va_chunks;	/* VA quantum chunks this cache's slabs hold */
+	uint64_t kc_va_partial;	/* ... of which in partially-free VA slabs */
+	uint64_t kc_va_partial_old; /* ... and owner slab is >= 1h old */
+	uint64_t kc_va_lone;	/* ... and this is the only chunk in use */
+	uint64_t kc_va_pinned;	/* bytes: share of free VA this cache pins */
+	uint64_t kc_lookup_miss; /* slabs whose VA chunk wasn't found */
+} kmem_census_t;
+
+/*
  * Cache
  */
 struct kmem_cache {
@@ -427,6 +449,8 @@ struct kmem_cache {
 	kmem_maglist_t	cache_empty;		/* empty magazines */
 	void		*cache_dumpfreelist;	/* heap during crash dump */
 	void		*cache_dumplog;		/* log entry during dump */
+
+	kmem_census_t	cache_census;		/* last kmem_va_census() */
 
 	/*
 	 * Per CPU structures
