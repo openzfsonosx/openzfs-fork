@@ -361,6 +361,292 @@ zfs_stop_notify_thread(void)
 	cv_destroy(&zfs_findernotify_thread_cv);
 }
 
+/*
+ * ZFS vnode cap.
+ *
+ * kern.maxvnodes is one limit for every filesystem, and xnu only recycles
+ * vnodes once the whole cache is full.  So ZFS's share grows to whatever
+ * the other filesystems leave, and when something walks a large non-ZFS
+ * tree (a backup of an APFS volume, say) xnu recycles the idle ZFS vnodes
+ * en masse.  The znodes, dnodes, dbufs and SA handles freed then leave
+ * their survivors scattered over slabs and 128K VA chunks; with ~2.4M ZFS
+ * vnodes that left 6-8 GB of VA stuck after each nightly backup on a Mac
+ * Studio, roughly in proportion to the vnode count before the collapse.
+ *
+ * zfs_vnode_target bounds ZFS's own share without shrinking the cache for
+ * other filesystems: while vnop_num_vnodes is above it, a thread recycles
+ * up to zfs_vnode_reclaim_batch idle ZFS vnodes per second, so the ZFS
+ * population (and with it the size of any later collapse) stays near the
+ * target.  0 disables it.
+ *
+ * Candidates come from the old end of each mount's z_all_znodes list
+ * (znodes are added at the tail); every znode looked at is moved to the
+ * tail, so successive passes work through the list like a clock (FIFO
+ * replacement: the znode list carries no record of recent use, and name
+ * cache hits never reach ZFS).  Vnodes that are open (usecount),
+ * directories, the root, .zfs nodes, unlinked or suspended znodes and
+ * vnodes with dirty pages are skipped.
+ *
+ * No vnode calls are made under z_znodes_lock, because reclaim takes it:
+ * (vnode, vid) pairs are collected under the lock and each vnode is
+ * re-acquired with vnode_getwithvid() after it is dropped, which fails if
+ * the vnode was reclaimed or reused in between.  Like zfs_zget(), this
+ * relies on xnu vnode memory staying a vnode while vnode_getwithvid()
+ * checks the vid.
+ */
+extern uint64_t vnop_num_vnodes;	/* maintained in getvnode/reclaim */
+
+uint64_t zfs_vnode_target = 0;
+uint64_t zfs_vnode_reclaim_batch = 2048;
+uint64_t zfs_vnode_cap_recycled = 0;
+uint64_t zfs_vnode_cap_passes = 0;
+
+/* where candidates drop out, cumulative; for tuning and debugging */
+uint64_t zfs_vnode_cap_mounts = 0;	/* ZFS mounts seen, last pass */
+uint64_t zfs_vnode_cap_examined = 0;	/* znodes looked at */
+uint64_t zfs_vnode_cap_skip_znode = 0;	/* ctldir/unlinked/root/... */
+uint64_t zfs_vnode_cap_candidates = 0;	/* (vnode, vid) collected */
+uint64_t zfs_vnode_cap_skip_vid = 0;	/* vnode_getwithvid() failed */
+uint64_t zfs_vnode_cap_skip_inuse = 0;	/* vnode_isinuse() */
+uint64_t zfs_vnode_cap_skip_dir = 0;	/* directory or root */
+uint64_t zfs_vnode_cap_skip_dirty = 0;	/* vnode_hasdirtyblks() */
+
+static kmutex_t		zfs_vnode_cap_lock;
+static kcondvar_t	zfs_vnode_cap_cv;
+static boolean_t	zfs_vnode_cap_thread_exit;
+
+typedef struct zfs_vnode_cap_cand {
+	struct vnode	*zvc_vp;
+	uint32_t	zvc_vid;
+} zfs_vnode_cap_cand_t;
+
+typedef struct zfs_vnode_cap_pass {
+	boolean_t		zvp_count_only;	/* first pass: count mounts */
+	int			zvp_nmounts;
+	int			zvp_visited;	/* mounts seen this round */
+	int			zvp_round;
+	/* budget: vnodes to recycle, all mounts */
+	uint64_t		zvp_budget;
+	uint64_t		zvp_recycled;
+	zfs_vnode_cap_cand_t	*zvp_cand;	/* zvp_budget entries */
+} zfs_vnode_cap_pass_t;
+
+static zfsvfs_t *
+zfs_vnode_cap_zfsvfs(mount_t mp)
+{
+	char tname[MFSNAMELEN] = { 0 };
+
+	/* As in zfs_findernotify_callback(): make sure this is ZFS */
+	vfs_name(mp, tname);
+	if (strncmp(tname, "zfs", MFSNAMELEN) != 0)
+		return (NULL);
+	return (vfs_fsprivate(mp));
+}
+
+static int
+zfs_vnode_cap_callback(mount_t mp, void *arg)
+{
+	zfs_vnode_cap_pass_t *p = arg;
+	zfsvfs_t *zfsvfs = zfs_vnode_cap_zfsvfs(mp);
+	znode_t *zp, *next, *stop = NULL;
+	uint64_t n = 0, examined = 0, skipped = 0, i, quota;
+	uint64_t s_vid = 0, s_inuse = 0, s_dir = 0, s_dirty = 0;
+
+	if (zfsvfs == NULL)
+		return (VFS_RETURNED);
+
+	if (p->zvp_count_only) {
+		p->zvp_nmounts++;
+		return (VFS_RETURNED);
+	}
+
+	/*
+	 * First round: this mount's share of what is left, so budget an
+	 * earlier mount could not use (few znodes, or all busy) passes on
+	 * to later ones.  Later rounds: all of what is left, which goes to
+	 * whichever mounts still have recyclable vnodes.
+	 */
+	if (p->zvp_recycled >= p->zvp_budget)
+		return (VFS_RETURNED);
+	quota = p->zvp_budget - p->zvp_recycled;
+	if (p->zvp_round == 0)
+		quota /= MAX(p->zvp_nmounts - p->zvp_visited, 1);
+	quota = MAX(quota, 1);
+	p->zvp_visited++;
+
+	if (zfs_enter(zfsvfs, FTAG) != 0)
+		return (VFS_RETURNED);
+
+	mutex_enter(&zfsvfs->z_znodes_lock);
+	for (zp = list_head(&zfsvfs->z_all_znodes);
+	    zp != NULL && zp != stop && n < quota &&
+	    examined < 4 * quota;
+	    zp = next) {
+		next = list_next(&zfsvfs->z_all_znodes, zp);
+		examined++;
+
+		/* to the back of the line, whatever happens to it */
+		list_remove(&zfsvfs->z_all_znodes, zp);
+		list_insert_tail(&zfsvfs->z_all_znodes, zp);
+		if (stop == NULL)
+			stop = zp;
+
+		if (zp->z_is_ctldir || zp->z_unlinked || zp->z_suspended ||
+		    zp->z_id == zfsvfs->z_root || zp->z_sa_hdl == NULL ||
+		    ZTOV(zp) == NULL) {
+			skipped++;
+			continue;
+		}
+
+		p->zvp_cand[n].zvc_vp = ZTOV(zp);
+		p->zvp_cand[n].zvc_vid = zp->z_vid;
+		n++;
+	}
+	mutex_exit(&zfsvfs->z_znodes_lock);
+	zfs_exit(zfsvfs, FTAG);
+
+	for (i = 0; i < n; i++) {
+		struct vnode *vp = p->zvp_cand[i].zvc_vp;
+
+		if (vnode_getwithvid(vp, p->zvp_cand[i].zvc_vid) != 0) {
+			s_vid++;	/* reclaimed or reused meanwhile */
+			continue;
+		}
+
+		if (vnode_isinuse(vp, 0)) {
+			s_inuse++;
+			vnode_put(vp);
+			continue;
+		}
+		if (vnode_isvroot(vp) || vnode_isdir(vp)) {
+			s_dir++;
+			vnode_put(vp);
+			continue;
+		}
+		if (vnode_hasdirtyblks(vp)) {
+			s_dirty++;
+			vnode_put(vp);
+			continue;
+		}
+
+		/* reclaimed when our iocount is dropped */
+		(void) vnode_recycle(vp);
+		vnode_put(vp);
+		p->zvp_recycled++;
+	}
+
+	atomic_add_64(&zfs_vnode_cap_examined, examined);
+	atomic_add_64(&zfs_vnode_cap_skip_znode, skipped);
+	atomic_add_64(&zfs_vnode_cap_candidates, n);
+	atomic_add_64(&zfs_vnode_cap_skip_vid, s_vid);
+	atomic_add_64(&zfs_vnode_cap_skip_inuse, s_inuse);
+	atomic_add_64(&zfs_vnode_cap_skip_dir, s_dir);
+	atomic_add_64(&zfs_vnode_cap_skip_dirty, s_dirty);
+
+	return (VFS_RETURNED);
+}
+
+static void
+zfs_vnode_cap_pass(void)
+{
+	zfs_vnode_cap_pass_t p = { 0 };
+	uint64_t target = zfs_vnode_target;
+	uint64_t have = vnop_num_vnodes;
+	uint64_t budget;
+	int round;
+
+	if (target == 0 || have <= target)
+		return;
+
+	budget = MIN(have - target, MAX(zfs_vnode_reclaim_batch, 1));
+
+	p.zvp_count_only = B_TRUE;
+	vfs_iterate(LK_NOWAIT, zfs_vnode_cap_callback, &p);
+	zfs_vnode_cap_mounts = p.zvp_nmounts;
+	if (p.zvp_nmounts == 0)
+		return;
+
+	p.zvp_count_only = B_FALSE;
+	p.zvp_budget = budget;
+	p.zvp_cand = kmem_alloc(budget * sizeof (zfs_vnode_cap_cand_t),
+	    KM_SLEEP);
+	/*
+	 * Vnodes are usually concentrated on one or two mounts, so an even
+	 * split leaves most of the budget unused (with 6 mounts and one
+	 * busy one, 341 of 2048 a second).  Further rounds hand out the
+	 * rest; stop once a round recycles nothing.
+	 */
+	for (round = 0; round < 4 && p.zvp_recycled < budget; round++) {
+		uint64_t before = p.zvp_recycled;
+
+		p.zvp_round = round;
+		p.zvp_visited = 0;
+		vfs_iterate(LK_NOWAIT, zfs_vnode_cap_callback, &p);
+		if (p.zvp_recycled == before)
+			break;
+	}
+	kmem_free(p.zvp_cand, budget * sizeof (zfs_vnode_cap_cand_t));
+
+	atomic_add_64(&zfs_vnode_cap_recycled, p.zvp_recycled);
+	atomic_inc_64(&zfs_vnode_cap_passes);
+}
+
+static void
+zfs_vnode_cap_thread(void *notused)
+{
+	callb_cpr_t cpr;
+
+	CALLB_CPR_INIT(&cpr, &zfs_vnode_cap_lock, callb_generic_cpr, FTAG);
+
+	mutex_enter(&zfs_vnode_cap_lock);
+	while (!zfs_vnode_cap_thread_exit) {
+		/* every second while capping, every 32s while off */
+		clock_t wait = (zfs_vnode_target != 0) ? hz : (hz << 5);
+
+		CALLB_CPR_SAFE_BEGIN(&cpr);
+		(void) cv_timedwait(&zfs_vnode_cap_cv, &zfs_vnode_cap_lock,
+		    ddi_get_lbolt() + wait);
+		CALLB_CPR_SAFE_END(&cpr, &zfs_vnode_cap_lock);
+
+		if (zfs_vnode_cap_thread_exit)
+			break;
+
+		mutex_exit(&zfs_vnode_cap_lock);
+		zfs_vnode_cap_pass();
+		mutex_enter(&zfs_vnode_cap_lock);
+	}
+
+	zfs_vnode_cap_thread_exit = B_FALSE;
+	cv_broadcast(&zfs_vnode_cap_cv);
+	CALLB_CPR_EXIT(&cpr);		/* drops zfs_vnode_cap_lock */
+	thread_exit();
+}
+
+static void
+zfs_start_vnode_cap_thread(void)
+{
+	mutex_init(&zfs_vnode_cap_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&zfs_vnode_cap_cv, NULL, CV_DEFAULT, NULL);
+	zfs_vnode_cap_thread_exit = B_FALSE;
+	(void) thread_create(NULL, 0, zfs_vnode_cap_thread, NULL, 0, &p0,
+	    TS_RUN, minclsyspri);
+}
+
+static void
+zfs_stop_vnode_cap_thread(void)
+{
+	mutex_enter(&zfs_vnode_cap_lock);
+	zfs_vnode_cap_thread_exit = B_TRUE;
+	/* the thread sets it back to B_FALSE once it is on its way out */
+	while (zfs_vnode_cap_thread_exit) {
+		cv_signal(&zfs_vnode_cap_cv);
+		cv_wait(&zfs_vnode_cap_cv, &zfs_vnode_cap_lock);
+	}
+	mutex_exit(&zfs_vnode_cap_lock);
+	mutex_destroy(&zfs_vnode_cap_lock);
+	cv_destroy(&zfs_vnode_cap_cv);
+}
+
 int
 zfs_vfs_sysctl(int *name, __unused uint_t namelen, user_addr_t oldp,
     size_t *oldlenp, user_addr_t newp, size_t newlen,
@@ -5466,6 +5752,9 @@ zfs_vfsops_init(void)
 	/* Start thread to notify Finder of changes */
 	zfs_start_notify_thread();
 
+	/* Start thread that holds ZFS vnodes near zfs_vnode_target */
+	zfs_start_vnode_cap_thread();
+
 	vfe.vfe_vfsops = &zfs_vfsops_template;
 	vfe.vfe_vopcnt = ZFS_VNOP_TBL_CNT;
 	vfe.vfe_opvdescs = zfs_vnodeop_opv_desc_list;
@@ -5502,6 +5791,7 @@ zfs_vfsops_fini(void)
 {
 
 	zfs_stop_notify_thread();
+	zfs_stop_vnode_cap_thread();
 
 	if (vnop_lookup_cache)
 		kmem_cache_destroy(vnop_lookup_cache);
