@@ -819,6 +819,18 @@ extern uint64_t zfs_vfs_sync_paranoia;
 extern uint64_t zfs_iokit_sync_paranoia;
 extern uint64_t vnop_num_vnodes;
 extern uint64_t vnop_num_reclaims;
+extern uint64_t zfs_vnode_target;
+extern uint64_t zfs_vnode_reclaim_batch;
+extern uint64_t zfs_vnode_cap_recycled;
+extern uint64_t zfs_vnode_cap_passes;
+extern uint64_t zfs_vnode_cap_mounts;
+extern uint64_t zfs_vnode_cap_examined;
+extern uint64_t zfs_vnode_cap_skip_znode;
+extern uint64_t zfs_vnode_cap_candidates;
+extern uint64_t zfs_vnode_cap_skip_vid;
+extern uint64_t zfs_vnode_cap_skip_inuse;
+extern uint64_t zfs_vnode_cap_skip_dir;
+extern uint64_t zfs_vnode_cap_skip_dirty;
 extern int zfs_vnop_force_formd_normalized_output;
 
 extern int zfs_expire_snapshot;
@@ -839,6 +851,30 @@ ZFS_MODULE_IMPL( , vnop_num_vnodes, active_vnodes, ULLONG, ZMOD_RD,
 	"Num active vnodes");
 ZFS_MODULE_IMPL( , vnop_num_reclaims, reclaim_nodes, ULLONG, ZMOD_RD,
 	"Num reclaimed vnodes");
+ZFS_MODULE_IMPL( , zfs_vnode_target, vnode_target, ULLONG, ZMOD_RW,
+	"Recycle idle ZFS vnodes while there are more than this (0 = off)");
+ZFS_MODULE_IMPL( , zfs_vnode_reclaim_batch, vnode_reclaim_batch, ULLONG,
+	ZMOD_RW, "Most idle ZFS vnodes vnode_target recycles per second");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_recycled, vnode_cap_recycled, ULLONG,
+	ZMOD_RD, "ZFS vnodes recycled by vnode_target");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_passes, vnode_cap_passes, ULLONG,
+	ZMOD_RD, "Passes made by the vnode_target thread");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_mounts, vnode_cap_mounts, ULLONG,
+	ZMOD_RD, "ZFS mounts seen by the last vnode_target pass");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_examined, vnode_cap_examined, ULLONG,
+	ZMOD_RD, "znodes looked at by vnode_target");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_skip_znode, vnode_cap_skip_znode, ULLONG,
+	ZMOD_RD, "znodes skipped as ctldir, unlinked, root, suspended, ...");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_candidates, vnode_cap_candidates, ULLONG,
+	ZMOD_RD, "vnodes collected as candidates by vnode_target");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_skip_vid, vnode_cap_skip_vid, ULLONG,
+	ZMOD_RD, "candidates gone (vnode_getwithvid failed)");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_skip_inuse, vnode_cap_skip_inuse, ULLONG,
+	ZMOD_RD, "candidates skipped as in use");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_skip_dir, vnode_cap_skip_dir, ULLONG,
+	ZMOD_RD, "candidates skipped as directories or the root");
+ZFS_MODULE_IMPL( , zfs_vnode_cap_skip_dirty, vnode_cap_skip_dirty, ULLONG,
+	ZMOD_RD, "candidates skipped for dirty blocks");
 ZFS_MODULE_IMPL( , zfs_vnop_force_formd_normalized_output,
     force_formd_normalized, UINT, ZMOD_RW, "Force FormD normalize");
 ZFS_MODULE_IMPL( , zfs_vnop_skip_unlinked_drain, skip_unlinked_drain,
