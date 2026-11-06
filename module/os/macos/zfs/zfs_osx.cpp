@@ -251,7 +251,7 @@ org_openzfsonosx_zfs_zvol::start(IOService *provider)
 
 	res = zfs_boot_init((IOService *)this);
 
-	printf("ZFS: Loaded module v%s-%s%s, "
+	spl_bootlog("ZFS: Loaded module v%s-%s%s, "
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
 	    ZFS_META_VERSION, ZFS_META_RELEASE, ZFS_DEBUG_STR,
 	    SPA_VERSION_STRING, ZPL_VERSION_STRING);

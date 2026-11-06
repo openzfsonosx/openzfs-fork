@@ -38,6 +38,21 @@
 extern void vcmn_err(int, const char *, __va_list);
 extern void cmn_err(int, const char *, ...);
 
+/*
+ * Print like printf(), and also keep the message in the SPL boot log
+ * (kstat.spl.misc.bootlog) so it survives os_log and dmesg losses.
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern void spl_bootlog(const char *, ...) __printflike(1, 2);
+extern void spl_vbootlog(const char *, __va_list) __printflike(1, 0);
+extern void spl_bootlog_kstat_init(void);
+extern void spl_bootlog_kstat_fini(void);
+#ifdef __cplusplus
+}
+#endif
+
 #define	cmn_err_once(ce, ...)				\
 {							\
 	static volatile uint32_t printed = 0;		\

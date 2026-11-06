@@ -51,6 +51,7 @@ noinst_LTLIBRARIES = libspl.la
 
 libspl_la_SOURCES = 	\
 	spl-atomic.c \
+	spl-bootlog.c \
 	spl-condvar.c \
 	spl-cpus.cpp \
 	spl-cred.c \

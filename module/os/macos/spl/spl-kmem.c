@@ -668,7 +668,7 @@ spl_kmem_va_routes_check(void)
 
 		if (!kmem_va_route_stale(i))
 			continue;
-		printf("SPL: %s: no kmem cache matched %s '%s' "
+		spl_bootlog("SPL: %s: no kmem cache matched %s '%s' "
 		    "(class %s); renamed upstream?\n", __func__,
 		    r->kvr_prefix ? "prefix" : "name", r->kvr_name,
 		    kmem_va_classes[r->kvr_class].kvc_name);
