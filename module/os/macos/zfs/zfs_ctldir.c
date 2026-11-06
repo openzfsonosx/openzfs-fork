@@ -200,6 +200,7 @@ zfsctl_vnode_alloc(zfsvfs_t *zfsvfs, uint64_t id,
 	zp->z_is_sa = B_FALSE;
 	zp->z_is_mapped = B_FALSE;
 	zp->z_is_ctldir = B_TRUE;
+	zp->z_suspended = B_FALSE;
 	zp->z_xattr_dir_absent = B_FALSE;
 	zp->z_has_seq = B_FALSE;
 	zp->z_sa_hdl = NULL;
