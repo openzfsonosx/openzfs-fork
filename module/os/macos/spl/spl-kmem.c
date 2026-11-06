@@ -194,6 +194,22 @@ struct kmem_cache_kstat {
 	kstat_named_t   kmc_no_vba_fail;
 	kstat_named_t   kmc_arc_no_grow_set;
 	kstat_named_t   kmc_arc_no_grow;
+	/* results of the last kmem_va_census(); see kmem_census_t */
+	kstat_named_t	kmc_census_time;
+	kstat_named_t	kmc_census_arena;
+	kstat_named_t	kmc_census_slabs;
+	kstat_named_t	kmc_census_age_lt_1m;
+	kstat_named_t	kmc_census_age_lt_10m;
+	kstat_named_t	kmc_census_age_lt_1h;
+	kstat_named_t	kmc_census_age_lt_1d;
+	kstat_named_t	kmc_census_age_ge_1d;
+	kstat_named_t	kmc_census_unqcached;
+	kstat_named_t	kmc_census_va_chunks;
+	kstat_named_t	kmc_census_va_partial;
+	kstat_named_t	kmc_census_va_partial_old;
+	kstat_named_t	kmc_census_va_lone;
+	kstat_named_t	kmc_census_va_pinned_bytes;
+	kstat_named_t	kmc_census_lookup_miss;
 } kmem_cache_kstat = {
 	{ "buf_size",		KSTAT_DATA_UINT64 },
 	{ "align",		KSTAT_DATA_UINT64 },
@@ -237,6 +253,21 @@ struct kmem_cache_kstat {
 	{ "no_vba_fail",	KSTAT_DATA_UINT64 },
 	{ "arc_no_grow_set",	KSTAT_DATA_UINT64 },
 	{ "arc_no_grow",	KSTAT_DATA_UINT64 },
+	{ "census_time",	KSTAT_DATA_UINT64 },
+	{ "census_arena",	KSTAT_DATA_UINT64 },
+	{ "census_slabs",	KSTAT_DATA_UINT64 },
+	{ "census_age_lt_1m",	KSTAT_DATA_UINT64 },
+	{ "census_age_lt_10m",	KSTAT_DATA_UINT64 },
+	{ "census_age_lt_1h",	KSTAT_DATA_UINT64 },
+	{ "census_age_lt_1d",	KSTAT_DATA_UINT64 },
+	{ "census_age_ge_1d",	KSTAT_DATA_UINT64 },
+	{ "census_unqcached",	KSTAT_DATA_UINT64 },
+	{ "census_va_chunks",	KSTAT_DATA_UINT64 },
+	{ "census_va_partial",	KSTAT_DATA_UINT64 },
+	{ "census_va_partial_old", KSTAT_DATA_UINT64 },
+	{ "census_va_lone",	KSTAT_DATA_UINT64 },
+	{ "census_va_pinned_bytes", KSTAT_DATA_UINT64 },
+	{ "census_lookup_miss",	KSTAT_DATA_UINT64 },
 };
 
 static kmutex_t kmem_cache_kstat_lock;
@@ -374,6 +405,240 @@ static vmem_t		*kmem_oversize_arena;
 static vmem_t		*kmem_va_arena;
 static vmem_t		*kmem_default_arena;
 static vmem_t		*kmem_firewall_arena;
+
+/*
+ * Lifetime segregation.
+ *
+ * kmem_va imports 128K slabs into its 16K and 32K quantum caches, and
+ * kmem_default carves every 16K and 32K kmem slab out of those.  A 128K
+ * chunk of VA therefore usually holds slabs from several unrelated caches,
+ * and it can only go back to the bucket arenas (and from there to xnu)
+ * once all of them are gone.  When long-lived slabs share chunks with
+ * short-lived ones, the long-lived ones pin the VA freed by the
+ * short-lived ones indefinitely.
+ *
+ * So kmem caches created without an explicit arena are sorted into
+ * lifetime classes, and each class other than the default gets its own
+ * pair of arenas with the same shape as kmem_va / kmem_default:
+ * kmem_<class> imports from kmem_<class>_va, which imports from
+ * heap_arena and has its own quantum caches.  A 128K chunk from
+ * bucket_131072 then belongs to exactly one class, and is pinned only by
+ * caches whose lifetimes are correlated.
+ *
+ * kmem_va_census() (kstat.spl.misc.spl_misc.kmem_va_census=1) measures
+ * whether the classification is right; see the census_* per-cache kstats
+ * and kstat.spl.misc.kmem_va_census_<class>.
+ */
+typedef enum kmem_va_class {
+	KMEM_VA_CLASS_DEFAULT = 0,	/* kmem_va / kmem_default */
+	KMEM_VA_CLASS_TRANSIENT,	/* I/O-path buffers, per-zio structs */
+	KMEM_VA_CLASS_ZIO16K,		/* 16K zio bufs: long-lived + churn */
+	KMEM_VA_CLASS_ARCHDR,		/* ARC and L2ARC headers */
+	KMEM_VA_CLASS_VNODE,		/* follow xnu's vnode cache */
+	KMEM_VA_CLASS_ARCBUF,		/* sub-16K zio bufs: ARC linear ABDs */
+	KMEM_VA_NCLASSES
+} kmem_va_class_t;
+
+typedef struct kmem_va_class_arenas {
+	const char	*kvc_name;	/* class name, for arenas and kstats */
+	vmem_t		*kvc_va;	/* VA arena with the quantum caches */
+	vmem_t		*kvc_arena;	/* slab source for the class's caches */
+} kmem_va_class_arenas_t;
+
+/*
+ * The arena names are "kmem_<name>_va" and "kmem_<name>", except for the
+ * default class whose arenas are the original kmem_va and kmem_default.
+ */
+static kmem_va_class_arenas_t kmem_va_classes[KMEM_VA_NCLASSES] = {
+	[KMEM_VA_CLASS_DEFAULT]		= { .kvc_name = "default" },
+	[KMEM_VA_CLASS_TRANSIENT]	= { .kvc_name = "transient" },
+	[KMEM_VA_CLASS_ZIO16K]		= { .kvc_name = "zio16k" },
+	[KMEM_VA_CLASS_ARCHDR]		= { .kvc_name = "archdr" },
+	[KMEM_VA_CLASS_VNODE]		= { .kvc_name = "vnode" },
+	[KMEM_VA_CLASS_ARCBUF]		= { .kvc_name = "arcbuf" },
+};
+
+/*
+ * Routing table: first match wins.  An entry with kvr_prefix set matches
+ * names starting with kvr_name, otherwise the name must match exactly.
+ *
+ * The groupings come from snapshots of a busy-then-idle machine:
+ *  - 16K zio bufs had a stable base of ~180-195k buffers (ARC-held
+ *    metadata) with heavy churn on top (~80k slab creates and ~70k
+ *    destroys in ~75 minutes), so they poison either neighbour.
+ *  - ARC headers turn over about once (slab_create / live slabs ~1.0-1.1)
+ *    and sit at 83-98% occupancy: long-lived anchors.
+ *  - znode, dnode_t, sa and dmu_buf_impl_t counts track active_vnodes;
+ *    they grow and shrink with xnu's vnode cache.  General kmem_alloc_N
+ *    size classes are deliberately not routed: which of them carries
+ *    per-vnode allocations depends on the build and the workload (832
+ *    on a release build, 24 and 56 on a ZFS_DEBUG build whose test
+ *    stat()ed every file), so a name route would be wrong somewhere.
+ *  - zio buffers below 16K are where the ARC keeps linear ABDs (abd_os.c
+ *    allocates linear below zfs_abd_scatter_min_size, 16K): small and
+ *    compressed blocks and small metadata, plus their decompressed
+ *    copies.  They live as long as the block stays cached, not for one
+ *    I/O; on a test with a 4K-recordsize dataset they held ~170M of the
+ *    ~190M of free VA left pinned in the transient class after idle.
+ *    They get their own class, arcbuf.
+ *  - the transient class is the rest of the zio buffers (16K and up,
+ *    except the 16K class above), per-I/O structures, dirty records
+ *    (live for one or two txgs) and ZIL write blocks and commit
+ *    waiters.
+ */
+typedef struct kmem_va_route {
+	const char	*kvr_name;
+	boolean_t	kvr_prefix;
+	kmem_va_class_t	kvr_class;
+	boolean_t	kvr_optional;	/* cache need not exist */
+	int		kvr_group;	/* != 0: any match in group will do */
+	size_t		kvr_below;	/* != 0: name is <prefix><size>, */
+					/* match only if size < kvr_below */
+} kmem_va_route_t;
+
+/*
+ * zio_init() creates either the combined zio_buf_comb_N cache or, when
+ * the metadata and data creation flags differ (ZFS_DEBUG builds set
+ * zio_buf_debug_limit to 16K), separate zio_buf_N and zio_data_buf_N
+ * caches.  Routes for the split names are optional; the 16K routes form
+ * a group, so zio_buf_comb_16384 is not reported as unmatched when the
+ * split 16K caches matched instead.
+ */
+#define	KVR(name, prefix, class, optional, group, below)		\
+	{ name, prefix, KMEM_VA_CLASS_##class, optional, group, below }
+
+static const kmem_va_route_t kmem_va_routes[] = {
+	KVR("zio_buf_comb_16384",	B_FALSE, ZIO16K, B_FALSE, 1, 0),
+	KVR("zio_buf_16384",		B_FALSE, ZIO16K, B_TRUE, 1, 0),
+	KVR("zio_data_buf_16384",	B_FALSE, ZIO16K, B_TRUE, 1, 0),
+
+	KVR("zio_buf_comb_",		B_TRUE,  ARCBUF, B_FALSE, 2, 16384),
+	KVR("zio_buf_",			B_TRUE,  ARCBUF, B_TRUE, 2, 16384),
+	KVR("zio_data_buf_",		B_TRUE,  ARCBUF, B_TRUE, 2, 16384),
+
+	KVR("zio_buf_",			B_TRUE,  TRANSIENT, B_FALSE, 0, 0),
+	KVR("zio_data_buf_",		B_TRUE,  TRANSIENT, B_TRUE, 0, 0),
+	KVR("zio_cache",		B_FALSE, TRANSIENT, B_FALSE, 0, 0),
+	KVR("zio_link_cache",		B_FALSE, TRANSIENT, B_FALSE, 0, 0),
+	KVR("lz4_cache",		B_FALSE, TRANSIENT, B_FALSE, 0, 0),
+	KVR("dbuf_dirty_record_t",	B_FALSE, TRANSIENT, B_FALSE, 0, 0),
+	KVR("zil_lwb_cache",		B_FALSE, TRANSIENT, B_FALSE, 0, 0),
+	KVR("zil_zcw_cache",		B_FALSE, TRANSIENT, B_FALSE, 0, 0),
+
+	KVR("arc_buf_hdr_t_",		B_TRUE,  ARCHDR, B_FALSE, 0, 0),
+
+	KVR("zfs_znode_cache",		B_FALSE, VNODE, B_FALSE, 0, 0),
+	KVR("dnode_t",			B_FALSE, VNODE, B_FALSE, 0, 0),
+	KVR("sa_cache",			B_FALSE, VNODE, B_FALSE, 0, 0),
+	KVR("dmu_buf_impl_t",		B_FALSE, VNODE, B_FALSE, 0, 0),
+
+	KVR(NULL,			B_FALSE, DEFAULT, B_FALSE, 0, 0),
+};
+
+#undef	KVR
+
+#define	KMEM_VA_NROUTES	\
+	(sizeof (kmem_va_routes) / sizeof (kmem_va_routes[0]))
+
+/*
+ * Number of kmem_cache_create() calls each route has matched.  A route
+ * that never matches is almost always a cache that upstream renamed,
+ * which would otherwise silently fall back to the default class; see
+ * spl_kmem_va_routes_check() and kmem_va_routes_unmatched.
+ */
+static uint64_t kmem_va_route_hits[KMEM_VA_NROUTES];
+
+/*
+ * For a size-limited route: does the rest of the name, after the
+ * prefix, consist only of a decimal size below r->kvr_below?
+ */
+static boolean_t
+kmem_va_route_size_ok(const kmem_va_route_t *r, const char *rest)
+{
+	size_t size = 0;
+
+	if (*rest == '\0')
+		return (B_FALSE);
+	for (; *rest != '\0'; rest++) {
+		if (*rest < '0' || *rest > '9')
+			return (B_FALSE);
+		size = size * 10 + (size_t)(*rest - '0');
+		if (size >= r->kvr_below)
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static kmem_va_class_t
+kmem_cache_va_class(const char *name)
+{
+	const kmem_va_route_t *r;
+
+	for (r = kmem_va_routes; r->kvr_name != NULL; r++) {
+		const size_t len = strlen(r->kvr_name);
+
+		if (r->kvr_prefix ? strncmp(name, r->kvr_name, len) != 0 :
+		    strcmp(name, r->kvr_name) != 0)
+			continue;
+		if (r->kvr_below != 0 &&
+		    !kmem_va_route_size_ok(r, name + len))
+			continue;
+		atomic_inc_64(&kmem_va_route_hits[r - kmem_va_routes]);
+		return (r->kvr_class);
+	}
+	return (KMEM_VA_CLASS_DEFAULT);
+}
+
+/*
+ * A route is stale if it is required, matched nothing, and no other
+ * route in its group matched either.
+ */
+static boolean_t
+kmem_va_route_stale(int i)
+{
+	const kmem_va_route_t *r = &kmem_va_routes[i];
+
+	if (r->kvr_optional || kmem_va_route_hits[i] != 0)
+		return (B_FALSE);
+
+	if (r->kvr_group != 0) {
+		for (int j = 0; kmem_va_routes[j].kvr_name != NULL; j++)
+			if (kmem_va_routes[j].kvr_group == r->kvr_group &&
+			    kmem_va_route_hits[j] != 0)
+				return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static uint64_t
+kmem_va_routes_unmatched(void)
+{
+	uint64_t n = 0;
+
+	for (int i = 0; kmem_va_routes[i].kvr_name != NULL; i++)
+		if (kmem_va_route_stale(i))
+			n++;
+	return (n);
+}
+
+/*
+ * Called by the macOS zfs start code once zfs_kmod_init() has created
+ * all the ZFS kmem caches: complain about routes that matched nothing.
+ */
+void
+spl_kmem_va_routes_check(void)
+{
+	for (int i = 0; kmem_va_routes[i].kvr_name != NULL; i++) {
+		const kmem_va_route_t *r = &kmem_va_routes[i];
+
+		if (!kmem_va_route_stale(i))
+			continue;
+		printf("SPL: %s: no kmem cache matched %s '%s' "
+		    "(class %s); renamed upstream?\n", __func__,
+		    r->kvr_prefix ? "prefix" : "name", r->kvr_name,
+		    kmem_va_classes[r->kvr_class].kvc_name);
+	}
+}
 
 /*
  * kmem slab consolidator thresholds (tunables)
@@ -613,6 +878,10 @@ typedef struct spl_stats {
 	kstat_named_t spl_lowest_zvol_stack_remaining;
 	kstat_named_t spl_split_stack_below;
 	kstat_named_t kmem_depot_reap_idle_magazines;
+	kstat_named_t kmem_va_census;
+	kstat_named_t kmem_va_census_runs;
+	kstat_named_t kmem_va_census_last_ns;
+	kstat_named_t kmem_va_routes_unmatched;
 } spl_stats_t;
 
 static spl_stats_t spl_stats = {
@@ -701,6 +970,10 @@ static spl_stats_t spl_stats = {
 	{"lowest_zvol_stack_remaining", KSTAT_DATA_UINT64},
 	{"split_stack_below", KSTAT_DATA_UINT64},
 	{"kmem_depot_reap_idle_magazines", KSTAT_DATA_UINT64},
+	{"kmem_va_census", KSTAT_DATA_UINT64},
+	{"kmem_va_census_runs", KSTAT_DATA_UINT64},
+	{"kmem_va_census_last_ns", KSTAT_DATA_UINT64},
+	{"kmem_va_routes_unmatched", KSTAT_DATA_UINT64},
 };
 
 static kstat_t *spl_ksp = 0;
@@ -3289,6 +3562,27 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 	kmcp->kmc_arc_no_grow_set.value.ui64    = cp->arc_no_grow_set;
 	kmcp->kmc_arc_no_grow.value.ui64	= cp->arc_no_grow;
 
+	{
+		const kmem_census_t *kc = &cp->cache_census;
+
+		kmcp->kmc_census_time.value.ui64	= kc->kc_time;
+		kmcp->kmc_census_arena.value.ui64	= kc->kc_arena;
+		kmcp->kmc_census_slabs.value.ui64	= kc->kc_slabs;
+		kmcp->kmc_census_age_lt_1m.value.ui64	= kc->kc_age[0];
+		kmcp->kmc_census_age_lt_10m.value.ui64	= kc->kc_age[1];
+		kmcp->kmc_census_age_lt_1h.value.ui64	= kc->kc_age[2];
+		kmcp->kmc_census_age_lt_1d.value.ui64	= kc->kc_age[3];
+		kmcp->kmc_census_age_ge_1d.value.ui64	= kc->kc_age[4];
+		kmcp->kmc_census_unqcached.value.ui64	= kc->kc_unqcached;
+		kmcp->kmc_census_va_chunks.value.ui64	= kc->kc_va_chunks;
+		kmcp->kmc_census_va_partial.value.ui64	= kc->kc_va_partial;
+		kmcp->kmc_census_va_partial_old.value.ui64 =
+		    kc->kc_va_partial_old;
+		kmcp->kmc_census_va_lone.value.ui64	= kc->kc_va_lone;
+		kmcp->kmc_census_va_pinned_bytes.value.ui64 = kc->kc_va_pinned;
+		kmcp->kmc_census_lookup_miss.value.ui64	= kc->kc_lookup_miss;
+	}
+
 	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++) {
 		kmem_cpu_cache_t *ccp = &cp->cache_cpu[cpu_seqid];
 
@@ -3570,8 +3864,12 @@ kmem_cache_create(
 	}
 #endif	/* DEBUG */
 
-	if (vmp == NULL)
-		vmp = kmem_default_arena;
+	if (vmp == NULL) {
+		/* class arenas are NULL until kmem_init()'s second pass */
+		vmp = kmem_va_classes[kmem_cache_va_class(name)].kvc_arena;
+		if (vmp == NULL)
+			vmp = kmem_default_arena;
+	}
 
 	/*
 	 * If this kmem cache has an identifier vmem arena as its source, mark
@@ -4220,6 +4518,35 @@ kmem_cache_init(int pass, int use_large_pages)
 		    vmem_alloc_impl, vmem_free_impl, kmem_va_arena,
 		    0, VMC_DUMPSAFE | VM_SLEEP);
 
+		kmem_va_classes[KMEM_VA_CLASS_DEFAULT].kvc_va = kmem_va_arena;
+		kmem_va_classes[KMEM_VA_CLASS_DEFAULT].kvc_arena =
+		    kmem_default_arena;
+
+		/*
+		 * Same shape as kmem_va / kmem_default for each other
+		 * lifetime class.  These must not import from kmem_va:
+		 * the point is to have separate quantum caches.
+		 */
+		for (i = KMEM_VA_CLASS_DEFAULT + 1; i < KMEM_VA_NCLASSES;
+		    i++) {
+			kmem_va_class_arenas_t *kvc = &kmem_va_classes[i];
+			char vname[VMEM_NAMELEN];
+
+			(void) snprintf(vname, sizeof (vname), "kmem_%s_va",
+			    kvc->kvc_name);
+			kvc->kvc_va = vmem_create(vname,
+			    NULL, 0, PAGESIZE,
+			    vmem_alloc_impl, vmem_free_impl, heap_arena,
+			    2 * PAGESIZE, VM_SLEEP);
+
+			(void) snprintf(vname, sizeof (vname), "kmem_%s",
+			    kvc->kvc_name);
+			kvc->kvc_arena = vmem_create(vname,
+			    NULL, 0, PAGESIZE,
+			    vmem_alloc_impl, vmem_free_impl, kvc->kvc_va,
+			    0, VMC_DUMPSAFE | VM_SLEEP);
+		}
+
 		/* Figure out what our maximum cache size is */
 		maxbuf = kmem_max_cached;
 		if (maxbuf <= KMEM_MAXBUF) {
@@ -4639,7 +4966,9 @@ spl_free_reap_caches(void)
 		return;
 
 	kmem_reap();
-	vmem_qcache_reap(kmem_va_arena);
+	for (int i = 0; i < KMEM_VA_NCLASSES; i++)
+		if (kmem_va_classes[i].kvc_va != NULL)
+			vmem_qcache_reap(kmem_va_classes[i].kvc_va);
 }
 
 void
@@ -5205,6 +5534,339 @@ spl_free_thread(void *notused)
 }
 
 
+/*
+ * kmem VA census.
+ *
+ * Measures how well kmem_cache_va_class() separates lifetimes, by looking
+ * at who holds the VA quantum-cache chunks of each class's VA arena.
+ *
+ * Each 16K or 32K slab of a cache whose arena is a class arena
+ * (kmem_default, kmem_<class>) was imported, whole, as one chunk of the
+ * 16K or 32K quantum cache of the class's VA arena (kmem_va,
+ * kmem_<class>_va); those quantum caches have 128K slabs.  For every such
+ * kmem slab we look up the quantum-cache slab that holds it and record,
+ * per owning cache (census_* in kstat.unix.kmem_cache.<name>):
+ *
+ *   census_arena		class index + 1 (1 = default, 2 = transient,
+ *				3 = zio16k, 4 = archdr, 5 = vnode,
+ *				6 = arcbuf)
+ *   census_age_*		histogram of the cache's slab ages
+ *   census_va_chunks		VA chunks held
+ *   census_va_partial		... in a 128K VA slab that has free chunks
+ *   census_va_partial_old	... and the owning slab is >= 1h old
+ *   census_va_lone		... and it is the only chunk still in use
+ *   census_va_pinned_bytes	this cache's share of the free VA in those
+ *				partial slabs (free bytes / chunks in use,
+ *				summed over its chunks)
+ *
+ * A cache in a short-lived class (transient) with many old slabs and a
+ * large census_va_partial_old / census_va_pinned_bytes is long-lived and
+ * is pinning VA the class should be able to give back.  A cache in the
+ * default or a long-lived class whose slabs are almost all young
+ * (census_age_lt_1m/10m) and whose slab_create count climbs quickly
+ * between censuses is short-lived and is fragmenting its neighbours.
+ * Either way, move it in kmem_va_routes[].
+ *
+ * Per-class totals go in kstat.spl.misc.kmem_va_census_<class>:
+ * allocated (VA quantum-cache bytes in use), attributed (of which
+ * accounted for by a kmem slab; the rest are chunks sitting in the
+ * quantum caches' magazines), partial_free (free bytes in partly-used
+ * 128K VA slabs: the fragmentation tax), empty (bytes in wholly free VA
+ * slabs) and lookup_miss (kmem slabs whose VA chunk wasn't found; should
+ * be 0).
+ *
+ * Triggered by writing a non-zero value to
+ * kstat.spl.misc.spl_misc.kmem_va_census; runs once on kmem_taskq, and
+ * kmem_va_census_runs counts completed runs.  It holds kmem_cache_lock
+ * for the duration and each cache's cache_lock while that cache is
+ * walked, so expect brief slab-layer stalls on caches with very many
+ * slabs.  The two passes (quantum caches, then owners) are not atomic
+ * with respect to each other, so totals are approximate on a busy
+ * system.
+ */
+
+typedef struct kmem_va_census_arena {
+	uint64_t	vca_allocated;	/* bytes of VA qcache chunks in use */
+	uint64_t	vca_attributed;	/* ... accounted for by a kmem slab */
+	uint64_t	vca_partial_free; /* free bytes in partly-used slabs */
+	uint64_t	vca_empty;	/* bytes in wholly free VA slabs */
+	uint64_t	vca_lookup_miss; /* kmem slabs with no VA chunk found */
+} kmem_va_census_arena_t;
+
+typedef struct kmem_va_census_kstat {
+	kstat_named_t	kvck_allocated;
+	kstat_named_t	kvck_attributed;
+	kstat_named_t	kvck_partial_free;
+	kstat_named_t	kvck_empty;
+	kstat_named_t	kvck_lookup_miss;
+} kmem_va_census_kstat_t;
+
+static const kmem_va_census_kstat_t kmem_va_census_kstat_template = {
+	{ "allocated",		KSTAT_DATA_UINT64 },
+	{ "attributed",		KSTAT_DATA_UINT64 },
+	{ "partial_free",	KSTAT_DATA_UINT64 },
+	{ "empty",		KSTAT_DATA_UINT64 },
+	{ "lookup_miss",	KSTAT_DATA_UINT64 },
+};
+
+static kmem_va_census_kstat_t kmem_va_census_kstat_data[KMEM_VA_NCLASSES];
+static kstat_t *kmem_va_census_ksp[KMEM_VA_NCLASSES];
+
+static uint64_t kmem_va_census_runs = 0;
+static uint64_t kmem_va_census_last_ns = 0;
+static _Atomic uint32_t kmem_va_census_busy = 0;
+
+static const hrtime_t kmem_census_age_limit[KMEM_CENSUS_AGE_BUCKETS - 1] = {
+	SEC2NSEC(60), SEC2NSEC(600), SEC2NSEC(3600), SEC2NSEC(86400)
+};
+
+#define	KMEM_CENSUS_OLD		SEC2NSEC(3600)
+
+static void
+kmem_va_census_kstat_init(void)
+{
+	for (int i = 0; i < KMEM_VA_NCLASSES; i++) {
+		char name[KSTAT_STRLEN];
+		kstat_t *ksp;
+
+		kmem_va_census_kstat_data[i] = kmem_va_census_kstat_template;
+		(void) snprintf(name, sizeof (name), "kmem_va_census_%s",
+		    kmem_va_classes[i].kvc_name);
+		ksp = kstat_create("spl", 0, name, "misc", KSTAT_TYPE_NAMED,
+		    sizeof (kmem_va_census_kstat_t) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL);
+		if (ksp != NULL) {
+			ksp->ks_data = &kmem_va_census_kstat_data[i];
+			kstat_install(ksp);
+		}
+		kmem_va_census_ksp[i] = ksp;
+	}
+}
+
+static void
+kmem_va_census_kstat_fini(void)
+{
+	for (int i = 0; i < KMEM_VA_NCLASSES; i++) {
+		if (kmem_va_census_ksp[i] != NULL)
+			kstat_delete(kmem_va_census_ksp[i]);
+		kmem_va_census_ksp[i] = NULL;
+	}
+}
+
+/*
+ * Sum the slab layer of each of va's quantum caches.
+ */
+static void
+kmem_va_census_qcaches(vmem_t *va, kmem_va_census_arena_t *st)
+{
+	for (int i = 0; i < VMEM_NQCACHE_MAX; i++) {
+		kmem_cache_t *qcp = va->vm_qcache[i];
+		kmem_slab_t *sp;
+		uint64_t bs;
+
+		if (qcp == NULL)
+			continue;
+
+		bs = qcp->cache_bufsize;
+
+		mutex_enter(&qcp->cache_lock);
+		for (sp = list_head(&qcp->cache_complete_slabs); sp != NULL;
+		    sp = list_next(&qcp->cache_complete_slabs, sp))
+			st->vca_allocated += sp->slab_refcnt * bs;
+		for (sp = avl_first(&qcp->cache_partial_slabs); sp != NULL;
+		    sp = AVL_NEXT(&qcp->cache_partial_slabs, sp)) {
+			st->vca_allocated += sp->slab_refcnt * bs;
+			if (sp->slab_refcnt == 0)
+				st->vca_empty += sp->slab_chunks * bs;
+			else
+				st->vca_partial_free +=
+				    (sp->slab_chunks - sp->slab_refcnt) * bs;
+		}
+		mutex_exit(&qcp->cache_lock);
+	}
+}
+
+/*
+ * Find the quantum-cache slab holding the chunk that starts at addr.
+ * Quantum caches are always KMF_HASH, so allocated chunks are in the
+ * hash table.
+ */
+static kmem_slab_t *
+kmem_va_census_qslab(kmem_cache_t *qcp, uintptr_t addr)
+{
+	kmem_bufctl_t *bcp;
+
+	ASSERT(MUTEX_HELD(&qcp->cache_lock));
+	ASSERT(qcp->cache_flags & KMF_HASH);
+
+	for (bcp = *KMEM_HASH(qcp, addr); bcp != NULL; bcp = bcp->bc_next)
+		if ((uintptr_t)bcp->bc_addr == addr)
+			return (bcp->bc_slab);
+
+	return (NULL);
+}
+
+static void
+kmem_va_census_slab(kmem_cache_t *cp, kmem_slab_t *sp, vmem_t *va,
+    hrtime_t now, kmem_census_t *kc, kmem_va_census_arena_t *st)
+{
+	kmem_cache_t *qcp;
+	kmem_slab_t *qsp;
+	hrtime_t age;
+	uintptr_t addr;
+	long refcnt = 0, chunks = 0;
+	uint64_t qbs;
+	int b;
+
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+
+	kc->kc_slabs++;
+
+	age = (sp->slab_create_time != 0) ? now - sp->slab_create_time : 0;
+	for (b = 0; b < KMEM_CENSUS_AGE_BUCKETS - 1; b++)
+		if (age < kmem_census_age_limit[b])
+			break;
+	kc->kc_age[b]++;
+
+	if (cp->cache_slabsize > va->vm_qcache_max) {
+		kc->kc_unqcached++;
+		return;
+	}
+
+	qcp = va->vm_qcache[(cp->cache_slabsize - 1) >> va->vm_qshift];
+	if (qcp == NULL) {
+		kc->kc_unqcached++;
+		return;
+	}
+	qbs = qcp->cache_bufsize;
+
+	/*
+	 * The slab was a PAGESIZE-aligned vmem_alloc() from cp's arena,
+	 * which imported exactly that much from va.  slab_base is the
+	 * slab plus its colour; for slabs no larger than 2 * PAGESIZE (the
+	 * quantum-cached sizes) the colour is always below PAGESIZE, so
+	 * aligning down recovers the start of the VA chunk.
+	 */
+	addr = P2ALIGN((uintptr_t)sp->slab_base, PAGESIZE);
+
+	mutex_enter(&qcp->cache_lock);
+	qsp = kmem_va_census_qslab(qcp, addr);
+	if (qsp != NULL) {
+		refcnt = qsp->slab_refcnt;
+		chunks = qsp->slab_chunks;
+	}
+	mutex_exit(&qcp->cache_lock);
+
+	if (qsp == NULL || refcnt <= 0) {
+		kc->kc_lookup_miss++;
+		st->vca_lookup_miss++;
+		return;
+	}
+
+	kc->kc_va_chunks++;
+	st->vca_attributed += qbs;
+
+	if (refcnt < chunks) {
+		kc->kc_va_partial++;
+		kc->kc_va_pinned += ((uint64_t)(chunks - refcnt) * qbs) /
+		    (uint64_t)refcnt;
+		if (refcnt == 1)
+			kc->kc_va_lone++;
+		if (age >= KMEM_CENSUS_OLD)
+			kc->kc_va_partial_old++;
+	}
+}
+
+static void
+kmem_va_census_cache(kmem_cache_t *cp, hrtime_t now,
+    kmem_va_census_arena_t *stats)
+{
+	kmem_census_t kc = { 0 };
+	kmem_slab_t *sp;
+	vmem_t *va = NULL;
+	int c;
+
+	if (cp->cache_cflags & KMC_QCACHE)
+		return;
+
+	for (c = 0; c < KMEM_VA_NCLASSES; c++) {
+		if (kmem_va_classes[c].kvc_arena != NULL &&
+		    cp->cache_arena == kmem_va_classes[c].kvc_arena) {
+			va = kmem_va_classes[c].kvc_va;
+			break;
+		}
+	}
+	if (va == NULL)
+		return;
+
+	kc.kc_arena = c + 1;
+	kc.kc_time = now;
+
+	mutex_enter(&cp->cache_lock);
+	for (sp = list_head(&cp->cache_complete_slabs); sp != NULL;
+	    sp = list_next(&cp->cache_complete_slabs, sp))
+		kmem_va_census_slab(cp, sp, va, now, &kc, &stats[c]);
+	for (sp = avl_first(&cp->cache_partial_slabs); sp != NULL;
+	    sp = AVL_NEXT(&cp->cache_partial_slabs, sp))
+		kmem_va_census_slab(cp, sp, va, now, &kc, &stats[c]);
+	cp->cache_census = kc;
+	mutex_exit(&cp->cache_lock);
+}
+
+static void
+kmem_va_census(void *arg __unused)
+{
+	kmem_va_census_arena_t st[KMEM_VA_NCLASSES];
+	const hrtime_t start = gethrtime();
+	kmem_cache_t *cp;
+	int c;
+
+	memset(st, 0, sizeof (st));
+
+	for (c = 0; c < KMEM_VA_NCLASSES; c++)
+		if (kmem_va_classes[c].kvc_va != NULL)
+			kmem_va_census_qcaches(kmem_va_classes[c].kvc_va,
+			    &st[c]);
+
+	mutex_enter(&kmem_cache_lock);
+	for (cp = list_head(&kmem_caches); cp != NULL;
+	    cp = list_next(&kmem_caches, cp))
+		kmem_va_census_cache(cp, start, st);
+	mutex_exit(&kmem_cache_lock);
+
+	for (c = 0; c < KMEM_VA_NCLASSES; c++) {
+		kmem_va_census_kstat_t *k = &kmem_va_census_kstat_data[c];
+
+		k->kvck_allocated.value.ui64 = st[c].vca_allocated;
+		k->kvck_attributed.value.ui64 = st[c].vca_attributed;
+		k->kvck_partial_free.value.ui64 = st[c].vca_partial_free;
+		k->kvck_empty.value.ui64 = st[c].vca_empty;
+		k->kvck_lookup_miss.value.ui64 = st[c].vca_lookup_miss;
+	}
+
+	kmem_va_census_last_ns = gethrtime() - start;
+	kmem_va_census_runs++;
+	kmem_va_census_busy = 0;
+}
+
+static void
+kmem_va_census_request(void)
+{
+	uint32_t expected = 0;
+
+	if (kmem_taskq == NULL)
+		return;
+
+	if (!__c11_atomic_compare_exchange_strong(&kmem_va_census_busy,
+	    &expected, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
+		return;		/* one already queued or running */
+
+	if (taskq_dispatch(kmem_taskq, kmem_va_census, NULL,
+	    TQ_NOSLEEP) == TASKQID_INVALID)
+		kmem_va_census_busy = 0;
+}
+
+
 static int
 spl_kstat_update(kstat_t *ksp, int rw)
 {
@@ -5292,6 +5954,12 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		    kmem_depot_reap_idle_magazines) {
 			kmem_depot_reap_idle_magazines =
 			    ks->kmem_depot_reap_idle_magazines.value.ui64;
+		}
+
+		/* reads as 0; writing any non-zero value requests a census */
+		if (ks->kmem_va_census.value.ui64 != 0) {
+			ks->kmem_va_census.value.ui64 = 0;
+			kmem_va_census_request();
 		}
 
 	} else {
@@ -5429,6 +6097,12 @@ spl_kstat_update(kstat_t *ksp, int rw)
 		    spl_split_stack_below;
 		ks->kmem_depot_reap_idle_magazines.value.ui64 =
 		    kmem_depot_reap_idle_magazines;
+
+		ks->kmem_va_census.value.ui64 = 0;
+		ks->kmem_va_census_runs.value.ui64 = kmem_va_census_runs;
+		ks->kmem_va_census_last_ns.value.ui64 = kmem_va_census_last_ns;
+		ks->kmem_va_routes_unmatched.value.ui64 =
+		    kmem_va_routes_unmatched();
 	}
 
 	return (0);
@@ -5608,6 +6282,8 @@ spl_kmem_init(uint64_t xtotal_memory)
 		spl_ksp->ks_update = spl_kstat_update;
 		kstat_install(spl_ksp);
 	}
+
+	kmem_va_census_kstat_init();
 }
 
 void
@@ -5617,6 +6293,7 @@ spl_kmem_fini(void)
 	kmem_cache_applyall(kmem_cache_magazine_disable, NULL, TQ_SLEEP);
 
 	kstat_delete(spl_ksp);
+	kmem_va_census_kstat_fini();
 
 	kmem_log_fini(kmem_slab_log);
 	kmem_log_fini(kmem_failure_log);
@@ -5653,6 +6330,12 @@ spl_kmem_fini(void)
 	segkmem_abd_fini();
 
 	// Now destroy the vmem arenas used by kmem.
+	for (int i = KMEM_VA_NCLASSES - 1; i > KMEM_VA_CLASS_DEFAULT; i--) {
+		vmem_destroy(kmem_va_classes[i].kvc_arena);
+		vmem_destroy(kmem_va_classes[i].kvc_va);
+		kmem_va_classes[i].kvc_arena = NULL;
+		kmem_va_classes[i].kvc_va = NULL;
+	}
 	vmem_destroy(kmem_default_arena);
 	vmem_destroy(kmem_va_arena);
 	vmem_destroy(kmem_oversize_arena);
