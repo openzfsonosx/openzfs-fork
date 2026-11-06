@@ -18,6 +18,7 @@
 
 #include <sys/processor.h>
 #include <sys/sysmacros.h>
+#include <sys/cmn_err.h>
 
 extern int cpu_number(void);
 
@@ -116,24 +117,24 @@ spl_cpuid_dt_add(uint32_t reg, uint32_t cpu_id, char cluster_type)
 		return (1);
 	}
 	if (!spl_cpuid_key(reg, &key)) {
-		printf("SPL: cpu-id %u reg 0x%x out of table range\n",
+		spl_bootlog("SPL: cpu-id %u reg 0x%x out of table range\n",
 		    cpu_id, reg);
 		return (2);
 	}
 	if (spl_cpuid_slot[key] != CPUID_SLOT_FREE) {
-		printf("SPL: cpu-id %u reg 0x%x duplicates cpu-id %u\n",
+		spl_bootlog("SPL: cpu-id %u reg 0x%x duplicates cpu-id %u\n",
 		    cpu_id, reg, spl_cpuid_slot[key] - 1);
 		return (3);
 	}
 	for (uint32_t k = 0; k < CPUID_NKEYS; k++) {
 		if (spl_cpuid_slot[k] == cpu_id + 1) {
-			printf("SPL: cpu-id %u appears twice\n", cpu_id);
+			spl_bootlog("SPL: cpu-id %u appears twice\n", cpu_id);
 			return (4);
 		}
 	}
 	spl_cpuid_slot[key] = (uint16_t)(cpu_id + 1);
 #ifdef DEBUG
-	printf("SPL: cpu-id %2u reg 0x%04x cluster %u core %u type %c\n",
+	spl_bootlog("SPL: cpu-id %2u reg 0x%04x cluster %u core %u type %c\n",
 	    cpu_id, reg, (reg >> 8) & 0xff, reg & 0xff,
 	    cluster_type ? cluster_type : '?');
 #endif
@@ -146,7 +147,7 @@ spl_cpuid_init(void)
 	int n = spl_cpuid_dt_walk();
 
 	if (n > 0) {
-		printf("SPL: cpu ids from IODeviceTree: %d of %u cpus\n",
+		spl_bootlog("SPL: cpu ids from IODeviceTree: %d of %u cpus\n",
 		    n, max_ncpus);
 		__atomic_store_n(&spl_cpuid_from_dt, 1, __ATOMIC_RELEASE);
 		return;
@@ -155,7 +156,7 @@ spl_cpuid_init(void)
 	/* walk failed or found nothing usable: discard any partial table */
 	for (uint32_t k = 0; k < CPUID_NKEYS; k++)
 		spl_cpuid_slot[k] = CPUID_SLOT_FREE;
-	printf("SPL: IODeviceTree cpu walk failed (%d), "
+	spl_bootlog("SPL: IODeviceTree cpu walk failed (%d), "
 	    "assigning cpu ids on first use\n", n);
 }
 
@@ -253,7 +254,7 @@ spl_cpuid_id_aa64isar0_el1(void)
 
 		_spl_cpuid_id_aa64isar0_el1 = value;
 
-		printf("cpu_features0: 0x%016llx \n",
+		spl_bootlog("cpu_features0: 0x%016llx \n",
 		    _spl_cpuid_id_aa64isar0_el1);
 
 		aes = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 4, 8);
@@ -261,7 +262,7 @@ spl_cpuid_id_aa64isar0_el1(void)
 		sha2 = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 12, 16);
 		sha3 = GET_BITS(_spl_cpuid_id_aa64isar0_el1, 32, 36);
 
-		printf("cpu_features0: %s%s%s%s%s%s\n",
+		spl_bootlog("cpu_features0: %s%s%s%s%s%s\n",
 		    aes & 3 ? "AES " : "",
 		    aes & 2 ? "PMULL " : "",
 		    sha1    ? "SHA1 " : "",
@@ -288,13 +289,13 @@ spl_cpuid_id_aa64isar1_el1(void)
 
 		_spl_cpuid_id_aa64isar1_el1 = value;
 
-		printf("cpu_features: 0x%016llx \n",
+		spl_bootlog("cpu_features: 0x%016llx \n",
 		    _spl_cpuid_id_aa64isar1_el1);
 
 		bf16 = GET_BITS(_spl_cpuid_id_aa64isar1_el1, 44, 48);
 		i8mm = GET_BITS(_spl_cpuid_id_aa64isar1_el1, 52, 56);
 
-		printf("cpu_features1: %s%s\n",
+		spl_bootlog("cpu_features1: %s%s\n",
 		    bf16 ? "BF16 " : "",
 		    i8mm ? "I8MM " : "");
 	}
@@ -314,7 +315,7 @@ spl_processor_init(void)
 #endif
 
 #if defined(__x86)
-	printf("CPUID: %s%s%s%s%s%s%s\n",
+	spl_bootlog("CPUID: %s%s%s%s%s%s%s\n",
 	    zfs_osxsave_available() ? "osxsave " : "",
 	    zfs_sse_available() ? "sse " : "",
 	    zfs_sse2_available() ? "sse2 " : "",
@@ -322,7 +323,7 @@ spl_processor_init(void)
 	    zfs_ssse3_available() ? "ssse3 " : "",
 	    zfs_sse4_1_available() ? "sse4.1 " : "",
 	    zfs_sse4_2_available() ? "sse4.2 " : "");
-	printf("CPUID: %s%s%s%s%s%s%s\n",
+	spl_bootlog("CPUID: %s%s%s%s%s%s%s\n",
 	    zfs_avx_available() ? "avx " : "",
 	    zfs_avx2_available() ? "avx2 " : "",
 	    zfs_aes_available() ? "aes " : "",

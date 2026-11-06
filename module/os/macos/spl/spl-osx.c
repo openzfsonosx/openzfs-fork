@@ -17,6 +17,7 @@
  */
 
 #include <sys/debug.h>
+#include <sys/cmn_err.h>
 #include <sys/kmem.h>
 #include <sys/systm.h>
 #include <mach/mach_types.h>
@@ -579,7 +580,7 @@ spl_count_ecores(unsigned int ncpus)
 		if (sysctlbyname(oid, &n, &len, NULL, 0) != 0 || n < 0)
 			continue;
 
-		printf("SPL: perflevel%d \"%s\": %d cpus\n", i, name, n);
+		spl_bootlog("SPL: perflevel%d \"%s\": %d cpus\n", i, name, n);
 
 		seen += n;
 		if (strcmp(name, "Efficiency") == 0)
@@ -587,7 +588,7 @@ spl_count_ecores(unsigned int ncpus)
 	}
 
 	if (seen < ncpus) {
-		printf("SPL: %u cpus in unreadable perflevels, "
+		spl_bootlog("SPL: %u cpus in unreadable perflevels, "
 		    "counting as Efficiency\n", ncpus - seen);
 		ecores += ncpus - seen;
 	}
@@ -601,7 +602,7 @@ spl_count_ecores(unsigned int ncpus)
 kern_return_t
 spl_start(kmod_info_t *ki, void *d)
 {
-	printf("SPL: loading\n");
+	spl_bootlog("SPL: loading\n");
 
 	int ncpus;
 	size_t len = sizeof (ncpus);
@@ -613,7 +614,7 @@ spl_start(kmod_info_t *ki, void *d)
 	 */
 
 	while (current_proc() == NULL) {
-		printf("SPL: waiting for kernel init...\n");
+		spl_bootlog("SPL: waiting for kernel init...\n");
 		delay(hz>>1);
 	}
 
@@ -632,7 +633,7 @@ spl_start(kmod_info_t *ki, void *d)
 		    NULL, 0);
 		if (spl_real_total_memory != 0) break;
 
-		printf("SPL: waiting for sysctl...\n");
+		spl_bootlog("SPL: waiting for sysctl...\n");
 		delay(hz>>1);
 	}
 
@@ -642,7 +643,7 @@ spl_start(kmod_info_t *ki, void *d)
 #if defined(__arm64__)
 	num_ecores = spl_count_ecores(max_ncpus);
 	boot_ncpus = MAX(1, (int)max_ncpus - (int)num_ecores);
-	printf("SPL: %u cpus, %u efficiency, boot_ncpus %u\n",
+	spl_bootlog("SPL: %u cpus, %u efficiency, boot_ncpus %u\n",
 	    max_ncpus, num_ecores, boot_ncpus);
 
 	/* before kmem: getcpuid() indexes per-CPU caches */
@@ -764,11 +765,19 @@ spl_start(kmod_info_t *ki, void *d)
 
 	spl_mutex_subsystem_init();
 	spl_kmem_init(spl_total_memory);
+	spl_bootlog_kstat_init();
 	spl_vnode_init();
 	spl_kmem_thread_init();
 	spl_kmem_mp_init();
 
 	spl_processor_init();
+
+	spl_bootlog("SPL: loaded: RAM %llu, total %llu, "
+	    "private %llu, shared %llu\n",
+	    (u_longlong_t)spl_real_total_memory,
+	    (u_longlong_t)spl_total_memory,
+	    (u_longlong_t)spl_data_private_memory,
+	    (u_longlong_t)spl_data_shared_memory);
 
 	return (KERN_SUCCESS);
 }
@@ -782,6 +791,7 @@ spl_stop(kmod_info_t *ki, void *d)
 	spl_rwlock_fini();
 	spl_tsd_fini();
 	spl_kmem_fini();
+	spl_bootlog_kstat_fini();
 	spl_kstat_fini();
 	spl_mutex_subsystem_fini();
 
