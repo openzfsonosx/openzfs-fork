@@ -4,6 +4,7 @@
 
 spl_SRCS = 	\
 	%D%/spl/spl-atomic.c \
+	%D%/spl/spl-bootlog.c \
 	%D%/spl/spl-condvar.c \
 	%D%/spl/spl-cpus.cpp \
 	%D%/spl/spl-cred.c \
