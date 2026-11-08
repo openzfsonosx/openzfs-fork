@@ -78,7 +78,7 @@ gitrev:
 	$(AM_V_GEN)cd "$(abs_top_builddir)"; \
 	$(top_srcdir)/scripts/make_gitrev.sh $(GITREV)
 
-GITREV_TARGETS := $(shell $(GREP) -rl --include="*.[ch]" $(notdir $(GITREV)) "$(abs_srcdir)"/* | sed "s|$(abs_srcdir)/||" )
+GITREV_TARGETS := $(shell $(GREP) -rl --include="*.[ch]" --include="*.cpp" $(notdir $(GITREV)) "$(abs_srcdir)"/* | sed "s|$(abs_srcdir)/||" )
 $(GITREV_TARGETS): gitrev
 
 PHONY += install-data-hook $(INSTALL_DATA_HOOKS)
