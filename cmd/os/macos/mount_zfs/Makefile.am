@@ -16,8 +16,6 @@ macos_mount_zfs_LDADD = \
 	libzfs_core.la \
 	libnvpair.la
 
-macos_mount_zfs_LDADD += $(LTLIBINTL)
-
 
 mount_zfs: macos_mount_zfs
 	cp "$^" "$@"

@@ -1085,9 +1085,9 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 		case ZFS_PROP_OWNERUID:
 		case ZFS_PROP_OWNERGID:
 			if (intval > UINT32_MAX) {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				zfs_error_aux(hdl,
 				    "invalid '%s' property: must be between "
-				    "0 and %u"), propname, UINT32_MAX);
+				    "0 and %u", propname, UINT32_MAX);
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}

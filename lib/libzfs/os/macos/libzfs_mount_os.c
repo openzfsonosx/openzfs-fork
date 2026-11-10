@@ -25,7 +25,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
-#include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -167,9 +166,9 @@ check_special(zfs_handle_t *zhp)
 	    &feat_refcount) != 0)
 		return;
 
-	printf(gettext("If importing from zfs-1.9.4 (or earlier), "
+	printf("If importing from zfs-1.9.4 (or earlier), "
 	    "then possibly enable features: \n"
-	    "    project_quota & userobj_accounting\n"));
+	    "    project_quota & userobj_accounting\n");
 
 }
 
@@ -709,15 +708,15 @@ zfs_snapshot_mountpoint(zfs_handle_t *zhp)
 
 	dataset_name = zfs_strdup(hdl, zhp->zfs_name);
 	if (dataset_name == NULL) {
-		(void) fprintf(stderr, gettext("not enough memory"));
+		(void) fprintf(stderr, "not enough memory");
 		return (NULL);
 	}
 
 	r = strrchr(dataset_name, '@');
 
 	if (r == NULL) {
-		(void) fprintf(stderr, gettext("snapshot '%s' "
-		    "has no '@'\n"), zhp->zfs_name);
+		(void) fprintf(stderr, "snapshot '%s' "
+		    "has no '@'\n", zhp->zfs_name);
 		free(dataset_name);
 		return (NULL);
 	}
@@ -728,7 +727,7 @@ zfs_snapshot_mountpoint(zfs_handle_t *zhp)
 	if ((parent = zfs_open(hdl, dataset_name,
 	    ZFS_TYPE_FILESYSTEM)) == NULL) {
 		(void) fprintf(stderr,
-		    gettext("unable to open parent dataset '%s'\n"),
+		    "unable to open parent dataset '%s'\n",
 		    dataset_name);
 		free(dataset_name);
 		return (NULL);
@@ -736,7 +735,7 @@ zfs_snapshot_mountpoint(zfs_handle_t *zhp)
 
 	if (!zfs_is_mounted(parent, &parent_mountpoint)) {
 		(void) fprintf(stderr,
-		    gettext("parent dataset '%s' must be mounted\n"),
+		    "parent dataset '%s' must be mounted\n",
 		    dataset_name);
 		free(dataset_name);
 		zfs_close(parent);
@@ -805,7 +804,7 @@ zfs_snapshot_mount(zfs_handle_t *zhp, const char *options,
 
 	if (ret == 0) {
 		(void) fprintf(stderr,
-		    gettext("ZFS: snapshot mountpoint '%s'\n"),
+		    "ZFS: snapshot mountpoint '%s'\n",
 		    mountpoint);
 	}
 

@@ -12,7 +12,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <libintl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -167,23 +166,23 @@ libzfs_error_init(int error)
 {
 	switch (error) {
 	case ENXIO:
-		return (dgettext(TEXT_DOMAIN, "The ZFS modules are not "
+		return ("The ZFS modules are not "
 		    "loaded.\nTry running '/sbin/kextload zfs.kext' as root "
-		    "to load them."));
+		    "to load them.");
 	case ENOENT:
-		return (dgettext(TEXT_DOMAIN, "/dev/zfs and /proc/self/mounts "
+		return ("/dev/zfs and /proc/self/mounts "
 		    "are required.\nTry running 'udevadm trigger' and 'mount "
-		    "-t proc proc /proc' as root."));
+		    "-t proc proc /proc' as root.");
 	case ENOEXEC:
-		return (dgettext(TEXT_DOMAIN, "The ZFS modules cannot be "
+		return ("The ZFS modules cannot be "
 		    "auto-loaded.\nTry running '/sbin/kextload zfs.kext' as "
-		    "root to manually load them."));
+		    "root to manually load them.");
 	case EACCES:
-		return (dgettext(TEXT_DOMAIN, "Permission denied the "
-		    "ZFS utilities must be run as root."));
+		return ("Permission denied the "
+		    "ZFS utilities must be run as root.");
 	default:
-		return (dgettext(TEXT_DOMAIN, "Failed to initialize the "
-		    "libzfs library."));
+		return ("Failed to initialize the "
+		    "libzfs library.");
 	}
 }
 

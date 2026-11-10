@@ -20,7 +20,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libintl.h>
 #include <locale.h>
 #include <sys/debug.h>
 #include <strings.h>
@@ -57,7 +56,7 @@ libdiskmgt_add_str(nvlist_t *attrs, const char *name, const char *val,
  * based on the caller(who). It is important to note that it is possible
  * for there to be more than one 'in use' statistic regarding a dev_name.
  * The **msg parameter returns a list of 'in use' details. This message
- * is formatted via gettext().
+ * is formatted via .
  */
 int
 dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
@@ -222,59 +221,59 @@ dm_get_usage_string(const char *what, const char *how, char **usage_string)
 
 	if (strcmp(what, DM_USE_MOUNT) == 0) {
 		if (strcmp(how, "swap") == 0) {
-			*usage_string = dgettext(TEXT_DOMAIN,
+			*usage_string =
 			    "%s is currently used by swap. Please see swap(1M)."
-			    "\n");
+			    "\n";
 		} else {
-			*usage_string = dgettext(TEXT_DOMAIN,
+			*usage_string =
 			    "%s is currently mounted on %s."
-			    " Please see umount(1M).\n");
+			    " Please see umount(1M).\n";
 		}
 	} else if (strcmp(what, DM_USE_FS) == 0 ||
 	    strcmp(what, DM_USE_FS_NO_FORCE) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
-		    "%s contains a %s filesystem.\n");
+		*usage_string =
+		    "%s contains a %s filesystem.\n";
 	} else if (strcmp(what, DM_USE_EXPORTED_ZPOOL) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is part of exported or potentially active ZFS pool %s. "
-		    "Please see zpool(1M).\n");
+		    "Please see zpool(1M).\n";
 	} else if (strcmp(what, DM_USE_ACTIVE_ZPOOL) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is part of active ZFS pool %s. Please see zpool(1M)."
-		    "\n");
+		    "\n";
 	} else if (strcmp(what, DM_USE_SPARE_ZPOOL) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is reserved as a hot spare for ZFS pool %s.  Please "
-		    "see zpool(1M).\n");
+		    "see zpool(1M).\n";
 	} else if (strcmp(what, DM_USE_L2CACHE_ZPOOL) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is in use as a cache device for ZFS pool %s.  "
-		    "Please see zpool(1M).\n");
+		    "Please see zpool(1M).\n";
 	} else if (strcmp(what, DM_USE_CORESTORAGE_PV) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is in use as a corestorage physical volume.  "
-		    "Please see diskutil(8).\n");
+		    "Please see diskutil(8).\n";
 	} else if (strcmp(what, DM_USE_CORESTORAGE_LOCKED_LV) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is a corestorage logical volume, "
 		    "but cannot be used as it is locked.  "
-		    "Please see diskutil(8).\n");
+		    "Please see diskutil(8).\n";
 	} else if (strcmp(what, DM_USE_CORESTORAGE_CONVERTING_LV) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is a corestorage physical volume, but is still "
 		    "converting (%s).\n"
 		    "Creating a zpool while converting will result in "
 		    "data corruption.\n"
-		    "Please see diskutil(8).\n");
+		    "Please see diskutil(8).\n";
 	} else if (strcmp(what, DM_USE_CORESTORAGE_OFFLINE_LV) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is a corestorage physical volume, but is not "
-		    "online (%s). Please see diskutil(8).\n");
+		    "online (%s). Please see diskutil(8).\n";
 	} else if (strcmp(what, DM_USE_OS_PARTITION) == 0 ||
 	    strcmp(what, DM_USE_OS_PARTITION_NO_FORCE) == 0) {
-		*usage_string = dgettext(TEXT_DOMAIN,
+		*usage_string =
 		    "%s is a %s partition. "
-		    "Please see diskutil(8).\n");
+		    "Please see diskutil(8).\n";
 	}
 }
 

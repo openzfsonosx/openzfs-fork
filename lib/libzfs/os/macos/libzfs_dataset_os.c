@@ -10,7 +10,6 @@
  * https://opensource.org/license/CDDL-1.0.
  */
 
-#include <libintl.h>
 #include "../../libzfs_impl.h"
 
 int
@@ -34,6 +33,6 @@ zfs_destroy_snaps_nvl_os(libzfs_handle_t *hdl, nvlist_t *snaps)
 		}
 	}
 	if (ret != 0)
-		fprintf(stderr, gettext("could not unmount snapshot(s)\n"));
+		fprintf(stderr, "could not unmount snapshot(s)\n");
 	return (ret);
 }

@@ -14,7 +14,6 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libintl.h>
 #include <libnvpair.h>
 #include <libzutil.h>
 #include <limits.h>
@@ -49,8 +48,8 @@ check_error(int err)
 	if (err == ENXIO || err == ENODEV)
 		return;
 
-	(void) fprintf(stderr, gettext("warning: device in use checking "
-	    "failed: %s\n"), strerror(err));
+	(void) fprintf(stderr, "warning: device in use checking "
+	    "failed: %s\n", strerror(err));
 }
 
 static int
@@ -136,8 +135,8 @@ check_disk(const char *path, int force,
 			/* Partitions will now be created using the backup */
 			return (0);
 		} else {
-			vdev_error(gettext("%s contains a corrupt primary "
-			    "EFI label.\n"), path);
+			vdev_error("%s contains a corrupt primary "
+			    "EFI label.\n", path);
 			return (-1);
 		}
 	}
@@ -177,8 +176,8 @@ int
 check_file(const char *file, boolean_t force, boolean_t isspare)
 {
 	if (dm_in_swap_dir(file)) {
-		vdev_error(gettext(
-		    "%s is located within the swapfile directory.\n"), file);
+		vdev_error(
+		    "%s is located within the swapfile directory.\n", file);
 		return (-1);
 	}
 

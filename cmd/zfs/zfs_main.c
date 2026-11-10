@@ -7649,7 +7649,7 @@ share_mount(int op, int argc, char **argv)
 
 		if (argc > 1) {
 			(void) fprintf(stderr,
-			    gettext("too many arguments\n"));
+			    "too many arguments\n");
 			usage(B_FALSE);
 		}
 

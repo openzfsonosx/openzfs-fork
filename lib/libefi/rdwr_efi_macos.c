@@ -28,7 +28,6 @@
 #include <unistd.h>
 #include <uuid/uuid.h>
 #include <zlib.h>
-#include <libintl.h>
 #include <sys/types.h>
 #include <sys/dkio.h>
 #include <sys/param.h>
