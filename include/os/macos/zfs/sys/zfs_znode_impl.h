@@ -129,6 +129,7 @@ typedef struct zfs_soft_state {
 #define	zn_flush_cached_data(zp, sync) \
 	(void) ubc_msync(ZTOV(zp), 0, \
 	ubc_getsize(ZTOV(zp)), NULL, UBC_PUSHALL | UBC_SYNC);
+#define	zn_zero_eof_page(zp, lr, end)	zfs_zero_eof_page(zp, lr, end)
 #define	zn_rlimit_fsize(size)		(0)
 #define	zn_rlimit_fsize_uio(zp, uio) (0)
 
@@ -183,6 +184,8 @@ extern void	zfs_tstamp_update_setup_ext(struct znode *,
 extern void	zfs_tstamp_update_setup(struct znode *,
     uint_t, uint64_t [2], uint64_t [2]);
 extern void zfs_znode_free(struct znode *);
+extern void zfs_zero_eof_page(struct znode *, struct zfs_locked_range *,
+    uint64_t);
 extern int zfs_freesp_keepsize(struct znode *, uint64_t, uint64_t);
 
 extern zil_get_data_t zfs_get_data;
