@@ -544,42 +544,37 @@ do_mount(zfs_handle_t *zhp, const char *dir, const char *optptr, int mflag)
 static int
 do_unmount_impl(const char *mntpt, int flags)
 {
-	const char force_opt[] = "force";
-	const char *argv[7] = {
-		"/usr/sbin/diskutil",
-		"unmount",
-		NULL, NULL, NULL, NULL };
-	int rc, count = 2;
+	const char *du_argv[] = {
+		"/usr/sbin/diskutil", "unmount", mntpt, NULL };
+	const char *duf_argv[] = {
+		"/usr/sbin/diskutil", "unmount", "force", mntpt, NULL };
+	const char *um_argv[] = {
+		"/sbin/umount", mntpt, NULL };
+	int rc;
 
-	if (flags & MS_FORCE) {
-		argv[count] = force_opt;
-		count++;
-	}
-
-	argv[count] = (const char *)mntpt;
-	rc = libzfs_run_process(argv[0], (char **)argv,
+	/*
+	 * Always go through DiskArbitration, and try a plain unmount first
+	 * even when forcing: it asks mds and other claimants to let go of
+	 * the volume. A forced unmount while mds still has files open can
+	 * leave the unmount waiting forever in vflush().
+	 */
+	rc = libzfs_run_process(du_argv[0], (char **)du_argv,
 	    STDOUT_VERBOSE|STDERR_VERBOSE);
+
+	if (rc != 0 && (flags & MS_FORCE))
+		rc = libzfs_run_process(duf_argv[0], (char **)duf_argv,
+		    STDOUT_VERBOSE|STDERR_VERBOSE);
 
 	/*
 	 * There is a bug, where we can not unmount, with the error
 	 * already unmounted, even though it wasn't. But it is easy
 	 * to work around by calling 'umount'. Until a real fix is done...
 	 * re-test this: 202004/lundman
+	 * Never use 'umount -f' here; it bypasses DiskArbitration.
 	 */
-	if (rc != 0) {
-		const char *argv[7] = {
-		    "/sbin/umount",
-		    NULL, NULL, NULL, NULL };
-		int count = 1;
-
-		if (flags & MS_FORCE) {
-			argv[count] = "-f";
-			count++;
-		}
-		argv[count] = (const char *)mntpt;
-		rc = libzfs_run_process(argv[0], (char **)argv,
+	if (rc != 0)
+		rc = libzfs_run_process(um_argv[0], (char **)um_argv,
 		    STDOUT_VERBOSE|STDERR_VERBOSE);
-	}
 
 	return (rc ? EINVAL : 0);
 }
