@@ -30,7 +30,7 @@
  */
 noinline int
 zfs_file_open(const char *path, int flags, int mode, cred_t *cr,
-	zfs_file_t **fpp)
+    zfs_file_t **fpp)
 {
 	struct vnode *vp = NULL;
 	vfs_context_t vctx;
@@ -42,8 +42,8 @@ zfs_file_open(const char *path, int flags, int mode, cred_t *cr,
 	vctx = vfs_context_create((vfs_context_t)0);
 	error = vnode_open(path, flags, mode, 0, &vp, vctx);
 	if (error == 0 && vp != NULL) {
-		zfs_file_t *zf;
-		zf = (zfs_file_t *)kmem_zalloc(sizeof (zfs_file_t), KM_SLEEP);
+		struct spl_fileproc *zf;
+		zf = kmem_zalloc(sizeof (*zf), KM_SLEEP);
 		zf->f_vnode = vp;
 		zf->f_fd = FILE_FD_NOTUSED;
 
@@ -68,8 +68,9 @@ zfs_file_open(const char *path, int flags, int mode, cred_t *cr,
 }
 
 void
-zfs_file_close(zfs_file_t *fp)
+zfs_file_close(zfs_file_t *zfp)
 {
+	struct spl_fileproc *fp = zfp;
 	vfs_context_t vctx;
 
 	if (fp == NULL)
@@ -79,13 +80,14 @@ zfs_file_close(zfs_file_t *fp)
 	vnode_close(fp->f_vnode, fp->f_writes ? FWASWRITTEN : 0, vctx);
 	(void) vfs_context_rele(vctx);
 
-	kmem_free(fp, sizeof (zfs_file_t));
+	kmem_free(fp, sizeof (*fp));
 }
 
 static int
-zfs_file_write_impl(zfs_file_t *fp, const void *buf, size_t count,
+zfs_file_write_impl(zfs_file_t *zfp, const void *buf, size_t count,
     loff_t *off, ssize_t *resid)
 {
+	struct spl_fileproc *fp = zfp;
 	int error;
 	ssize_t local_resid = count;
 
@@ -150,8 +152,9 @@ again:
  * Returns 0 on success errno on failure.
  */
 int
-zfs_file_write(zfs_file_t *fp, const void *buf, size_t count, ssize_t *resid)
+zfs_file_write(zfs_file_t *zfp, const void *buf, size_t count, ssize_t *resid)
 {
+	struct spl_fileproc *fp = zfp;
 	loff_t off = fp->f_offset;
 	ssize_t rc;
 
@@ -182,9 +185,10 @@ zfs_file_pwrite(zfs_file_t *fp, const void *buf, size_t count, loff_t off,
 }
 
 static ssize_t
-zfs_file_read_impl(zfs_file_t *fp, void *buf, size_t count, loff_t *off,
+zfs_file_read_impl(zfs_file_t *zfp, void *buf, size_t count, loff_t *off,
     ssize_t *resid)
 {
+	struct spl_fileproc *fp = zfp;
 	int error;
 	ssize_t local_resid = count;
 
@@ -237,8 +241,9 @@ again:
  * Returns 0 on success errno on failure.
  */
 int
-zfs_file_read(zfs_file_t *fp, void *buf, size_t count, ssize_t *resid)
+zfs_file_read(zfs_file_t *zfp, void *buf, size_t count, ssize_t *resid)
 {
+	struct spl_fileproc *fp = zfp;
 	loff_t off = fp->f_offset;
 	int rc;
 
@@ -276,8 +281,10 @@ zfs_file_pread(zfs_file_t *fp, void *buf, size_t count, loff_t off,
  * Returns 0 on success errno on failure (ESPIPE for non seekable types)
  */
 int
-zfs_file_seek(zfs_file_t *fp, loff_t *offp, int whence)
+zfs_file_seek(zfs_file_t *zfp, loff_t *offp, int whence)
 {
+	struct spl_fileproc *fp = zfp;
+
 	if (*offp < 0 || *offp > MAXOFFSET_T)
 		return (EINVAL);
 
@@ -312,8 +319,9 @@ zfs_file_seek(zfs_file_t *fp, loff_t *offp, int whence)
  * Returns 0 on success or error code of underlying getattr call on failure.
  */
 int
-zfs_file_getattr(zfs_file_t *filp, zfs_file_attr_t *zfattr)
+zfs_file_getattr(zfs_file_t *zfp, zfs_file_attr_t *zfattr)
 {
+	struct spl_fileproc *filp = zfp;
 	vfs_context_t vctx;
 	int rc;
 	vattr_t vap;
@@ -347,8 +355,9 @@ zfs_file_getattr(zfs_file_t *filp, zfs_file_attr_t *zfattr)
  * Returns 0 on success or error code of underlying sync call on failure.
  */
 int
-zfs_file_fsync(zfs_file_t *filp, int flags)
+zfs_file_fsync(zfs_file_t *zfp, int flags)
 {
+	struct spl_fileproc *filp = zfp;
 	vfs_context_t vctx;
 	int rc;
 
@@ -372,8 +381,9 @@ zfs_file_fsync(zfs_file_t *filp, int flags)
  * OPTIONAL
  */
 int
-zfs_file_deallocate(zfs_file_t *fp, loff_t offset, loff_t len)
+zfs_file_deallocate(zfs_file_t *zfp, loff_t offset, loff_t len)
 {
+	struct spl_fileproc *fp = zfp;
 	int rc;
 	struct flock flck = { 0 };
 
@@ -399,8 +409,10 @@ zfs_file_deallocate(zfs_file_t *fp, loff_t offset, loff_t len)
  * Returns current file offset.
  */
 loff_t
-zfs_file_off(zfs_file_t *fp)
+zfs_file_off(zfs_file_t *zfp)
 {
+	struct spl_fileproc *fp = zfp;
+
 	if (fp == NULL)
 		return (-EIO);
 
@@ -466,7 +478,7 @@ zfs_file_unlink(const char *path)
 static uint_t zfs_file_offset_tsd = 0;
 
 static boolean_t
-zfs_file_is_regular(zfs_file_t *fp)
+zfs_file_is_regular(struct spl_fileproc *fp)
 {
 	return (fp->f_vnode != NULL && vnode_isreg(fp->f_vnode));
 }
@@ -481,7 +493,7 @@ zfs_file_is_regular(zfs_file_t *fp)
 zfs_file_t *
 zfs_file_get(int fd)
 {
-	zfs_file_t *fp = getf(fd);
+	struct spl_fileproc *fp = getf(fd);
 	uint64_t *offp = tsd_get(zfs_file_offset_tsd);
 
 	if (fp != NULL && offp != NULL && zfs_file_is_regular(fp))
@@ -496,8 +508,9 @@ zfs_file_get(int fd)
  * fp - input file struct pointer
  */
 void
-zfs_file_put(zfs_file_t *fp)
+zfs_file_put(zfs_file_t *zfp)
 {
+	struct spl_fileproc *fp = zfp;
 	uint64_t *offp = tsd_get(zfs_file_offset_tsd);
 
 	if (offp != NULL && zfs_file_is_regular(fp))

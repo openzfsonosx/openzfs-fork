@@ -21,6 +21,11 @@
 #include <libzpool.h>
 #include <libzutil.h>
 
+#ifdef __APPLE__
+/* The macOS SDK's <sys/kernel_types.h> already typedefs file_t. */
+#define	file_t	libzpool_file_t
+#endif
+
 typedef struct {
 	int f_fd;
 	int f_dump_fd;
