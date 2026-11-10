@@ -417,8 +417,16 @@ zfs_zrele_async(znode_t *zp)
 
 	ASSERT(os != NULL);
 
-	if (vp == NULL)
+	/*
+	 * Only a ZGET_FLAG_ASYNC zget returns a znode whose vnode is not
+	 * attached yet. The reference the caller holds is the iocount the
+	 * pending vnode_create() will produce, so wait for the attach and
+	 * release that, or the vnode can never be reclaimed.
+	 */
+	if (vp == NULL) {
+		zfs_znode_asyncput(zp);
 		return;
+	}
 
 	/* If iocount > 1, AND, vp is set (not async_get) */
 	if (vnode_iocount(vp) > 1) {
