@@ -433,6 +433,11 @@ macos_zfs_SOURCES = \
 # Zstd uses -O3 by default, so we should follow
 %D%/../../zstd/lib/macos_zfs-zstd.$(OBJEXT): CFLAGS := -fno-tree-vectorize -O3
 
+# The top-level GITREV_TARGETS grep yields module/zfs/spa_history.c, which
+# make does not match against the unnormalised path used here, so make sure
+# zfs_gitrev.h exists before this copy is compiled.
+%D%/../../zfs/macos_zfs-spa_history.$(OBJEXT): | gitrev
+
 
 KERNEL_MODDIR=  $(DESTDIR)@KERNEL_MODPREFIX@/zfs.kext
 
