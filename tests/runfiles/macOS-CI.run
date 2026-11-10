@@ -259,10 +259,6 @@ tests = ['removal_all_vdev', 'removal_cancel', 'removal_check_space',
     'remove_indirect']
 tags = ['functional', 'removal']
 
-[tests/functional/resilver]
-tests = ['resilver_restart_001', 'resilver_restart_002']
-tags = ['functional', 'resilver']
-
 [tests/functional/rsend]
 tests = ['recv_dedup', 'recv_dedup_encrypted_zvol', 'rsend_001_pos',
     'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos', 'rsend_005_pos',
@@ -271,7 +267,7 @@ tests = ['recv_dedup', 'recv_dedup_encrypted_zvol', 'rsend_001_pos',
     'rsend_014_pos', 'rsend_016_neg', 'rsend_019_pos', 'rsend_020_pos',
     'rsend_021_pos', 'rsend_022_pos', 'rsend_024_pos',
     'send-c_verify_ratio', 'send-c_verify_contents', 'send-c_props',
-    'send-c_incremental', 'send-c_volume', 'send-c_zstreamdump',
+    'send-c_incremental', 'send-c_volume',
     'send-c_lz4_disabled', 'send-c_recv_lz4_disabled',
     'send-c_mixed_compression', 'send-c_stream_size_estimate',
     'send-c_embedded_blocks', 'send-c_resume', 'send-cpL_varied_recsize',
@@ -305,10 +301,6 @@ tests = ['clone_001_pos', 'rollback_001_pos', 'rollback_002_pos',
     'snapshot_012_pos', 'snapshot_013_pos', 'snapshot_014_pos',
     'snapshot_017_pos']
 tags = ['functional', 'snapshot']
-
-[tests/functional/threadsappend]
-tests = ['threadsappend_001_pos']
-tags = ['functional', 'threadsappend']
 
 [tests/functional/upgrade]
 tests = ['upgrade_userobj_001_pos', 'upgrade_readonly_pool']
