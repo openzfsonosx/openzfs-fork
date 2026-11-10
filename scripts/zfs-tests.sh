@@ -227,6 +227,9 @@ find_runfile() {
 # called by the CI.  It will periodically need to be updated as new
 # tests are added, but everything will still work even if a test is not in
 # the database.
+#
+# Associative arrays need bash 4, so skip this on bash 3.2 (macOS /bin/bash).
+if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
 declare -A testdb=(["redundancy"]=1608 ["mmp"]=1423 ["events"]=926
 ["rsend"]=754 ["raidz"]=683 ["zpool_import"]=606 ["bclone"]=541 ["slog"]=515
 ["replacement"]=504 ["l2arc"]=498 ["fault"]=484 ["pool_checkpoint"]=429
@@ -275,6 +278,7 @@ declare -A testdb=(["redundancy"]=1608 ["mmp"]=1423 ["events"]=926
 ["json"]=0 ["hkdf"]=0 ["getfsuuid"]=0 ["exec"]=0 ["dos_attributes"]=0
 ["devices"]=0 ["device_access"]=0 ["crypto"]=0 ["crtime"]=0 ["chattr"]=0
 ["arc"]=0 ["append"]=0)
+fi
 
 # Given a TAGS with a format like "1/3" or "2/3" then divide up the test list
 # into portions and print that portion.  So "1/3" for "the first third of the
@@ -327,7 +331,7 @@ split_tags() {
 	# stale testdb is.
 	declare -A this_testdb
 	for i in $all_groups ; do
-		if ! [[ -v testdb[$i] ]]; then
+		if [ -z "${testdb[$i]+set}" ]; then
 			# This test is not in testdb, so we don't know how
 			# long it will take to run.  Use the average as
 			# a best guess.
@@ -745,6 +749,9 @@ RUNFILES=${R#,}
 # "append,atime,bootfs,cachefile,checksum,cp_files,deadman,dos_attributes, ..."
 #
 if echo "$TAGS" | grep -Eq '^[0-9]+/[0-9]+$' ; then
+	if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+		fail "Splitting tags with -T N/M requires bash 4 or later"
+	fi
 	TAGS=$(split_tags)
 fi
 
