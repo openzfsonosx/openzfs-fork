@@ -79,7 +79,7 @@ spl_panic(const char *file, const char *func, int line, const char *fmt, ...)
 
 int
 spl_assertf(const char *file, const char *func, int line,
-	const char *fmt, ...)
+    const char *fmt, ...)
 {
 	char msg[MAXMSGLEN];
 	va_list ap;
