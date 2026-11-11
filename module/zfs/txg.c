@@ -548,9 +548,19 @@ txg_sync_thread(void *arg)
 		 * MMP we don't want to bump anything that would make it
 		 * harder to detect if another host is changing it when
 		 * resuming after a MMP suspend.
+		 *
+		 * Once the timeout has expired, or with a txg_wait_synced()
+		 * caller waiting, the loop above does not sleep, so wait
+		 * here instead of spinning until the pool resumes. Waiters
+		 * (e.g. zpool clear) signal tx_sync_more_cv.
 		 */
-		if (spa_suspended(spa))
+		if (spa_suspended(spa)) {
+			txg_thread_wait(tx, &cpr, &tx->tx_sync_more_cv,
+			    timeout);
+			start = ddi_get_lbolt();
+			delta = 0;
 			continue;
+		}
 
 		/*
 		 * Wait until the quiesce thread hands off a txg to us,
