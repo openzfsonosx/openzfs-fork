@@ -178,7 +178,12 @@ getf(int fd)
 	 * and used in vn_rdwr().
 	 */
 
-	sfp = kmem_alloc(sizeof (*sfp), KM_SLEEP);
+	/*
+	 * Zeroed: zfs_file_write() hands f_ioflags to vn_rdwr(), so a
+	 * stale value there made sends to a regular file write with
+	 * random IO_* flags (IO_HEADZEROFILL, IO_APPEND, ...).
+	 */
+	sfp = kmem_zalloc(sizeof (*sfp), KM_SLEEP);
 	if (!sfp)
 		return (NULL);
 
