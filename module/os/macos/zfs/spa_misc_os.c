@@ -34,6 +34,8 @@
 #include <sys/ZFSPool.h>
 #include <sys/zfs_vfsops.h>
 #include <sys/zfs_boot.h>
+#include <sys/zio.h>
+#include <sys/systeminfo.h>
 #include <libkern/OSKextLib.h>
 
 #include "zfs_prop.h"
@@ -79,6 +81,81 @@ spa_import_os(spa_t *spa)
 	}
 
 	spa_close(spa, FTAG);
+}
+
+/*
+ * Shutdown handling.
+ *
+ * launchd sets kern.willshutdown as soon as it commits to a shutdown,
+ * then boots out every daemon, then lets the kernel sync and unmount
+ * several seconds later. Storage that lives in user space (disk image
+ * helpers, dexts) can be gone by then, and a pool that keeps syncing
+ * while its vdevs disappear one by one hits syncing-context VERIFYs
+ * (openzfsonosx/openzfs-fork#129).
+ *
+ * zfs_shutdown_check() is called from points that run early in
+ * shutdown (zed closing /dev/zfs at bootout, device loss). Once the
+ * shutdown is confirmed it flushes every pool while its storage is
+ * still present, so whatever happens to the devices afterwards there
+ * is little or nothing left to write.
+ */
+static volatile uint32_t zfs_shutdown_started = 0;
+
+static void
+zfs_shutdown_sync_task(void *arg)
+{
+	(void) arg;
+	printf("ZFS: system shutdown detected, syncing pools\n");
+	spa_sync_allpools();
+	printf("ZFS: pools synced for shutdown\n");
+}
+
+void
+zfs_shutdown_check(void)
+{
+	if (zfs_shutdown_started != 0 || !spl_system_inshutdown())
+		return;
+	if (atomic_cas_32(&zfs_shutdown_started, 0, 1) != 0)
+		return;
+	(void) taskq_dispatch(system_taskq, zfs_shutdown_sync_task, NULL,
+	    TQ_SLEEP);
+}
+
+/*
+ * A vdev went away during shutdown: stop the pool instead of letting
+ * it process the removal. Removal dirties the config, and the next
+ * sync would write labels and ZAPs to a vdev tree that is being torn
+ * down underneath it. A suspended pool issues no new transactions,
+ * and zfs_vfs_unmount() leaves its filesystems mounted.
+ */
+void
+zfs_shutdown_freeze(spa_t *spa)
+{
+	if (spa_suspended(spa))
+		return;
+	printf("ZFS: pool '%s' lost a device during shutdown, "
+	    "suspending it\n", spa_name(spa));
+	/*
+	 * Fail new transactions with EIO instead of blocking them until
+	 * the pool resumes (failmode=wait). A process blocked on a
+	 * suspended pool can not be killed, and the kernel's final kill
+	 * pass waits for every process to exit. This also keeps
+	 * failmode=panic from panicking here. In-core only, the pool
+	 * property is not changed.
+	 */
+	spa->spa_failmode = ZIO_FAILURE_MODE_CONTINUE;
+	zio_suspend(spa, NULL, ZIO_SUSPEND_IOERR);
+}
+
+/*
+ * True when waiting for this pool to sync would never return: the
+ * system is going down and the pool is suspended.
+ */
+boolean_t
+zfs_shutdown_frozen(spa_t *spa)
+{
+	return (spa != NULL && spa_suspended(spa) &&
+	    spl_system_inshutdown());
 }
 
 void

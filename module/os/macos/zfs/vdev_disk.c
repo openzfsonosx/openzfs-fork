@@ -27,6 +27,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/zio.h>
 #include <sys/ldi_osx.h>
+#include <sys/systeminfo.h>
 #include <sys/disk.h>
 #include <libkern/OSDebug.h>
 
@@ -116,6 +117,26 @@ vdev_disk_off_notify(ldi_handle_t lh, ldi_ev_cookie_t ecookie, void *arg,
 	 */
 	dvd->vd_ldi_offline = B_TRUE;
 	vdev_disk_close(vd);
+
+	/*
+	 * During shutdown, storage goes away on its own schedule. Do not
+	 * start removal processing (it dirties the config and makes the
+	 * next sync write to a partial vdev tree); freeze the pool.
+	 *
+	 * Removal is processed by the async thread, which is only
+	 * dispatched once a txg finishes syncing. A sync with writes in
+	 * flight to this vdev never finishes: failed allocating writes
+	 * are reexecuted and allocate on the same top-level vdev again,
+	 * forever. Mark the top-level vdev unwritable now, so the
+	 * allocator fails over or the write suspends the pool.
+	 */
+	if (spl_system_inshutdown()) {
+		zfs_shutdown_check();
+		if (vd->vdev_top != NULL)
+			vd->vdev_top->vdev_cant_write = B_TRUE;
+		zfs_shutdown_freeze(vd->vdev_spa);
+		return (LDI_EV_SUCCESS);
+	}
 
 	/*
 	 * Now that the device is closed, request that the spa_async_thread

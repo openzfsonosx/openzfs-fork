@@ -146,6 +146,13 @@ zfsdev_release(dev_t dev, int flags, int devtype, struct proc *p)
 	zfsdev_state_t *zs = zfsdev_private_get_state(priv);
 	if (zs != NULL)
 		zfsdev_state_destroy(priv);
+
+	/*
+	 * launchd boots out zed (and any other daemon holding /dev/zfs)
+	 * right after committing to a shutdown, so this close is the
+	 * earliest hint the kext gets.
+	 */
+	zfs_shutdown_check();
 	return (0);
 }
 

@@ -26,6 +26,7 @@
 
 const char *spl_panicstr(void);
 int spl_system_inshutdown(void);
+void spl_system_set_inshutdown(void);
 
 
 #endif /* SPL_SYSTEMINFO_H */

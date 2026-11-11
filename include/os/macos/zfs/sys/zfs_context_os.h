@@ -197,6 +197,11 @@ void sysctl_os_fini(void);
 extern int vdev_disk_init(void);
 extern void vdev_disk_fini(void);
 
+struct spa;
+extern void zfs_shutdown_check(void);
+extern boolean_t zfs_shutdown_frozen(struct spa *spa);
+extern void zfs_shutdown_freeze(struct spa *spa);
+
 /* See rant in vdev_file.c */
 #define	CLOSE_ON_UNMOUNT
 

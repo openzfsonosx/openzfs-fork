@@ -161,13 +161,36 @@ spl_panicstr(void)
 	return (NULL);
 }
 
-extern int get_system_inshutdown(void);
+/*
+ * Shutdown detection. launchd writes kern.willshutdown=1 the moment it
+ * commits to a shutdown or reboot, before it boots out any daemon, and
+ * the value is never reset. That is seconds before the kernel's own
+ * sync and unmount, and before storage provided by user space (disk
+ * images, dexts) goes away. There is no notification, so latch it
+ * the first time we see it set. Callers must be able to sleep.
+ */
+static volatile int spl_inshutdown = 0;
 
 int
 spl_system_inshutdown(void)
 {
-	// return (get_system_inshutdown());
-	return (1);
+	int val = 0;
+	size_t len = sizeof (val);
+
+	if (spl_inshutdown)
+		return (1);
+
+	if (sysctlbyname("kern.willshutdown", &val, &len, NULL, 0) == 0 &&
+	    val != 0)
+		spl_inshutdown = 1;
+
+	return (spl_inshutdown);
+}
+
+void
+spl_system_set_inshutdown(void)
+{
+	spl_inshutdown = 1;
 }
 
 #include <mach-o/loader.h>

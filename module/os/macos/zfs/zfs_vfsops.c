@@ -245,10 +245,10 @@ zfs_vfs_sync(struct mount *vfsp, __unused int waitfor,
 		dp = dmu_objset_pool(zfsvfs->z_os);
 
 		/*
-		 * If the system is shutting down, then skip any
-		 * filesystems which may exist on a suspended pool.
+		 * Skip filesystems on a suspended pool, zil_commit()
+		 * would wait for the pool to resume.
 		 */
-		if (spl_system_inshutdown() && spa_suspended(dp->dp_spa)) {
+		if (spa_suspended(dp->dp_spa)) {
 			zfs_exit(zfsvfs, FTAG);
 			return (0);
 		}
@@ -2284,6 +2284,21 @@ zfs_vfs_unmount(struct mount *mp, int mntflags, vfs_context_t context)
 	int destroyed_zfsctl = 0;
 
 	dprintf("%s\n", __func__);
+
+	/*
+	 * A pool frozen during shutdown can not write anything, and
+	 * tearing down a filesystem on it (ZIL close, dirty data) would
+	 * wait for it forever, holding up the kernel's unmount pass
+	 * until the shutdown watchdog fires. Leave it mounted, as if
+	 * the power was cut. Not EBUSY: xnu retries those for a minute.
+	 */
+	if (zfs_shutdown_frozen(dmu_objset_spa(zfsvfs->z_os))) {
+		printf("ZFS: pool '%s' is suspended, not unmounting %s "
+		    "during shutdown\n",
+		    spa_name(dmu_objset_spa(zfsvfs->z_os)),
+		    vfs_statfs(mp)->f_mntonname);
+		return (SET_ERROR(EIO));
+	}
 
 	zfs_unlinked_drain_stop_wait(zfsvfs);
 
