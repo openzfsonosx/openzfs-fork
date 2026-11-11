@@ -1,5 +1,4 @@
 #!/bin/bash
-# SPDX-License-Identifier: CDDL-1.0
 date '+%s' >> /tmp/o3x.log
 echo $0 >> /tmp/o3x.log
 
