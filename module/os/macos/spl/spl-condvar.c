@@ -109,7 +109,7 @@ spl_cv_wait(kcondvar_t *cvp, kmutex_t *mp, int flags, const char *msg)
 	 * Avoids a starvation in bqueue_dequeue().
 	 * Does timedwait() versions need the same?
 	 */
-	if (result == EINTR &&
+	if ((result == EINTR || result == ERESTART) &&
 	    (mp->m_waiters > 0 || mp->m_sleepers > 0)) {
 		mutex_exit(mp);
 		spl_data_barrier();
@@ -121,8 +121,13 @@ spl_cv_wait(kcondvar_t *cvp, kmutex_t *mp, int flags, const char *msg)
 	/*
 	 * 1 - condvar got cv_signal()/cv_broadcast()
 	 * 0 - received signal (kill -signal)
+	 * With PCATCH, msleep() returns ERESTART rather than EINTR when
+	 * the handler was installed with SA_RESTART (zed does). The
+	 * signal stays pending, so treating that as a wakeup makes every
+	 * further msleep() return at once: zed spun in zfs_zevent_wait()
+	 * on SIGTERM until it was SIGKILLed.
 	 */
-	return (result == EINTR ? 0 : 1);
+	return ((result == EINTR || result == ERESTART) ? 0 : 1);
 }
 
 /*
