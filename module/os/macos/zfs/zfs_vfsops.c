@@ -2885,6 +2885,17 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, dsl_dataset_t *ds)
 
 
 bail:
+	/*
+	 * zfsvfs_init() may have failed after pointing z_os at an objset
+	 * without SA set up, and the unmount below fails while the
+	 * filesystem is busy, so make every later VOP fail with EIO.
+	 */
+	if (err != 0) {
+		zfsvfs->z_unmounted = B_TRUE;
+		printf("ZFS: %s: resume of %s failed: %d\n", __func__,
+		    vfs_statfs(zfsvfs->z_vfs)->f_mntfromname, err);
+	}
+
 	/* release the VFS ops */
 	ZFS_TEARDOWN_INACTIVE_EXIT_WRITE(zfsvfs);
 	ZFS_TEARDOWN_EXIT(zfsvfs, FTAG);
