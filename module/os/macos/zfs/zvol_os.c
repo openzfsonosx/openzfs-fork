@@ -719,6 +719,8 @@ zvol_os_create_minor(const char *name)
 		goto out_dmu_objset_disown;
 	}
 	zv->zv_hash = hash;
+	/* zvol_first_open() owns the dataset by this object number */
+	zv->zv_dsobj = dmu_objset_id(os);
 
 	if (dmu_objset_is_snapshot(os))
 		zv->zv_flags |= ZVOL_RDONLY;
