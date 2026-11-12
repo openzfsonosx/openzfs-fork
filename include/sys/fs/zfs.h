@@ -703,7 +703,7 @@ typedef enum {
 typedef enum zfs_mimic {
 	ZFS_MIMIC_OFF = 0,
 	ZFS_MIMIC_HFS,
-	ZFS_MIMIC_APFS
+	ZFS_MIMIC_APFS = 2 /* retired; do not reuse */
 } zfs_mimic_t;
 
 typedef enum zfs_devdisk {

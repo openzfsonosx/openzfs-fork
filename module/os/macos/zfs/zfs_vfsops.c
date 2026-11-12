@@ -442,17 +442,9 @@ mimic_changed_cb(void *arg, uint64_t newval)
 	struct vfsstatfs *vfsstatfs;
 	vfsstatfs = vfs_statfs(zfsvfs->z_vfs);
 
-	/*
-	 * An APFS container teardown scans all mounts whose f_fstypename is
-	 * "apfs", then interprets vfs_fsprivate() as an APFS mount object.
-	 * ZFS provides a zfsvfs_t instead, which can panic APFS at NULL+0xc8.
-	 * Refuse the unsafe disguise even for a previously stored property.
-	 */
-	if (newval == ZFS_MIMIC_APFS) {
-		cmn_err(CE_WARN, "ZFS: com.apple.mimic=apfs is unsafe; "
-		    "reporting zfs instead");
+	/* Treat persisted, retired APFS values as plain ZFS. */
+	if (newval != ZFS_MIMIC_HFS)
 		newval = ZFS_MIMIC_OFF;
-	}
 
 	zfsvfs->z_mimic = newval;
 
