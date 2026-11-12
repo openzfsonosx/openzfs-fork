@@ -506,7 +506,9 @@ constrain_path() {
 		ln -fs /sbin/fsck_hfs "$STF_PATH/fsck"
 		ln -fs /sbin/newfs_hfs "$STF_PATH/newfs_hfs"
 		ln -fs /sbin/mount_hfs "$STF_PATH/mount"
-		ln -fs /usr/local/bin/gtruncate "$STF_PATH/truncate"
+		# GNU truncate if installed, else keep the system one (macOS 26+)
+		_gtruncate=$(command -v gtruncate 2>/dev/null)
+		[ -n "$_gtruncate" ] && ln -fs "$_gtruncate" "$STF_PATH/truncate"
 		ln -fs /usr/sbin/sysctl "$STF_PATH/sysctl"
 		ln -fs /usr/bin/dscl "$STF_PATH/dscl"
 		ln -fs /usr/bin/xxd "$STF_PATH/xxd"
