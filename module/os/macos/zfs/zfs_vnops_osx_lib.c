@@ -488,8 +488,14 @@ zfs_getattr_znode_unlocked(struct vnode *vp, vattr_t *vap)
 #ifdef VNODE_ATTR_va_document_id
 	if (VATTR_IS_ACTIVE(vap, va_document_id)) {
 
+		/*
+		 * va_name is the caller's buffer only when va_name was
+		 * asked for; otherwise it is uninitialized.
+		 */
 		if (!zp->z_document_id) {
-			zfs_setattr_generate_id(zp, parent, vap->va_name);
+			zfs_setattr_generate_id(zp, parent,
+			    VATTR_IS_ACTIVE(vap, va_name) ?
+			    vap->va_name : NULL);
 		}
 
 		VATTR_RETURN(vap, va_document_id, zp->z_document_id);
