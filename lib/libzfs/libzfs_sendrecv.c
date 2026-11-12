@@ -4502,6 +4502,9 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	uint64_t errflags = 0;
 	uint64_t parent_snapguid = 0;
 	prop_changelist_t *clp = NULL;
+#ifdef __APPLE__
+	void *desc_clp = NULL;
+#endif
 	nvlist_t *snapprops_nvlist = NULL;
 	nvlist_t *snapholds_nvlist = NULL;
 	zprop_errflags_t prop_errflags;
@@ -4958,6 +4961,22 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 				goto out;
 			}
 		}
+
+#ifdef __APPLE__
+		/*
+		 * An online receive swaps this filesystem's contents, which
+		 * can remove the directories its mounted descendants sit on
+		 * and orphan those mounts until reboot, as rollback did (see
+		 * zfs_rollback_pre_os()). Unmount them around the receive.
+		 */
+		if (!flags->dryrun && zhp->zfs_type == ZFS_TYPE_FILESYSTEM &&
+		    !stream_wantsnewfs && !stream_resumingnewfs &&
+		    zfs_rollback_pre_os(zhp, &desc_clp) != 0) {
+			zfs_close(zhp);
+			err = -1;
+			goto out;
+		}
+#endif
 
 		/*
 		 * If we are resuming a newfs, set newfs here so that we will
@@ -5484,6 +5503,10 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 	err = 0;
 out:
+#ifdef __APPLE__
+	/* Remount the descendants unmounted above, even on failure */
+	zfs_rollback_os(NULL, desc_clp);
+#endif
 	if (prop_errors != NULL)
 		fnvlist_free(prop_errors);
 
