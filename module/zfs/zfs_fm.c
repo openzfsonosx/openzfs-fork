@@ -1574,13 +1574,20 @@ zfs_ereport_zvol_post(const char *subclass, const char *name,
 	nvlist_t *aux;
 	char *r;
 
+	/*
+	 * Do not wait for an import or export of the pool: zpool export
+	 * waits for the zvol removal that posts this. Hold the namespace
+	 * lock until the event is posted so the pool cannot go away.
+	 */
 	boolean_t locked = spa_namespace_held();
-	if (!locked) spa_namespace_enter(FTAG);
-	spa_t *spa = spa_lookup(name);
-	if (!locked) spa_namespace_exit(FTAG);
-
-	if (spa == NULL)
+	if (!locked)
+		spa_namespace_enter(FTAG);
+	spa_t *spa = spa_lookup_nowait(name);
+	if (spa == NULL) {
+		if (!locked)
+			spa_namespace_exit(FTAG);
 		return;
+	}
 
 	aux = fm_nvlist_create(NULL);
 	fnvlist_add_string(aux, FM_EREPORT_PAYLOAD_ZFS_DEVICE_NAME, dev_name);
@@ -1592,6 +1599,9 @@ zfs_ereport_zvol_post(const char *subclass, const char *name,
 
 	zfs_post_common(spa, NULL, FM_RSRC_CLASS, subclass, aux);
 	fm_nvlist_destroy(aux, FM_NVA_FREE);
+
+	if (!locked)
+		spa_namespace_exit(FTAG);
 }
 
 EXPORT_SYMBOL(zfs_ereport_post);

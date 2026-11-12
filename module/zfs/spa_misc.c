@@ -738,17 +738,11 @@ retry:
 	/*
 	 * Avoid racing with import/export, which don't hold the namespace
 	 * lock for their entire duration.
-	 *
-	 * spa_export_common() waits for the pool's zvol taskq to drain, so a
-	 * task running on that taskq must not wait for the export to finish
-	 * (macOS posts a zvol symlink event from there).
 	 */
 	if ((spa->spa_load_thread != NULL &&
 	    spa->spa_load_thread != curthread) ||
 	    (spa->spa_export_thread != NULL &&
-	    spa->spa_export_thread != curthread &&
-	    (spa->spa_zvol_taskq == NULL ||
-	    !taskq_member(spa->spa_zvol_taskq, curthread)))) {
+	    spa->spa_export_thread != curthread)) {
 		if (busy != NULL) {
 			*busy = B_TRUE;
 			return (spa);
@@ -764,6 +758,18 @@ spa_t *
 spa_lookup(const char *name)
 {
 	return (spa_lookup_impl(name, NULL));
+}
+
+/*
+ * Like spa_lookup(), but return the pool at once even while another
+ * thread imports or exports it.
+ */
+spa_t *
+spa_lookup_nowait(const char *name)
+{
+	boolean_t busy = B_FALSE;
+
+	return (spa_lookup_impl(name, &busy));
 }
 
 /*
