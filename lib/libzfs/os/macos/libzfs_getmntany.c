@@ -418,7 +418,32 @@ getmntent(FILE *fp, struct mnttab *mp)
 {
 	static int index = -1;
 	int error = 0;
-	(void) fp;
+
+	/*
+	 * The cursor is the offset of the MNTTAB stream (/dev/null) the
+	 * caller opened, as on FreeBSD: a fresh fopen() starts at 0 and
+	 * refreshes the list. A single static cursor was shared by every
+	 * reader in the process, so a caller that stopped early made the
+	 * next one, such as libzfs_mnttab_update(), start in the middle and
+	 * miss the mounts before it.
+	 */
+	if (fp != NULL) {
+		off_t nfs = lseek(fileno(fp), 0, SEEK_CUR);
+
+		if (nfs == -1)
+			return (errno);
+		if (nfs == 0 || gsfs == NULL) {
+			error = statfs_init();
+			if (error != 0)
+				return (error);
+		}
+		if (nfs >= allfs)
+			return (-1);
+		statfs2mnttab(&gsfs[nfs], mp);
+		if (lseek(fileno(fp), 1, SEEK_CUR) == -1)
+			return (errno);
+		return (0);
+	}
 
 	if (index < 0) {
 		error = statfs_init();

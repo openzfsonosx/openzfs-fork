@@ -656,7 +656,9 @@ unmount_snapshots(zfs_handle_t *zhp, const char *mntpt, int flags)
 	sysctlbyname("kstat.zfs.darwin.tunable.zfs_auto_snapshot",
 	    NULL, NULL, &automount, len);
 
-	while (getmntent(NULL, &entry) == 0) {
+	FILE *mnttab = fopen(MNTTAB, "re");
+
+	while (mnttab != NULL && getmntent(mnttab, &entry) == 0) {
 		/* Starts with our mountpoint ? */
 		if (strncmp(mntpt, entry.mnt_mountp, mntlen) == 0) {
 			/* The next part is "/.zfs/snapshot/" ? */
@@ -667,6 +669,8 @@ unmount_snapshots(zfs_handle_t *zhp, const char *mntpt, int flags)
 			}
 		}
 	}
+	if (mnttab != NULL)
+		(void) fclose(mnttab);
 
 	/* Restore automount setting */
 	sysctlbyname("kstat.zfs.darwin.tunable.zfs_auto_snapshot",
