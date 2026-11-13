@@ -37,3 +37,39 @@ AC_DEFUN([ZFS_AC_MACOS_LTO_OBJECT_PATH], [
 	])
 	AC_MSG_RESULT([$lto_object_path])
 ])
+
+dnl #
+dnl # --enable-flto[=thin|full]: compile the C sources of the userland and
+dnl # of the kext for link-time optimization.  The flag is added after the
+dnl # configure tests have run, so they are not slowed down by it.
+dnl #
+AC_DEFUN([ZFS_AC_MACOS_LTO], [
+	AC_ARG_ENABLE([flto],
+		AS_HELP_STRING([--enable-flto@<:@=thin|full@:>@],
+		[Build with link-time optimization (macOS) [default: no]]),
+		[], [enable_flto=no])
+
+	AC_MSG_CHECKING([whether to build with link-time optimization])
+	AS_CASE(["x$enable_flto"],
+	    [xno], [lto_flag=""],
+	    [xyes|xfull], [lto_flag="-flto"],
+	    [xthin], [lto_flag="-flto=thin"],
+	    [AC_MSG_RESULT([error])
+	    AC_MSG_ERROR([Unknown argument --enable-flto=$enable_flto])])
+	AC_MSG_RESULT([${lto_flag:-no}])
+
+	AS_IF([test -n "$lto_flag"], [
+		AS_IF([test "x$ac_system" != "xmacOS"], [
+			AC_MSG_ERROR([--enable-flto is only supported on macOS])
+		])
+
+		AC_MSG_CHECKING([whether $CC can link with $lto_flag])
+		CFLAGS="$CFLAGS $lto_flag"
+		AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [
+			AC_MSG_RESULT([yes])
+		], [
+			AC_MSG_RESULT([no])
+			AC_MSG_ERROR([$CC cannot link with $lto_flag])
+		])
+	])
+])
