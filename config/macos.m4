@@ -78,5 +78,32 @@ AC_DEFUN([ZFS_AC_MACOS_LTO], [
 			AC_MSG_RESULT([no])
 			AC_MSG_ERROR([$CC cannot link with $lto_flag])
 		])
+
+		dnl # LTO objects are bitcode, which ar and ranlib read through
+		dnl # an LTO library to index an archive.  Tools older than the
+		dnl # compiler (Xcode's with a MacPorts clang) cannot, and fail
+		dnl # in the middle of the build.
+		AC_MSG_CHECKING([whether $AR and $RANLIB can archive $lto_flag objects])
+		lto_archive=no
+		AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+			int zfs_lto_conftest(void);
+			int zfs_lto_conftest(void) { return (0); }
+		]])], [
+			rm -f libconftest.a
+			AS_IF([$AR cr libconftest.a conftest.$ac_objext \
+			    >&AS_MESSAGE_LOG_FD 2>&1 &&
+			    $RANLIB libconftest.a >&AS_MESSAGE_LOG_FD 2>&1],
+			    [lto_archive=yes])
+		])
+		rm -f libconftest.a
+		AC_MSG_RESULT([$lto_archive])
+		AS_IF([test "x$lto_archive" != "xyes"], [
+			AC_MSG_ERROR([
+	$AR or $RANLIB cannot archive objects compiled with $lto_flag.
+	They probably belong to an older toolchain than $CC.
+	Set AR, RANLIB, NM and DSYMUTIL to the tools that come with the
+	compiler, such as llvm-ar, llvm-ranlib, llvm-nm and dsymutil
+	(MacPorts: llvm-ar-mp-NN and so on), or omit --enable-flto.])
+		])
 	])
 ])
