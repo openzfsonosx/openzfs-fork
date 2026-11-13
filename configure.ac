@@ -61,6 +61,9 @@ ZFS_AC_DEBUG_INVARIANTS
 ZFS_AC_METASLAB_TRACING
 ZFS_AC_OBJTOOL_WERROR
 
+dnl # Must follow every test that links: it adds make functions to LDFLAGS.
+ZFS_AC_MACOS_LTO_OBJECT_PATH
+
 AC_CONFIG_FILES([
 	contrib/debian/rules
 	contrib/debian/changelog
