@@ -2118,6 +2118,7 @@ static int
 zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 {
 	znode_t	*zp;
+	struct vnode *vp;
 	/*
 	 * We have experienced deadlocks with dmu_recv_end happening between
 	 * suspend_fs() and resume_fs(). Clearly something is not quite ready
@@ -2215,10 +2216,17 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 		    zp = list_next(&zfsvfs->z_all_znodes, zp)) {
 			if (zp->z_sa_hdl)
 				zfs_znode_dmu_fini(zp);
-			if (VN_HOLD(ZTOV(zp)) == 0) {
-				vnode_ref(ZTOV(zp));
+			/*
+			 * z_vnode can be NULL: an async zget may still be
+			 * attaching it, and zfs_vnop_reclaim() clears it
+			 * before taking z_teardown_inactive_lock. Once
+			 * VN_HOLD() succeeds, our iocount keeps vp alive.
+			 */
+			vp = ZTOV(zp);
+			if (vp != NULL && VN_HOLD(vp) == 0) {
+				vnode_ref(vp);
 				zp->z_suspended = B_TRUE;
-				VN_RELE(ZTOV(zp));
+				VN_RELE(vp);
 			}
 		}
 		mutex_exit(&zfsvfs->z_znodes_lock);
