@@ -482,3 +482,4 @@ macos_clean_local:
 	%D%/zfs.kext/Contents/MacOS \
 	%D%/zfs.kext/Contents \
 	%D%/zfs.kext || true
+	-$(RM) -R lto-objs

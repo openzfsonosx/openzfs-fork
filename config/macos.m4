@@ -11,3 +11,99 @@ AC_DEFUN([ZFS_AC_MACOS_IMPURE_ENABLE], [
 ])
 
 
+
+dnl #
+dnl # With LTO the Apple linker hands the debug information to dsymutil and
+dnl # lldb in temporary objects, which it keeps only if -object_path_lto
+dnl # names a place for them.  It names those objects by index and
+dnl # architecture alone, and it reads them back while linking, so no two
+dnl # links may share a directory: parallel links then overwrite each
+dnl # other's objects and fail, or lose their debug information.
+dnl #
+dnl # Give every link target a directory of its own under lto-objs/.  The
+dnl # make functions are expanded once per link, in the recipe.  This must
+dnl # run after the last link test, as the shell cannot expand them.
+dnl #
+AC_DEFUN([ZFS_AC_MACOS_LTO_OBJECT_PATH], [
+	AC_MSG_CHECKING([whether to keep LTO objects per link target])
+	lto_object_path=no
+	AS_IF([test "x$ac_system" = "xmacOS"], [
+		AS_CASE([" $CC $CXX $CFLAGS $CXXFLAGS $LDFLAGS "],
+		    [*object_path_lto*], [lto_object_path="no, set by user"],
+		    [*" -flto"*], [lto_object_path=yes])
+	])
+	AS_IF([test "x$lto_object_path" = "xyes"], [
+		LDFLAGS="$LDFLAGS "'-Wl,-object_path_lto,$(shell d=$(abs_top_builddir)/lto-objs/$(subst /,_,@S|@@); mkdir -p $$d; echo $$d)'
+	])
+	AC_MSG_RESULT([$lto_object_path])
+
+	dnl # A path given by hand is the shared one this macro exists to avoid.
+	AS_IF([test "x$lto_object_path" = "xno, set by user"], [
+		AS_CASE([" $CC $CXX $CFLAGS $CXXFLAGS $LDFLAGS "], [*" -flto"*], [
+			AC_MSG_WARN([-object_path_lto is set in the flags, so every link shares that path. Debug information is lost and parallel links can fail with -flto=thin. Remove it and configure sets one per link target.])
+		])
+	])
+])
+
+dnl #
+dnl # --enable-flto[=thin|full]: compile the C sources of the userland and
+dnl # of the kext for link-time optimization.  The flag is added after the
+dnl # configure tests have run, so they are not slowed down by it.
+dnl #
+AC_DEFUN([ZFS_AC_MACOS_LTO], [
+	AC_ARG_ENABLE([flto],
+		AS_HELP_STRING([--enable-flto@<:@=thin|full@:>@],
+		[Build with link-time optimization (macOS) [default: no]]),
+		[], [enable_flto=no])
+
+	AC_MSG_CHECKING([whether to build with link-time optimization])
+	AS_CASE(["x$enable_flto"],
+	    [xno], [lto_flag=""],
+	    [xyes|xfull], [lto_flag="-flto"],
+	    [xthin], [lto_flag="-flto=thin"],
+	    [AC_MSG_RESULT([error])
+	    AC_MSG_ERROR([Unknown argument --enable-flto=$enable_flto])])
+	AC_MSG_RESULT([${lto_flag:-no}])
+
+	AS_IF([test -n "$lto_flag"], [
+		AS_IF([test "x$ac_system" != "xmacOS"], [
+			AC_MSG_ERROR([--enable-flto is only supported on macOS])
+		])
+
+		AC_MSG_CHECKING([whether $CC can link with $lto_flag])
+		CFLAGS="$CFLAGS $lto_flag"
+		AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [
+			AC_MSG_RESULT([yes])
+		], [
+			AC_MSG_RESULT([no])
+			AC_MSG_ERROR([$CC cannot link with $lto_flag])
+		])
+
+		dnl # LTO objects are bitcode, which ar and ranlib read through
+		dnl # an LTO library to index an archive.  Tools older than the
+		dnl # compiler (Xcode's with a MacPorts clang) cannot, and fail
+		dnl # in the middle of the build.
+		AC_MSG_CHECKING([whether $AR and $RANLIB can archive $lto_flag objects])
+		lto_archive=no
+		AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+			int zfs_lto_conftest(void);
+			int zfs_lto_conftest(void) { return (0); }
+		]])], [
+			rm -f libconftest.a
+			AS_IF([$AR cr libconftest.a conftest.$ac_objext \
+			    >&AS_MESSAGE_LOG_FD 2>&1 &&
+			    $RANLIB libconftest.a >&AS_MESSAGE_LOG_FD 2>&1],
+			    [lto_archive=yes])
+		])
+		rm -f libconftest.a
+		AC_MSG_RESULT([$lto_archive])
+		AS_IF([test "x$lto_archive" != "xyes"], [
+			AC_MSG_ERROR([
+	$AR or $RANLIB cannot archive objects compiled with $lto_flag.
+	They probably belong to an older toolchain than $CC.
+	Set AR, RANLIB, NM and DSYMUTIL to the tools that come with the
+	compiler, such as llvm-ar, llvm-ranlib, llvm-nm and dsymutil
+	(MacPorts: llvm-ar-mp-NN and so on), or omit --enable-flto.])
+		])
+	])
+])
