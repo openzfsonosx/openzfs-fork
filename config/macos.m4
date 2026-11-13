@@ -36,6 +36,13 @@ AC_DEFUN([ZFS_AC_MACOS_LTO_OBJECT_PATH], [
 		LDFLAGS="$LDFLAGS "'-Wl,-object_path_lto,$(shell d=$(abs_top_builddir)/lto-objs/$(subst /,_,@S|@@); mkdir -p $$d; echo $$d)'
 	])
 	AC_MSG_RESULT([$lto_object_path])
+
+	dnl # A path given by hand is the shared one this macro exists to avoid.
+	AS_IF([test "x$lto_object_path" = "xno, set by user"], [
+		AS_CASE([" $CC $CXX $CFLAGS $CXXFLAGS $LDFLAGS "], [*" -flto"*], [
+			AC_MSG_WARN([-object_path_lto is set in the flags, so every link shares that path. Debug information is lost and parallel links can fail with -flto=thin. Remove it and configure sets one per link target.])
+		])
+	])
 ])
 
 dnl #
