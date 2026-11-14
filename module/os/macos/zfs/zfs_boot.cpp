@@ -132,6 +132,13 @@ static taskq_t *zfs_boot_taskq;
 #define	ZFS_BOOT_DATASET_RDONLY_KEY	"zfs_dataset_rdonly"
 #define	ZFS_MOUNTROOT_RETRIES	50
 #define	ZFS_BOOTLOG_DELAY	100
+/*
+ * Seconds to wait for the remaining leaf vdevs of the boot pool to be
+ * published once the first has been found, before importing without
+ * them. Override with boot-arg zfs_boot_vdev_wait=N, 0 disables the wait.
+ */
+#define	ZFS_BOOT_VDEV_WAIT	10
+#define	ZFS_BOOT_VDEV_WAIT_KEY	"zfs_boot_vdev_wait"
 
 /*
  * C functions for boot-time vdev discovery
@@ -179,6 +186,9 @@ typedef struct pool_list {
 	IOService		*zfs_hl;
 	IONotifier		*notifier;
 	_Atomic UInt64		terminating;
+	/* Only used by zfs_boot_import_thread */
+	hrtime_t		vdev_wait_deadline;
+	boolean_t		vdev_wait_expired;
 } pool_list_t;
 
 #define	ZFS_BOOT_ACTIVE		0x1
@@ -191,6 +201,7 @@ typedef struct pool_list {
 static ZFSBootDevice *bootdev = 0;
 #endif
 static pool_list_t *zfs_boot_pool_list = 0;
+static uint32_t zfs_boot_vdev_wait = ZFS_BOOT_VDEV_WAIT;
 
 DSTATIC char *
 zfs_boot_get_devid(const char *path)
@@ -935,6 +946,110 @@ nomem:
 	 */
 
 	return (NULL);
+}
+
+/*
+ * Count the disk vdevs in this vdev tree that the labels say should be
+ * present, but which have not been probed yet. Each probed disk with a
+ * matching label has a name entry, see zfs_boot_add_config. A top-level
+ * vdev none of whose disks have been probed appears as a 'missing' vdev.
+ * Disks recorded as offline, faulted or removed are not expected.
+ * A disk recorded as not present is still expected: that is how a disk
+ * which lost this race at the previous boot is recorded.
+ */
+DSTATIC uint_t
+zfs_boot_count_absent(nvlist_t *nv, name_entry_t *names, boolean_t verbose)
+{
+	nvlist_t **child;
+	uint_t c, children, absent = 0;
+	uint64_t guid, val;
+	const char *type, *path;
+	name_entry_t *ne;
+
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
+		return (0);
+
+	if (strcmp(type, VDEV_TYPE_MISSING) == 0) {
+		if (verbose)
+			printf("%s: top-level vdev not present yet\n",
+			    __func__);
+		return (1);
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++)
+			absent += zfs_boot_count_absent(child[c], names,
+			    verbose);
+		return (absent);
+	}
+
+	/* Only disks are published as IOMedia */
+	if (strcmp(type, VDEV_TYPE_DISK) != 0)
+		return (0);
+
+	if ((nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE, &val) == 0 &&
+	    val != 0) ||
+	    (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_FAULTED, &val) == 0 &&
+	    val != 0) ||
+	    (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVED, &val) == 0 &&
+	    val != 0))
+		return (0);
+
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
+		return (0);
+
+	for (ne = names; ne != NULL; ne = ne->ne_next) {
+		if (ne->ne_guid == guid)
+			return (0);
+	}
+
+	if (verbose) {
+		if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) != 0)
+			path = "";
+		printf("%s: vdev %llu not present yet, was %s\n",
+		    __func__, guid, path);
+	}
+	return (1);
+}
+
+/*
+ * Decide whether to import this config now. If some of the pool's disks
+ * have not been published yet, hold off until they have been, or until
+ * the wait runs out. Otherwise a mirror would be imported degraded
+ * whenever its second disk is slower to appear than the first.
+ */
+DSTATIC boolean_t
+zfs_boot_import_ready(pool_list_t *pools, nvlist_t *config)
+{
+	nvlist_t *nvroot;
+	uint_t absent;
+
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) != 0)
+		return (B_TRUE);
+
+	absent = zfs_boot_count_absent(nvroot, pools->names, B_FALSE);
+	if (absent == 0)
+		return (B_TRUE);
+
+	if (!pools->vdev_wait_expired && zfs_boot_vdev_wait != 0) {
+		if (pools->vdev_wait_deadline == 0) {
+			pools->vdev_wait_deadline = gethrtime() +
+			    SEC2NSEC(zfs_boot_vdev_wait);
+			printf("%s: waiting up to %u s for %u vdev(s)\n",
+			    __func__, zfs_boot_vdev_wait, absent);
+			(void) zfs_boot_count_absent(nvroot, pools->names,
+			    B_TRUE);
+		}
+		if (gethrtime() < pools->vdev_wait_deadline)
+			return (B_FALSE);
+		pools->vdev_wait_expired = B_TRUE;
+	}
+
+	printf("%s: importing without %u vdev(s)\n", __func__, absent);
+	(void) zfs_boot_count_absent(nvroot, pools->names, B_TRUE);
+	return (B_TRUE);
 }
 
 /*
@@ -1711,7 +1826,7 @@ zfs_boot_publish_bootfs(IOService *zfs_hl, pool_list_t *pools)
 DSTATIC void
 zfs_boot_import_thread(void *arg)
 {
-	nvlist_t *configs, *nv, *newnv;
+	nvlist_t *configs = NULL, *nv, *newnv;
 	nvpair_t *elem;
 	IOService *zfs_hl = 0;
 	OSSet *disks, *new_set = 0;
@@ -1760,7 +1875,17 @@ zfs_boot_import_thread(void *arg)
 		/* Check for work */
 		if (pools->disks->getCount() == 0) {
 			dprintf("%s no disks to check\n", __func__);
-			goto next_locked;
+			/*
+			 * If the wait for the pool's remaining disks has
+			 * just run out, import with the disks seen so far.
+			 */
+			if (pools->vdev_wait_deadline == 0 ||
+			    pools->vdev_wait_expired ||
+			    gethrtime() < pools->vdev_wait_deadline)
+				goto next_locked;
+			pools->vdev_wait_expired = B_TRUE;
+			mutex_exit(&pools->lock);
+			goto check_configs;
 		}
 
 		/* Swap full set with a new empty one */
@@ -1844,6 +1969,7 @@ zfs_boot_import_thread(void *arg)
 		/* Release pool list lock */
 		mutex_exit(&pools->lock);
 
+check_configs:
 		/* Generate a list of pool configs to import */
 		configs = zfs_boot_get_configs(pools, B_TRUE);
 
@@ -1877,9 +2003,14 @@ zfs_boot_import_thread(void *arg)
 				goto out_unlocked;
 			}
 
-			/* Try import */
+			/* Wait for the rest of the pool's disks */
+			if (!zfs_boot_import_ready(pools, nv)) {
+				dprintf("%s waiting for vdevs\n", __func__);
+				continue;
+			}
+
+			/* Try import, nv is freed along with configs */
 			newnv = spa_tryimport(nv);
-			nvlist_free(nv);
 			nv = 0;
 			if (newnv) {
 				dprintf("%s newnv: %p\n", __func__, newnv);
@@ -1917,6 +2048,10 @@ zfs_boot_import_thread(void *arg)
 			}
 		}
 
+		/* Free the list of pool configs */
+		nvlist_free(configs);
+		configs = NULL;
+
 		/* Retake pool list lock */
 		mutex_enter(&pools->lock);
 
@@ -1945,6 +2080,12 @@ out_locked:
 	mutex_exit(&pools->lock);
 
 out_unlocked:
+	/* Free the list of pool configs */
+	if (configs) {
+		nvlist_free(configs);
+		configs = NULL;
+	}
+
 	/* Cleanup new_set */
 	if (new_set) {
 		new_set->flushCollection();
@@ -2129,6 +2270,10 @@ zfs_boot_init(IOService *zfs_hl)
 	pools->zfs_hl = zfs_hl;
 	/* and finally hit the _Atomic to spread the above */
 	pools->terminating = ZFS_BOOT_ACTIVE;
+
+	/* Optional override of the wait for the pool's remaining disks */
+	(void) PE_parse_boot_argn(ZFS_BOOT_VDEV_WAIT_KEY,
+	    &zfs_boot_vdev_wait, sizeof (zfs_boot_vdev_wait));
 
 	notifier = IOService::addMatchingNotification(
 	    gIOFirstPublishNotification, IOService::serviceMatching(
