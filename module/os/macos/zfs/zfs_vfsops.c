@@ -442,6 +442,10 @@ mimic_changed_cb(void *arg, uint64_t newval)
 	struct vfsstatfs *vfsstatfs;
 	vfsstatfs = vfs_statfs(zfsvfs->z_vfs);
 
+	/* Treat persisted, retired APFS values as plain ZFS. */
+	if (newval != ZFS_MIMIC_HFS)
+		newval = ZFS_MIMIC_OFF;
+
 	zfsvfs->z_mimic = newval;
 
 	switch (newval) {
@@ -451,10 +455,6 @@ mimic_changed_cb(void *arg, uint64_t newval)
 			break;
 		case ZFS_MIMIC_HFS:
 			strlcpy(vfsstatfs->f_fstypename, "hfs", MFSTYPENAMELEN);
-			break;
-		case ZFS_MIMIC_APFS:
-			strlcpy(vfsstatfs->f_fstypename, "apfs",
-			    MFSTYPENAMELEN);
 			break;
 	}
 }
