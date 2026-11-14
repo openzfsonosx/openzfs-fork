@@ -73,12 +73,10 @@ spl_panic(const char *file, const char *func, int line, const char *fmt, ...)
 	/*
 	 * The panic report is not always saved, so get what is needed to
 	 * find the caller into the kernel log before calling panic().
-	 * spl_backtrace() prints raw return addresses, the address of
-	 * this function gives the kext's slide for symbolication.
+	 * spl_backtrace() prints raw return addresses, and its own
+	 * address to give the kext's slide for symbolication.
 	 */
 	printf("SPL: PANIC at %s:%d:%s(): %s", file, line, func, msg);
-	printf("SPL: spl_panic is at 0x%lx\n",
-	    (unsigned long)(uintptr_t)spl_panic);
 	spl_backtrace((char *)"spl_panic");
 
 	panic("%s:%d:%s(): %s", file, line, func, msg);
