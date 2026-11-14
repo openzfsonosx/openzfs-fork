@@ -187,7 +187,7 @@ typedef struct pool_list {
 	IONotifier		*notifier;
 	_Atomic UInt64		terminating;
 	/* Only used by zfs_boot_import_thread */
-	hrtime_t		vdev_wait_deadline;
+	int64_t			vdev_wait_deadline;	/* in lbolt ticks */
 	boolean_t		vdev_wait_expired;
 } pool_list_t;
 
@@ -1035,14 +1035,18 @@ zfs_boot_import_ready(pool_list_t *pools, nvlist_t *config)
 
 	if (!pools->vdev_wait_expired && zfs_boot_vdev_wait != 0) {
 		if (pools->vdev_wait_deadline == 0) {
-			pools->vdev_wait_deadline = gethrtime() +
-			    SEC2NSEC(zfs_boot_vdev_wait);
+			/*
+			 * ddi_get_lbolt() is inline. gethrtime() cannot be
+			 * used here, this file sees it with C++ linkage.
+			 */
+			pools->vdev_wait_deadline = ddi_get_lbolt() +
+			    (int64_t)zfs_boot_vdev_wait * hz;
 			printf("%s: waiting up to %u s for %u vdev(s)\n",
 			    __func__, zfs_boot_vdev_wait, absent);
 			(void) zfs_boot_count_absent(nvroot, pools->names,
 			    B_TRUE);
 		}
-		if (gethrtime() < pools->vdev_wait_deadline)
+		if (ddi_get_lbolt() < pools->vdev_wait_deadline)
 			return (B_FALSE);
 		pools->vdev_wait_expired = B_TRUE;
 	}
@@ -1881,7 +1885,7 @@ zfs_boot_import_thread(void *arg)
 			 */
 			if (pools->vdev_wait_deadline == 0 ||
 			    pools->vdev_wait_expired ||
-			    gethrtime() < pools->vdev_wait_deadline)
+			    ddi_get_lbolt() < pools->vdev_wait_deadline)
 				goto next_locked;
 			pools->vdev_wait_expired = B_TRUE;
 			mutex_exit(&pools->lock);
