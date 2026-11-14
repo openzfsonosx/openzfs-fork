@@ -189,6 +189,7 @@ typedef struct pool_list {
 	/* Only used by zfs_boot_import_thread */
 	int64_t			vdev_wait_deadline;	/* in lbolt ticks */
 	boolean_t		vdev_wait_expired;
+	uint_t			vdev_checks;
 } pool_list_t;
 
 #define	ZFS_BOOT_ACTIVE		0x1
@@ -971,7 +972,7 @@ zfs_boot_count_absent(nvlist_t *nv, name_entry_t *names, boolean_t verbose)
 
 	if (strcmp(type, VDEV_TYPE_MISSING) == 0) {
 		if (verbose)
-			printf("%s: top-level vdev not present yet\n",
+			spl_bootlog("%s: top-level vdev not present yet\n",
 			    __func__);
 		return (1);
 	}
@@ -1007,7 +1008,7 @@ zfs_boot_count_absent(nvlist_t *nv, name_entry_t *names, boolean_t verbose)
 	if (verbose) {
 		if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) != 0)
 			path = "";
-		printf("%s: vdev %llu not present yet, was %s\n",
+		spl_bootlog("%s: vdev %llu not present yet, was %s\n",
 		    __func__, guid, path);
 	}
 	return (1);
@@ -1029,9 +1030,14 @@ zfs_boot_import_ready(pool_list_t *pools, nvlist_t *config)
 	    &nvroot) != 0)
 		return (B_TRUE);
 
+	pools->vdev_checks++;
 	absent = zfs_boot_count_absent(nvroot, pools->names, B_FALSE);
-	if (absent == 0)
+	if (absent == 0) {
+		spl_bootlog("%s: all expected vdevs present at check %u%s\n",
+		    __func__, pools->vdev_checks,
+		    pools->vdev_wait_deadline != 0 ? ", after waiting" : "");
 		return (B_TRUE);
+	}
 
 	if (!pools->vdev_wait_expired && zfs_boot_vdev_wait != 0) {
 		if (pools->vdev_wait_deadline == 0) {
@@ -1041,7 +1047,7 @@ zfs_boot_import_ready(pool_list_t *pools, nvlist_t *config)
 			 */
 			pools->vdev_wait_deadline = ddi_get_lbolt() +
 			    (int64_t)zfs_boot_vdev_wait * hz;
-			printf("%s: waiting up to %u s for %u vdev(s)\n",
+			spl_bootlog("%s: waiting up to %u s for %u vdev(s)\n",
 			    __func__, zfs_boot_vdev_wait, absent);
 			(void) zfs_boot_count_absent(nvroot, pools->names,
 			    B_TRUE);
@@ -1051,7 +1057,8 @@ zfs_boot_import_ready(pool_list_t *pools, nvlist_t *config)
 		pools->vdev_wait_expired = B_TRUE;
 	}
 
-	printf("%s: importing without %u vdev(s)\n", __func__, absent);
+	spl_bootlog("%s: importing without %u vdev(s) at check %u\n",
+	    __func__, absent, pools->vdev_checks);
 	(void) zfs_boot_count_absent(nvroot, pools->names, B_TRUE);
 	return (B_TRUE);
 }
@@ -1412,8 +1419,9 @@ zfs_boot_probe_disk(pool_list_t *pools, IOMedia *media)
 		if (strlen(pools->pool_name) == strlen(pname) &&
 		    strncmp(pools->pool_name, pname,
 		    strlen(pname)) == 0) {
-			printf("%s matched pool %s\n",
-			    __func__, pname);
+			/* spl_bootlog() so it can be read back after boot */
+			spl_bootlog("%s matched pool %s at %s\n",
+			    __func__, pname, path);
 			matched = B_TRUE;
 		}
 	/* Compare with pool_guid */
