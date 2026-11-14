@@ -64,6 +64,17 @@ SYSCTL_STRING(_zfs, OID_AUTO, kext_version,
     CTLFLAG_RD | CTLFLAG_LOCKED,
     spl_gitrev, 0, "ZFS KEXT Version");
 
+/*
+ * The git revision the kext was built from (zfs_gitrev.h), which unlike
+ * kext_version changes with every commit. Kept separate so that what
+ * "zpool version" prints from kext_version is unchanged.
+ */
+static char zfs_kext_gitrev[] = ZFS_META_GITREV;
+
+SYSCTL_STRING(_zfs, OID_AUTO, kext_gitrev,
+    CTLFLAG_RD | CTLFLAG_LOCKED,
+    zfs_kext_gitrev, 0, "ZFS KEXT git revision");
+
 
 extern kern_return_t _start(kmod_info_t *ki, void *data);
 extern kern_return_t _stop(kmod_info_t *ki, void *data);
@@ -225,6 +236,7 @@ org_openzfsonosx_zfs_zvol::start(IOService *provider)
 	/* Register ZFS KEXT Version sysctl - separate to kstats */
 	sysctl_register_oid(&sysctl__zfs);
 	sysctl_register_oid(&sysctl__zfs_kext_version);
+	sysctl_register_oid(&sysctl__zfs_kext_gitrev);
 
 	/* Init LDI */
 	int error = 0;
@@ -260,6 +272,7 @@ org_openzfsonosx_zfs_zvol::start(IOService *provider)
 
 failure:
 	spl_stop(NULL, NULL);
+	sysctl_unregister_oid(&sysctl__zfs_kext_gitrev);
 	sysctl_unregister_oid(&sysctl__zfs_kext_version);
 	sysctl_unregister_oid(&sysctl__zfs);
 	return (false);
@@ -284,6 +297,7 @@ org_openzfsonosx_zfs_zvol::stop(IOService *provider)
 
 	ldi_fini();
 
+	sysctl_unregister_oid(&sysctl__zfs_kext_gitrev);
 	sysctl_unregister_oid(&sysctl__zfs_kext_version);
 	sysctl_unregister_oid(&sysctl__zfs);
 
