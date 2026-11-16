@@ -522,6 +522,9 @@ static const char *aes_impl[] = {
 };
 
 static const char *aes_gcm_impl[][2] = {
+	{ "fastest", "fastest" },
+	{ "fastest", "ghashv8" },
+	{ "aesv8",   "fastest" },
 	{ "generic", "generic" },
 	{ "x86_64",  "generic" },
 	{ "aesni",   "generic" },

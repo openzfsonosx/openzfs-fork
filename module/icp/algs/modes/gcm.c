@@ -922,7 +922,7 @@ gcm_impl_init(void)
 	 * Set the fastest implementation given the assumption that the
 	 * hardware accelerated version is the fastest.
 	 */
-#if defined(__aarch64__) && defined(HAVE_ARMV8)
+#if defined(__aarch64__) && defined(HAVE_AESV8)
 	if (gcm_ghashv8_impl.is_supported()) {
 		memcpy(&gcm_fastest_impl, &gcm_ghashv8_impl,
 		    sizeof (gcm_fastest_impl));
