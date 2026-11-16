@@ -107,23 +107,38 @@ gcm_ghashv8_will_work(void)
 	    zfs_pmull_available());
 }
 
+static void
+gcm_init_v8_htab(uint64_t *Htable, const uint64_t H[2])
+{
+	/* gcm_init_v8() follows OpenSSL's host-order H calling convention. */
+	uint64_t host_H[2] = { ntohll(H[0]), ntohll(H[1]) };
+
+	gcm_init_v8(Htable, host_H);
+	memset(host_H, 0, sizeof (host_H));
+}
+
 const gcm_impl_ops_t gcm_ghashv8_impl = {
 	.name = "ghashv8",
 	.needs_htable = B_TRUE,
 	.ghash = &gcm_ghash_v8,
-	.ghash_init = &gcm_init_v8, // or gcm_init_htab(), not NULL!
+	.ghash_init = &gcm_init_v8_htab,
 	.is_supported = &gcm_ghashv8_will_work
 };
 
 // Turbo up the GHASH
 #undef GHASH
+/*
+ * gcm_ghash_v8() computes ghash = (ghash ^ d) * H in place. Every caller
+ * passes t == c->gcm_ghash, which is where the generic GHASH leaves it.
+ */
 #define	GHASH(c, d, t, o) do { \
-		xor_block((uint8_t *)(d), (uint8_t *)(c)->gcm_ghash); \
 		if ((o)->ghash != NULL) { \
 			(o)->ghash((uint64_t *)(c)->gcm_ghash, \
 				(const uint64_t *)(c)->gcm_Htable, \
-				(const uint8_t *)(t), 16); \
+				(const uint8_t *)(d), 16); \
 		} else { \
+			xor_block((uint8_t *)(d), \
+			    (uint8_t *)(c)->gcm_ghash); \
 			(o)->mul((uint64_t *)(c)->gcm_ghash, (c)->gcm_H, \
 				(uint64_t *)(t)); \
 		} \
@@ -609,7 +624,8 @@ gcm_format_initial_blocks(const uint8_t *iv, ulong_t iv_len,
 
 		len_a_len_c[0] = 0;
 		len_a_len_c[1] = htonll(CRYPTO_BYTES2BITS(iv_len));
-		GHASH(ctx, len_a_len_c, ctx->gcm_J0, gops);
+		GHASH(ctx, len_a_len_c, ghash, gops);
+		copy_block(ghash, (uint8_t *)ctx->gcm_J0);
 
 		/* J0 will be used again in the final */
 		copy_block((uint8_t *)ctx->gcm_J0, (uint8_t *)cb);
@@ -632,10 +648,19 @@ gcm_init(gcm_ctx_t *ctx, const uint8_t *iv, size_t iv_len,
 	encrypt_block(ctx->gcm_keysched, (uint8_t *)ctx->gcm_H,
 	    (uint8_t *)ctx->gcm_H);
 
+	gops = gcm_impl_get_ops();
+	if (gops->needs_htable) {
+		/*
+		 * H is only available after encrypting the zero block.  The
+		 * precomputed table must be initialized before hashing a
+		 * non-standard IV or any AAD below.
+		 */
+		gops->ghash_init(ctx->gcm_Htable, ctx->gcm_H);
+	}
+
 	gcm_format_initial_blocks(iv, iv_len, ctx, block_size,
 	    copy_block, xor_block);
 
-	gops = gcm_impl_get_ops();
 	authp = (uint8_t *)ctx->gcm_tmp;
 	ghash = (uint8_t *)ctx->gcm_ghash;
 	memset(authp, 0, block_size);
@@ -720,13 +745,6 @@ gcm_init_ctx(gcm_ctx_t *gcm_ctx, char *param,
 		gcm_ctx->gcm_htab_len = 32 * sizeof (uint64_t);
 		gcm_ctx->gcm_Htable =
 		    kmem_alloc(gcm_ctx->gcm_htab_len, KM_SLEEP);
-
-		/*
-		 * We assume ghash_init is set to at least
-		 * gcm_init_htab() (generic), since this only
-		 * applies to new code with .needs_htable set.
-		 */
-		gops->ghash_init(gcm_ctx->gcm_Htable, gcm_ctx->gcm_H);
 	}
 
 #ifdef CAN_USE_GCM_ASM
