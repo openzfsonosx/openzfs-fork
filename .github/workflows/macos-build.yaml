@@ -1,5 +1,5 @@
 name: Build on macOS
-on: push
+on: [push, pull_request]
 
 jobs:
   build:
@@ -36,6 +36,8 @@ jobs:
         run: |
           tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_gcm_test.txt
           tests/zfs-tests/cmd/crypto_test -c tests/zfs-tests/tests/functional/crypto/aes_ccm_test.txt
+      - name: Userspace unit tests
+        run: make -j4 unit
       #- name: install
       #  run: |
       #    sudo make install DESTDIR=///
