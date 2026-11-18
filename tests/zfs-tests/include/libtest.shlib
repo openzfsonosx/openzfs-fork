@@ -154,6 +154,27 @@ function is_macos
 	[ "$UNAME" = "Darwin" ]
 }
 
+#
+# Remove a mountpoint directory left behind by a pool or dataset.  On macOS
+# the pool mountpoints under / are synthetic.conf entries on the sealed
+# system volume and cannot be removed, so failure is ignored there.
+#
+# -m	removal must succeed (not checked on macOS)
+#
+function rm_mntpt # [-m] dir
+{
+	typeset must=""
+	if [ "$1" = "-m" ]; then
+		must=log_must
+		shift
+	fi
+	if is_macos; then
+		rm -f "$1"
+	else
+		$must rm -rf "$1"
+	fi
+}
+
 # Determine if this is a DilOS test system
 #
 # Return 0 if platform DilOS, 1 if otherwise
@@ -317,7 +338,7 @@ function default_setup_noexit
 		if poolexists $TESTPOOL ; then
 			destroy_pool $TESTPOOL
 		fi
-		[[ -d /$TESTPOOL ]] && rm -f /$TESTPOOL
+		[[ -d /$TESTPOOL ]] && rm_mntpt /$TESTPOOL
 		log_must zpool create -f $TESTPOOL $disklist
 	else
 		reexport_pool
@@ -523,7 +544,7 @@ function default_mirror_setup_noexit
 		log_fail "$func: No parameters passed"
 	[[ -z $secondary ]] && \
 		log_fail "$func: No secondary partition passed"
-	[[ -d /$TESTPOOL ]] && rm -f /$TESTPOOL
+	[[ -d /$TESTPOOL ]] && rm_mntpt /$TESTPOOL
 	log_must zpool create -f $TESTPOOL mirror $@
 	log_must zfs create $TESTPOOL/$TESTFS
 	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
@@ -564,7 +585,7 @@ function default_raidz_setup_noexit
 		log_fail "A raid-z requires a minimum of two disks."
 	fi
 
-	[[ -d /$TESTPOOL ]] && rm -f /$TESTPOOL
+	[[ -d /$TESTPOOL ]] && rm_mntpt /$TESTPOOL
 	log_must zpool create -f $TESTPOOL raidz $disklist
 	log_must zfs create $TESTPOOL/$TESTFS
 	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
@@ -1761,7 +1782,7 @@ function create_pool #pool devs_list
 	fi
 
 	if is_global_zone ; then
-		[[ -d /$pool ]] && rm -f /$pool
+		[[ -d /$pool ]] && rm_mntpt /$pool
 
 		for internal_vd in "$@" ; do
 			if [[ "$internal_vd" =~ "loop" ]] ; then
@@ -1804,7 +1825,7 @@ function destroy_pool #pool
 			log_must_busy zpool destroy -f $pool
 
 			[[ -d $mtpt && ! "$mtpt" -ef / ]] && \
-				rm -f $mtpt
+				rm_mntpt -m $mtpt
 		else
 			log_note "Pool does not exist. ($pool)"
 			return 1
@@ -1862,7 +1883,7 @@ function destroy_dataset # dataset [args]
 			mtpt=$(get_prop mountpoint "$dataset")
 			log_must_busy zfs destroy $args $dataset
 
-			[ -d $mtpt ] && rm -f $mtpt
+			[ -d $mtpt ] && rm_mntpt -m $mtpt
 		else
 			log_note "Dataset does not exist. ($dataset)"
 			return 1
