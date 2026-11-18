@@ -39,7 +39,11 @@ env:
 jobs:
   detect:
     name: Detect
-    if: github.event_name != 'push' || github.repository != 'openzfs/zfs'
+    # Pushes are checked against the merge base with openzfs/zfs master.
+    # The macOS port carries upstream as cherry-picks, so that merge base
+    # is ancient and every upstream test commit since is "new"; only check
+    # pull requests (and manual runs), which use their real base.
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     outputs:
       found: ${{ steps.detect.outputs.found }}
