@@ -70,6 +70,7 @@
 #include <sys/mntent.h>
 #include <sys/fm/fs/zfs.h>
 #include "zfs_namecheck.h"
+#include "zfs_ctldir_impl.h"
 
 extern kmem_cache_t *znode_cache;
 extern uint64_t vnop_num_vnodes;
@@ -120,27 +121,11 @@ struct zfsctl_unmount_delay {
 };
 typedef struct zfsctl_unmount_delay zfsctl_unmount_delay_t;
 
-/*
- * We need to remember the pid,tid of processes involved with unmount
- * so they do not trigger mount due to it. This feels a little hacky
- * so there is reoom for improvement here.
- */
-#define	IGNORE_MAX 5
+/* Remember unmounting threads so their lookups do not remount snapshots. */
 static uint32_t ignore_next = 0;
 static kthread_t *ignore_lookups_tid[IGNORE_MAX] = {NULL};
 static pid_t ignore_lookups_pid[IGNORE_MAX] = {0};
 static clock_t ignore_lookups_time[IGNORE_MAX] = {0};
-#define	IGNORE_NEXT do { \
-	if (atomic_inc_32_nv(&ignore_next) >= IGNORE_MAX) ignore_next = 0; \
-	} while (0)
-
-#define	IGNORE_ADD(pid, tid, time) do {			\
-	int i = ignore_next; \
-	ignore_lookups_pid[i] = (pid); \
-	ignore_lookups_tid[i] = (tid); \
-	ignore_lookups_time[i] = (time); \
-	IGNORE_NEXT; \
-	} while (0)
 
 #define	IGNORE_FIND_CLEAR(pid, tid, time) do {	\
 	for (int i = 0; i < IGNORE_MAX; i++) {  \
