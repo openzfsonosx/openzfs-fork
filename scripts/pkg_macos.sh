@@ -46,7 +46,8 @@ WORKDIR="/private/var/tmp/${WORKNAME}"
 # If there are two dots "10.15.4", eat it
 OS=$(sw_vers | awk '{if ($1 == "ProductVersion:") print $2;}')
 OS=$(echo "$OS" | awk -F . '{if ($1 == 10) print $1"."$2; else print $1}')
-RC=$(grep Release: META | awk '$2 ~ /rc/ { print $2}')
+# rcN (release candidate) and pN (patch release) go in the pkg name
+RC=$(grep Release: META | awk '$2 ~ /^(rc|p)[0-9]+$/ { print $2}')
 
 friendly=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | tr -d '\\')
 if [ -z "$friendly" ]; then
