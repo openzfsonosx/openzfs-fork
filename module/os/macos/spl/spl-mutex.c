@@ -54,28 +54,49 @@ static wrapper_mutex_t mutex_list_mtx;
 static uint64_t mutex_list_wait_loc;
 
 
+/*
+ * One of these per live mutex.  The fields written on every mutex_enter()
+ * and read by the watchdog are kept together in the first 64 bytes.
+ *
+ * The file and function strings are __FILE__ / __func__ literals in this
+ * kext's own text, so they stay valid for as long as the kext is loaded
+ * and we only need to remember the pointers rather than copying them on
+ * every lock acquisition.
+ */
 struct leak {
 	list_node_t	mutex_leak_node;
 
-#define	SPL_DEBUG_MUTEX_MAXCHAR_FUNC 24
-#define	SPL_DEBUG_MUTEX_MAXCHAR_FILE 40 /* __FILE__ may have ../../... */
-
-	char		last_locked_file[SPL_DEBUG_MUTEX_MAXCHAR_FILE];
-	char		last_locked_function[SPL_DEBUG_MUTEX_MAXCHAR_FUNC];
-	int		last_locked_line;
-	void		*mp;
-
-	uint64_t	locktime;	// time lock was taken
-	hrtime_t	mutex_created_time;
-	char		creation_file[SPL_DEBUG_MUTEX_MAXCHAR_FILE];
-	char		creation_function[SPL_DEBUG_MUTEX_MAXCHAR_FUNC];
-	int		creation_line;
-	uint64_t	total_lock_count;
-	uint64_t	total_trylock_success;
-	uint64_t	total_trylock_miss;
+	uint64_t	locktime;	// coarse time lock was taken, or 0
 	uint32_t	period_lock_count;
 	uint32_t	period_trylock_miss;
+	const char	*last_locked_file;
+	const char	*last_locked_function;
+	int		last_locked_line;
+	uint64_t	total_lock_count;
+
+	uint64_t	total_trylock_success;
+	uint64_t	total_trylock_miss;
+	void		*mp;
+	hrtime_t	mutex_created_time;
+	const char	*creation_file;
+	const char	*creation_function;
+	int		creation_line;
 };
+
+/*
+ * Wall-clock seconds as of the most recent pass of the watchdog thread
+ * (i.e. up to SPL_MUTEX_WATCHDOG_SLEEP seconds stale).  Lock hold times
+ * only matter at the scale of SPL_MUTEX_WATCHDOG_TIMEOUT, and reading
+ * this is a single load, whereas gethrestime_sec() takes the kernel's
+ * global clock spinlock with interrupts off.
+ */
+static uint64_t wdlist_coarse_sec = 0;
+
+uint64_t
+spl_wdlist_coarse_sec(void)
+{
+	return (atomic_load_nonatomic(&wdlist_coarse_sec));
+}
 
 static int wdlist_exit = 0;
 
@@ -123,6 +144,7 @@ spl_wdlist_check(void *ignored)
 		spl_data_barrier();
 
 		uint64_t noe = gethrestime_sec();
+		atomic_store_nonatomic(&wdlist_coarse_sec, noe);
 		for (mp = list_head(&mutex_list);
 		    mp;
 		    mp = list_next(&mutex_list, mp)) {
@@ -131,7 +153,7 @@ spl_wdlist_check(void *ignored)
 			    noe - locktime >= SPL_MUTEX_WATCHDOG_TIMEOUT) {
 				printf("SPL: mutex (%p) held for %llus by "
 				    "'%s':%s:%d\n", mp,
-				    noe - mp->locktime,
+				    noe - locktime,
 				    mp->last_locked_file,
 				    mp->last_locked_function,
 				    mp->last_locked_line);
@@ -191,9 +213,9 @@ spl_wdlist_check(void *ignored)
 
 		/* decay "high score" record by 1% every pass */
 		period_lock_record_holder =
-		    (period_lock_record_holder * 100) / 99;
+		    ((uint64_t)period_lock_record_holder * 99) / 100;
 		period_miss_record_holder =
-		    (period_miss_record_holder * 100) / 99;
+		    ((uint64_t)period_miss_record_holder * 99) / 100;
 		prev_noe = noe;
 
 	} // while not exit
@@ -232,6 +254,8 @@ spl_mutex_subsystem_init(void)
 		    __func__, __LINE__, i+1);
 
 	}
+
+	atomic_store_nonatomic(&wdlist_coarse_sec, gethrestime_sec());
 
 	list_create(&mutex_list, sizeof (struct leak),
 	    offsetof(struct leak, mutex_leak_node));
@@ -395,11 +419,11 @@ spl_mutex_init(kmutex_t *mp, char *name, kmutex_type_t type, void *ibc)
 	memset(leak, 0, sizeof (struct leak));
 
 	leak->mutex_created_time = gethrtime();
-	strlcpy(leak->last_locked_file, file, SPL_DEBUG_MUTEX_MAXCHAR_FILE);
-	strlcpy(leak->last_locked_function, fn, SPL_DEBUG_MUTEX_MAXCHAR_FUNC);
+	leak->last_locked_file = file;
+	leak->last_locked_function = fn;
 	leak->last_locked_line = line;
-	strlcpy(leak->creation_file, file, SPL_DEBUG_MUTEX_MAXCHAR_FILE);
-	strlcpy(leak->creation_function, fn, SPL_DEBUG_MUTEX_MAXCHAR_FUNC);
+	leak->creation_file = file;
+	leak->creation_function = fn;
 	leak->creation_line = line;
 	leak->mp = mp;
 
@@ -585,11 +609,9 @@ spl_mutex_enter(kmutex_t *mp)
 		 * thread (see below) or a mutex_tryenter() (which will fail)
 		 */
 		struct leak *leak = (struct leak *)mp->leak;
-		leak->locktime = gethrestime_sec();
-		strlcpy(leak->last_locked_file,
-		    file, sizeof (leak->last_locked_file));
-		strlcpy(leak->last_locked_function,
-		    func, sizeof (leak->last_locked_function));
+		leak->locktime = spl_wdlist_coarse_sec();
+		leak->last_locked_file = file;
+		leak->last_locked_function = func;
 		leak->last_locked_line = line;
 		leak->total_lock_count++;
 		/*
@@ -676,11 +698,9 @@ spl_mutex_enter_interruptible(kmutex_t *mp)
 		 * thread (see below) or a mutex_tryenter() (which will fail)
 		 */
 		struct leak *leak = (struct leak *)mp->leak;
-		leak->locktime = gethrestime_sec();
-		strlcpy(leak->last_locked_file,
-		    file, sizeof (leak->last_locked_file));
-		strlcpy(leak->last_locked_function,
-		    func, sizeof (leak->last_locked_function));
+		leak->locktime = spl_wdlist_coarse_sec();
+		leak->last_locked_file = file;
+		leak->last_locked_function = func;
 		leak->last_locked_line = line;
 		leak->total_lock_count++;
 		/*
@@ -737,12 +757,12 @@ spl_mutex_exit(kmutex_t *mp)
 	if (likely(mp->leak)) {
 		struct leak *leak = (struct leak *)mp->leak;
 		uint64_t locktime = leak->locktime;
-		uint64_t noe = gethrestime_sec();
+		uint64_t noe = spl_wdlist_coarse_sec();
 		if ((locktime > 0) && (noe > locktime) &&
 		    noe - locktime >= SPL_MUTEX_WATCHDOG_TIMEOUT) {
 			printf("SPL: mutex (%p) finally released after %llus "
 			    "was held by %s:'%s':%d\n",
-			    leak, noe - leak->locktime,
+			    leak, noe - locktime,
 			    leak->last_locked_file, leak->last_locked_function,
 			    leak->last_locked_line);
 		}
@@ -816,14 +836,12 @@ spl_mutex_tryenter(kmutex_t *mp)
 			 * SPL_DEBUG_MUTEX section, and below.
 			 */
 			struct leak *leak = (struct leak *)mp->leak;
-			leak->locktime = gethrestime_sec();
+			leak->locktime = spl_wdlist_coarse_sec();
 			leak->total_trylock_success++;
 			leak->total_lock_count++;
 			leak->period_lock_count++;
-			strlcpy(leak->last_locked_file, file,
-			    SPL_DEBUG_MUTEX_MAXCHAR_FILE);
-			strlcpy(leak->last_locked_function, func,
-			    SPL_DEBUG_MUTEX_MAXCHAR_FUNC);
+			leak->last_locked_file = file;
+			leak->last_locked_function = func;
 			leak->last_locked_line = line;
 		} else {
 			panic("SPL: %s:%d: where is my leak data?",
