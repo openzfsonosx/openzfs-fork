@@ -5,19 +5,22 @@ echo $0 >> /tmp/o3x.log
 pkgutil --pkgs | egrep 'net.lundman.openzfs|org.openzfsonosx.zfs' |\
 while read apkg
 do
-	for i in {1..2}
+	# Walk the bom in reverse so children go before their parents.
+	# Only remove our own (now empty) directories: the bom also lists
+	# shared ones like /Library/Extensions, which rmdir -p used to
+	# delete once our files were gone.
+	pkgutil --lsbom "$apkg" | sed -E 's/^\.//' | tail -r |\
+	while read e
 	do
-		pkgutil --lsbom "$apkg" | sed -E 's/^\.//' |\
-		while read e
-		do
-			if [ -f "$e" ] ; then
-				rm "$e"
-			elif [ -d "$e" ] ; then
-				rmdir -p "$e"
-			elif [ -L "$e" ] ; then
-				rm "$e"
-			fi
-		done
+		if [ -L "$e" ] || [ -f "$e" ] ; then
+			rm "$e"
+		elif [ -d "$e" ] ; then
+			case "$e" in
+			*[zZ][fF][sS]*|*ZetaWatch*)
+				rmdir "$e" 2>/dev/null
+				;;
+			esac
+		fi
 	done
 	pkgutil --forget "$apkg"
 done
