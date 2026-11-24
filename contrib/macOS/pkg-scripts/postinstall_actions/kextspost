@@ -33,8 +33,8 @@ printf "\nTouching %s\n" "${kernelextensionsdir}"
 /usr/bin/killall -HUP kextd
 
 # Load kext
-printf "\nLoading openzfs.kext...\n"
-/usr/bin/kextutil "${kernelextensionsdir}/openzfs.kext" 2>&1 | grep -q "rejected due to system policy"
+printf "\nLoading zfs.kext...\n"
+/usr/bin/kextutil "${kernelextensionsdir}/zfs.kext" 2>&1 | grep -q "rejected due to system policy"
 
 err=$?
 echo "kexutil said $err"
