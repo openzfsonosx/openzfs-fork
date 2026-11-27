@@ -1075,7 +1075,23 @@ handle_close(struct ldi_handle *lhp)
 		 * Otherwise the device was marked missing and clients need
 		 * to drop openrefs until it can be released.
 		 */
-		goto drop_openref;
+		if (lhp->lh_openref > 1) {
+			goto drop_openref;
+		}
+
+		/*
+		 * Last openref on a terminated device. The IOMedia (or
+		 * vnode) is still open on our behalf, and nothing else
+		 * will close it: the handle is freed as soon as the last
+		 * hold is released. An IOMedia that is left open can never
+		 * finish terminating, which keeps the IORegistry busy and
+		 * prevents the port it was attached to from enumerating a
+		 * replacement device. Close it like any other last close.
+		 */
+		handle_status_change_locked(lhp, LDI_STATUS_CLOSING);
+		/* Unlock and exit loop */
+		mutex_exit(&lhp->lh_lock);
+		goto do_close;
 
 	default:
 		mutex_exit(&lhp->lh_lock);
