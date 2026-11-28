@@ -50,6 +50,7 @@ extern wait_result_t thread_block(thread_continue_t continuation);
 
 #ifdef SPL_DEBUG_MUTEX
 void spl_wdlist_settime(void *mpleak, uint64_t value);
+uint64_t spl_wdlist_coarse_sec(void);
 #endif
 
 void
@@ -100,7 +101,7 @@ spl_cv_wait(kcondvar_t *cvp, kmutex_t *mp, int flags, const char *msg)
 	atomic_dec_64(&mp->m_sleepers);
 	mp->m_owner = current_thread();
 #ifdef SPL_DEBUG_MUTEX
-	spl_wdlist_settime(mp->leak, gethrestime_sec());
+	spl_wdlist_settime(mp->leak, spl_wdlist_coarse_sec());
 #endif
 
 	/*
@@ -175,7 +176,7 @@ spl_cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flags,
 	mp->m_owner = current_thread();
 
 #ifdef SPL_DEBUG_MUTEX
-	spl_wdlist_settime(mp->leak, gethrestime_sec());
+	spl_wdlist_settime(mp->leak, spl_wdlist_coarse_sec());
 #endif
 
 	switch (msleep_result) {
@@ -242,7 +243,7 @@ cv_timedwait_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
 	atomic_dec_64(&mp->m_sleepers);
 	mp->m_owner = current_thread();
 #ifdef SPL_DEBUG_MUTEX
-	spl_wdlist_settime(mp->leak, gethrestime_sec());
+	spl_wdlist_settime(mp->leak, spl_wdlist_coarse_sec());
 #endif
 
 	switch (msleep_result) {
