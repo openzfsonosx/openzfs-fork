@@ -893,3 +893,92 @@ ZFS_MODULE_IMPL( , zfs_disable_spotlight, zfs_disable_spotlight,
     UINT, ZMOD_RW, "Forcefully stop spotlight");
 ZFS_MODULE_IMPL( , zfs_disable_trashes, zfs_disable_trashes,
     UINT, ZMOD_RW, "Forcefully stop .Trashes");
+
+/*
+ * kstat.zfs.darwin.tunable.avz_rebuild
+ *
+ * Writing the name of an imported, writeable pool rebuilds that pool's
+ * all-vdev ZAP (AVZ) from its vdev tree, in the next txg.  The new AVZ
+ * lists exactly the per-vdev ZAPs the vdev tree refers to, and any ZAP
+ * that only the old AVZ listed is destroyed.  This is the same
+ * AVZ_ACTION_REBUILD that "zpool split" asks spa_sync_config_object()
+ * for; nothing else can ask for it, so a pool whose AVZ has picked up an
+ * entry that no vdev owns keeps it for good, and a debug build reports
+ * it from spa_sync() each time the config is written:
+ *
+ *   ASSERT3U(vdev_count_verify_zaps(spa->spa_root_vdev), ==,
+ *       all_vdev_zap_entry_count)
+ *
+ * The write returns once the txg holding the rebuild has synced.
+ * Reading returns an empty string.
+ */
+static int
+sysctl_tunable_avz_rebuild(ZFS_MODULE_PARAM_ARGS)
+{
+	char buf[ZFS_MAX_DATASET_NAME_LEN];
+	uint64_t before = 0, after = 0;
+	uint64_t txg;
+	spa_t *spa;
+	int err;
+
+	buf[0] = '\0';
+	err = sysctl_handle_string(oidp, buf, sizeof (buf), req);
+	if (err != 0 || req->newptr == (user_addr_t)NULL)
+		return (err);
+
+	err = spa_open(buf, &spa, FTAG);
+	if (err != 0)
+		return (err);
+
+	if (!spa_writeable(spa)) {
+		spa_close(spa, FTAG);
+		return (SET_ERROR(EROFS));
+	}
+
+	/*
+	 * The counts are only for the log.  They have to be read without
+	 * the vdev lock, because the MOS cannot be read with the config
+	 * lock held as writer.
+	 */
+	if (spa->spa_all_vdev_zaps != 0) {
+		(void) zap_count(spa->spa_meta_objset,
+		    spa->spa_all_vdev_zaps, &before);
+	}
+
+	/*
+	 * spa_avz_action is otherwise set only while the pool loads or
+	 * splits, and spa_sync_config_object() reads and clears it with
+	 * SCL_STATE held, so the vdev lock keeps the two apart.  Leave a
+	 * pool alone if it has no AVZ yet, or has an AVZ action of its
+	 * own still waiting for its first sync.
+	 */
+	txg = spa_vdev_enter(spa);
+	if (spa->spa_all_vdev_zaps == 0 ||
+	    spa->spa_avz_action != AVZ_ACTION_NONE) {
+		(void) spa_vdev_exit(spa, NULL, txg, SET_ERROR(EBUSY));
+		spa_close(spa, FTAG);
+		return (SET_ERROR(EBUSY));
+	}
+	spa->spa_avz_action = AVZ_ACTION_REBUILD;
+	vdev_config_dirty(spa->spa_root_vdev);
+	(void) spa_vdev_exit(spa, NULL, txg, 0);
+
+	(void) zap_count(spa->spa_meta_objset, spa->spa_all_vdev_zaps,
+	    &after);
+
+	printf("ZFS: %s: all-vdev ZAP rebuilt, %llu -> %llu entries\n",
+	    spa_name(spa), (u_longlong_t)before, (u_longlong_t)after);
+	spa_history_log_internal(spa, "avz rebuild", NULL,
+	    "entries %llu -> %llu", (u_longlong_t)before,
+	    (u_longlong_t)after);
+
+	spa_close(spa, FTAG);
+	return (0);
+}
+
+#define	sysctl_tunable_avz_rebuild_args \
+	CTLTYPE_STRING, NULL, 0, sysctl_tunable_avz_rebuild, "A"
+
+ZFS_MODULE_PARAM_CALL_IMPL(_tunable, avz_rebuild,
+    CTLFLAG_RW | CTLFLAG_LOCKED, sysctl_tunable_avz_rebuild_args,
+    "Write a pool name to rebuild its all-vdev ZAP from the vdev tree");
