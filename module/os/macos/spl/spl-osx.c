@@ -356,18 +356,29 @@ panic_print_symbol_name(vm_address_t search)
 }
 
 
+/*
+ * On arm64e, return addresses saved on the stack and function pointers
+ * carry a pointer authentication signature in their upper bits. Strip
+ * it, so that what is printed is an address that can be symbolicated.
+ * Key 0 is ptrauth_key_asia, stripping is the same for either code key.
+ */
+#if __has_feature(ptrauth_intrinsics)
+#define	SPL_STRIP_CODE_PTR(p)	\
+	((uintptr_t)__builtin_ptrauth_strip((void *)(uintptr_t)(p), 0))
+#else
+#define	SPL_STRIP_CODE_PTR(p)	((uintptr_t)(p))
+#endif
+
 void
 spl_backtrace(char *thesignal)
 {
-	void *stackptr = NULL;
+	/* Both x86 and arm64 keep { previous frame, return address } here */
+	void *stackptr = __builtin_frame_address(0);
 
 	printf("SPL: backtrace \"%s\"\n", thesignal);
-
-#if defined(__i386__)
-	__asm__ volatile("movl %%ebp, %0" : "=m" (stackptr));
-#elif defined(__x86_64__)
-	__asm__ volatile("movq %%rbp, %0" : "=m" (stackptr));
-#endif
+	/* A known address, to work out the kext's slide from the log */
+	printf("SPL: spl_backtrace is at 0x%lx\n",
+	    (unsigned long)SPL_STRIP_CODE_PTR(spl_backtrace));
 
 	int frame_index;
 	int nframes = 16;
@@ -390,9 +401,14 @@ spl_backtrace(char *thesignal)
 			break;
 		}
 #endif
-		printf("SPL: %p : 0x%lx ", frame, frame->caller);
-		panic_print_symbol_name((vm_address_t)frame->caller);
+		printf("SPL: 0x%lx : 0x%lx ", (unsigned long)curframep,
+		    (unsigned long)SPL_STRIP_CODE_PTR(frame->caller));
+		panic_print_symbol_name(
+		    (vm_address_t)SPL_STRIP_CODE_PTR(frame->caller));
 		printf("\n");
+		/* The stack grows down, so callers' frames are higher */
+		if ((vm_offset_t)frame->prev <= curframep)
+			break;
 		frame = frame->prev;
 	}
 }
