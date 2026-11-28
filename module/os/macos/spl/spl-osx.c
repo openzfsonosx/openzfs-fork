@@ -716,6 +716,8 @@ spl_start(kmod_info_t *ki, void *d)
 
 	physmem = spl_total_memory / PAGE_SIZE;
 
+#define	SPL_LARGE_RAM	(64ULL * 1024ULL * 1024ULL * 1024ULL)
+
 #if defined(__arm64__)
 
 	/*
@@ -757,10 +759,34 @@ spl_start(kmod_info_t *ki, void *d)
 
 	extern _Atomic uint64_t spl_dynamic_memory_cap;
 
-	if (spl_real_total_memory >= 64LL*1024LL*1024LL*1024LL)
+	if (spl_real_total_memory >= SPL_LARGE_RAM)
 		spl_dynamic_memory_cap = spl_total_memory;
 
 #endif
+
+	/*
+	 * Below SPL_LARGE_RAM, physical memory runs short long before the
+	 * kernel VA maps do, so the kernel signals memory pressure and
+	 * spl_free_thread() reacts to it.  Those reactions are transient.
+	 * The dynamic memory cap is not: it only ever moves downwards, so
+	 * one overshoot of spl_total_memory can walk it to its floor of
+	 * 1/8 of spl_total_memory, where it holds ARC at its minimum size
+	 * until an administrator resets it.
+	 *
+	 * Therefore do not enforce the memory caps by default on these
+	 * machines.  spl_free is still computed against spl_total_memory,
+	 * and spl_should_arc_no_grow() still applies.
+	 *
+	 * Enforcement can be turned on with the
+	 * kstat.spl.misc.spl_misc.spl_osif_enforce_memory_caps sysctl,
+	 * which is also needed for spl_osif_manual_memory_cap to have
+	 * any effect.
+	 */
+
+	extern uint64_t spl_enforce_memory_caps;
+
+	if (spl_real_total_memory < SPL_LARGE_RAM)
+		spl_enforce_memory_caps = 0;
 
 	len = sizeof (utsname_static.sysname);
 	sysctlbyname("kern.ostype", &utsname_static.sysname, &len, NULL, 0);
@@ -801,6 +827,10 @@ spl_start(kmod_info_t *ki, void *d)
 	    (u_longlong_t)spl_total_memory,
 	    (u_longlong_t)spl_data_private_memory,
 	    (u_longlong_t)spl_data_shared_memory);
+
+	if (spl_enforce_memory_caps == 0)
+		spl_bootlog("SPL: memory caps not enforced (RAM below %llu)\n",
+		    (u_longlong_t)SPL_LARGE_RAM);
 
 	return (KERN_SUCCESS);
 }
